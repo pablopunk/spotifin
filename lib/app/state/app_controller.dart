@@ -84,7 +84,6 @@ class AppController extends Notifier<AppState> {
       return;
     }
     state = AppState(
-      status: AppStatus.ready,
       session: session,
       smallStreaming: smallStreaming,
       smallDownloads: smallDownloads,
@@ -99,6 +98,7 @@ class AppController extends Notifier<AppState> {
         );
     final cached = await ref.read(databaseProvider).allTracks();
     if (cached.isNotEmpty) await ref.read(playbackProvider).restore(cached);
+    state = state.copyWith(status: AppStatus.ready);
     await refresh(silent: cached.isNotEmpty);
   }
 

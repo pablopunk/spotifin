@@ -7,8 +7,8 @@ import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../platform/playback_state_store.dart';
 import '../../storage/database.dart';
 import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
@@ -49,6 +49,7 @@ class PlaybackService extends ChangeNotifier {
 
   final JellyfinClient _client;
   final DownloadService _downloads;
+  final PlaybackStateStore _stateStore = PlaybackStateStore();
   final AudioPlayer _player = AudioPlayer();
   final StreamController<double> _volumeController =
       StreamController<double>.broadcast();
@@ -213,18 +214,19 @@ class PlaybackService extends ChangeNotifier {
   Future<void> restore(List<Track> catalog) async {
     final session = _session;
     if (session == null || catalog.isEmpty) return;
-    final preferences = await SharedPreferences.getInstance();
-    final ids = (jsonDecode(
-      preferences.getString('queue') ?? '[]',
-    ) as List<dynamic>).cast<String>();
+    final encoded = await _stateStore.read();
+    if (encoded == null) return;
+    final snapshot = jsonDecode(encoded) as Map<String, dynamic>;
+    final ids = (snapshot['queue'] as List<dynamic>? ?? const [])
+        .cast<String>();
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
     _rememberTracks(_queue);
     _context = List.of(_queue);
     _contextEnd = _context.length;
-    final index = preferences.getInt('queueIndex') ?? 0;
-    final milliseconds = preferences.getInt('queuePosition') ?? 0;
+    final index = snapshot['index'] as int? ?? 0;
+    final milliseconds = snapshot['positionMilliseconds'] as int? ?? 0;
     await _loadSources(
       initialIndex: index.clamp(0, _queue.length - 1),
       initialPosition: Duration(milliseconds: milliseconds),
@@ -241,10 +243,7 @@ class PlaybackService extends ChangeNotifier {
     _context = const [];
     _contextEnd = 0;
     _session = null;
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.remove('queue');
-    await preferences.remove('queueIndex');
-    await preferences.remove('queuePosition');
+    await _stateStore.clear();
     notifyListeners();
   }
 
@@ -295,18 +294,18 @@ class PlaybackService extends ChangeNotifier {
   }
 
   Future<void> _saveQueue() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
-      'queue',
-      jsonEncode(_queue.map((track) => track.id).toList()),
-    );
-    await preferences.setInt('queueIndex', currentIndex ?? 0);
     await _savePosition(_player.position);
   }
 
   Future<void> _savePosition(Duration position) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setInt('queuePosition', position.inMilliseconds);
+    if (_queue.isEmpty) return;
+    await _stateStore.write(
+      jsonEncode({
+        'queue': _queue.map((track) => track.id).toList(),
+        'index': currentIndex ?? 0,
+        'positionMilliseconds': position.inMilliseconds,
+      }),
+    );
   }
 
   Future<void> _handleTrackChange() async {
