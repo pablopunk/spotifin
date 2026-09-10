@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
+import 'package:spotifin/features/common/artwork.dart';
+import 'package:spotifin/features/common/playlist_artwork.dart';
 import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/shell/sidebar_playlists.dart';
 import 'package:spotifin/storage/database.dart';
@@ -18,20 +20,7 @@ void main() {
     await database.replacePlaylists([
       PlaylistsCompanion.insert(id: 'playlist', name: 'Road trip'),
     ]);
-    final track = Track(
-      id: 'track',
-      name: 'Song',
-      album: 'Album',
-      artist: 'Artist',
-      artistIds: '[]',
-      labels: '[]',
-      durationTicks: 1,
-      container: 'mp3',
-      favorite: false,
-      playCount: 0,
-      normalizationGain: null,
-      albumNormalizationGain: null,
-    );
+    final track = _track('track', 'album');
     Playlist? selected;
 
     await tester.pumpWidget(
@@ -83,4 +72,42 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  testWidgets('uses the first four distinct album covers', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: PlaylistArtwork(
+            tracks: [
+              _track('1', 'a'),
+              _track('2', 'a'),
+              _track('3', 'b'),
+              _track('4', 'c'),
+              _track('5', 'd'),
+              _track('6', 'e'),
+            ],
+            size: 100,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Artwork), findsNWidgets(4));
+  });
 }
+
+Track _track(String id, String albumId) => Track(
+  id: id,
+  name: 'Song $id',
+  album: 'Album $albumId',
+  albumId: albumId,
+  artist: 'Artist',
+  artistIds: '[]',
+  labels: '[]',
+  durationTicks: 1,
+  container: 'mp3',
+  favorite: false,
+  playCount: 0,
+  normalizationGain: null,
+  albumNormalizationGain: null,
+);

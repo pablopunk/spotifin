@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +7,7 @@ import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/playlist_artwork.dart';
 import '../common/track_tile.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -149,16 +148,11 @@ class _PlaylistsTab extends ConsumerWidget {
             itemCount: playlists.length,
             itemBuilder: (context, index) {
               final playlist = playlists[index];
-              final ids = (jsonDecode(playlist.trackIds) as List<dynamic>)
-                  .cast<String>();
-              final playlistTracks = ids
-                  .map((id) => byId[id])
-                  .whereType<Track>()
-                  .toList();
+              final playlistTracks = tracksInPlaylist(playlist, byId);
               return SpotifinCollectionCard(
                 artwork: LayoutBuilder(
-                  builder: (context, constraints) => Artwork(
-                    itemId: playlist.id,
+                  builder: (context, constraints) => PlaylistArtwork(
+                    tracks: playlistTracks,
                     size: constraints.biggest.shortestSide,
                     borderRadius: SpotifinRadii.small,
                   ),
@@ -171,6 +165,11 @@ class _PlaylistsTab extends ConsumerWidget {
                       title: playlist.name,
                       tracks: playlistTracks,
                       icon: Icons.queue_music_rounded,
+                      artwork: PlaylistArtwork(
+                        tracks: playlistTracks,
+                        size: 160,
+                        borderRadius: SpotifinRadii.card,
+                      ),
                     ),
                   ),
                 ),
@@ -209,16 +208,16 @@ class PlaylistScreen extends ConsumerWidget {
                 for (final track in trackSnapshot.data ?? const <Track>[])
                   track.id: track,
               };
-              final ids = (jsonDecode(playlist.trackIds) as List<dynamic>)
-                  .cast<String>();
-              final tracks = ids
-                  .map((id) => byId[id])
-                  .whereType<Track>()
-                  .toList();
+              final tracks = tracksInPlaylist(playlist, byId);
               return CollectionScreen(
                 title: playlist.name,
                 tracks: tracks,
                 icon: Icons.queue_music_rounded,
+                artwork: PlaylistArtwork(
+                  tracks: tracks,
+                  size: 160,
+                  borderRadius: SpotifinRadii.card,
+                ),
               );
             },
           );
@@ -231,11 +230,13 @@ class CollectionScreen extends ConsumerWidget {
     required this.title,
     required this.tracks,
     required this.icon,
+    this.artwork,
     super.key,
   });
   final String title;
   final List<Track> tracks;
   final IconData icon;
+  final Widget? artwork;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
@@ -268,11 +269,9 @@ class CollectionScreen extends ConsumerWidget {
                       ),
                       boxShadow: [SpotifinShadows.dialog],
                     ),
-                    child: Icon(
-                      icon,
-                      size: 72,
-                      color: SpotifinColors.textMuted,
-                    ),
+                    child:
+                        artwork ??
+                        Icon(icon, size: 72, color: SpotifinColors.textMuted),
                   ),
                   SizedBox(
                     width: 320,
