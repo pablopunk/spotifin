@@ -21,10 +21,10 @@ details, and run:
 mise run dev
 ```
 
-Flutter opens Chrome automatically and also serves the app on port 8080. Other
-Tailnet devices can open `http://<your-Mac-Tailscale-IP>:8080`. The ignored
-`.env` credentials are compiled into this development build, so do not use it
-for deployment or expose the port outside your trusted Tailnet.
+Flutter opens Chrome automatically and Tailscale Serve exposes the same app to
+your Tailnet over HTTPS. Use the URL printed by `tailscale serve status` on
+other devices. The ignored `.env` credentials are compiled into this
+development build, so do not expose it outside your trusted Tailnet.
 
 For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
 `mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.
