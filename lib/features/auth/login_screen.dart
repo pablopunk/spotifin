@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../common/brand_logo.dart';
 import '../common/design_system.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -54,17 +55,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Center(
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundColor: SpotifinColors.accent,
-                              foregroundColor: Colors.black,
-                              child: Icon(Icons.graphic_eq_rounded, size: 36),
-                            ),
-                          ),
+                          const Center(child: SpotifinLogo(size: 60)),
                           const SizedBox(height: 16),
                           Text(
-                            'Your music. Your server.',
+                            'Your music. Your rules.',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),

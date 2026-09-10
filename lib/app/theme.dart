@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
 
 abstract final class SpotifinColors {
-  static const background = Color(0xFF121212);
-  static const surface = Color(0xFF181818);
-  static const interactive = Color(0xFF1F1F1F);
-  static const raised = Color(0xFF252525);
-  static const hover = Color(0xFF2A2A2A);
-  static const border = Color(0xFF4D4D4D);
-  static const borderStrong = Color(0xFF7C7C7C);
-  static const accent = Color(0xFF1ED760);
-  static const accentDark = Color(0xFF1DB954);
+  static const voidBlack = Color(0xFF0B0D12);
+  static const background = Color(0xFF111319);
+  static const surface = Color(0xFF181B22);
+  static const interactive = Color(0xFF20232C);
+  static const raised = Color(0xFF292D38);
+  static const hover = Color(0xFF303541);
+  static const border = Color(0xFF454B59);
+  static const borderStrong = Color(0xFF71798A);
+  static const accent = Color(0xFF39F4D1);
+  static const brandBlue = Color(0xFF33BFFF);
+  static const brandViolet = Color(0xFF9B68FF);
   static const text = Color(0xFFFFFFFF);
-  static const textMuted = Color(0xFFB3B3B3);
+  static const textMuted = Color(0xFFB8BECA);
   static const negative = Color(0xFFF3727F);
   static const warning = Color(0xFFFFA42B);
   static const announcement = Color(0xFF539DF5);
+}
+
+abstract final class SpotifinGradients {
+  static const brand = LinearGradient(
+    colors: [
+      SpotifinColors.accent,
+      SpotifinColors.brandBlue,
+      SpotifinColors.brandViolet,
+    ],
+  );
 }
 
 abstract final class SpotifinRadii {
@@ -93,7 +105,7 @@ ThemeData buildTheme() {
     textTheme: textTheme,
     visualDensity: VisualDensity.standard,
     splashFactory: InkRipple.splashFactory,
-    focusColor: const Color(0x661ED760),
+    focusColor: const Color(0x6639F4D1),
     appBarTheme: const AppBarTheme(
       elevation: 0,
       scrolledUnderElevation: 0,

@@ -28,8 +28,7 @@ void main() {
     );
 
     final selectedBackground = find.byWidgetPredicate(
-      (widget) =>
-          widget is Material && widget.color == SpotifinColors.accentDark,
+      (widget) => widget is Material && widget.color == SpotifinColors.accent,
     );
     final icon = find.byIcon(Icons.home_rounded);
     final label = find.text('Home');

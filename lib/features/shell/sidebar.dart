@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../common/brand_logo.dart';
 import '../common/design_system.dart';
 
 class SpotifinSidebarDestination {
@@ -63,20 +64,10 @@ class _SidebarLogo extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(28, 24, 16, 32),
     child: Row(
       children: [
-        const Icon(
-          Icons.graphic_eq_rounded,
-          size: 34,
-          color: SpotifinColors.accent,
-        ),
+        const SpotifinLogo(size: 34),
         if (extended) ...[
           const SizedBox(width: SpotifinSpacing.sm),
-          Flexible(
-            child: Text(
-              'Spotifin',
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ),
+          const Flexible(child: SpotifinWordmark()),
         ],
       ],
     ),
@@ -99,13 +90,13 @@ class _SidebarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = selected
-        ? SpotifinColors.text
+        ? SpotifinColors.voidBlack
         : SpotifinColors.textMuted;
     final button = Semantics(
       selected: selected,
       button: true,
       child: Material(
-        color: selected ? SpotifinColors.accentDark : Colors.transparent,
+        color: selected ? SpotifinColors.accent : Colors.transparent,
         borderRadius: BorderRadius.circular(SpotifinRadii.pill),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
