@@ -25,6 +25,10 @@ class ShellScreen extends ConsumerStatefulWidget {
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
   late final PlaybackService _playback;
+  final _desktopNavigatorKeys = List.generate(
+    _destinations.length,
+    (_) => GlobalKey<NavigatorState>(),
+  );
   late final List<Widget> _screens = [
     const HomeScreen(),
     SearchScreen(focusNode: widget.controller.searchFocusNode),
@@ -137,7 +141,13 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                               ),
                               child: ColoredBox(
                                 color: SpotifinColors.background,
-                                child: _screens[selectedIndex],
+                                child: IndexedStack(
+                                  index: selectedIndex,
+                                  children: List.generate(
+                                    _screens.length,
+                                    _buildDesktopNavigator,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -183,6 +193,12 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       ),
     );
   }
+
+  Widget _buildDesktopNavigator(int index) => Navigator(
+    key: _desktopNavigatorKeys[index],
+    onGenerateRoute: (_) =>
+        MaterialPageRoute<void>(builder: (_) => _screens[index]),
+  );
 }
 
 const _destinations = [
