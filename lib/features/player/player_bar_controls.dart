@@ -7,6 +7,7 @@ import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'volume_scale.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
   const DesktopPlayerBar({
@@ -358,13 +359,14 @@ class _DesktopUtilities extends StatelessWidget {
       if (AirPlayControl.isSupported) const AirPlayControl(),
       const Icon(Icons.volume_up_rounded, size: 20),
       SizedBox(
-        width: 88,
+        width: 144,
         child: StreamBuilder<double>(
           stream: playback.player.volumeStream,
           initialData: playback.player.volume,
           builder: (context, snapshot) => Slider(
-            value: snapshot.data ?? 1,
-            onChanged: playback.player.setVolume,
+            value: sliderFromVolume(snapshot.data ?? 1),
+            onChanged: (position) =>
+                playback.player.setVolume(volumeFromSlider(position)),
           ),
         ),
       ),
