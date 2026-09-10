@@ -8,7 +8,7 @@
 PRODUCT_NAME = spotifin
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = app.spotifin.spotifin
+PRODUCT_BUNDLE_IDENTIFIER = com.pablopunk.spotifin
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 app.spotifin. All rights reserved.
