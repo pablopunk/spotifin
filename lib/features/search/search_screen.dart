@@ -36,7 +36,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() => _results = const Stream.empty());
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 180), () {
+    _debounce = Timer(const Duration(milliseconds: 80), () {
       if (!mounted) return;
       final words = _query.toLowerCase().split(RegExp(r'\s+'));
       setState(() {

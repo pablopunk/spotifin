@@ -30,6 +30,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
   );
+  final _visitedDestinations = <int>{0};
   late final List<Widget> _screens = [
     const HomeScreen(),
     SearchScreen(focusNode: widget.controller.searchFocusNode),
@@ -80,6 +81,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         !playerPanels.isEmpty &&
         _playback.currentTrack != null;
     final selectedIndex = widget.controller.selectedIndex;
+    _visitedDestinations.add(selectedIndex);
     final content = Stack(
       children: [
         Positioned.fill(child: _screens[selectedIndex]),
@@ -116,7 +118,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                                   index: selectedIndex,
                                   children: List.generate(
                                     _screens.length,
-                                    _buildDesktopNavigator,
+                                    (index) =>
+                                        _visitedDestinations.contains(index)
+                                        ? _buildDesktopNavigator(index)
+                                        : const SizedBox.shrink(),
                                   ),
                                 ),
                               ),
