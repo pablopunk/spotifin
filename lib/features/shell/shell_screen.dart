@@ -13,6 +13,7 @@ import '../player/player_side_panel.dart';
 import '../search/search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
+import 'sidebar.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
   const ShellScreen({required this.controller, super.key});
@@ -93,41 +94,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             Positioned.fill(
               child: Row(
                 children: [
-                  NavigationRail(
+                  SpotifinSidebar(
                     selectedIndex: selectedIndex,
                     onDestinationSelected: widget.controller.selectDestination,
                     extended: width >= SpotifinBreakpoints.extendedRail,
-                    minWidth: 80,
-                    minExtendedWidth: 220,
-                    leading: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.graphic_eq_rounded,
-                            size: 34,
-                            color: SpotifinColors.accent,
-                          ),
-                          if (width >= SpotifinBreakpoints.extendedRail) ...[
-                            const SizedBox(width: 10),
-                            Text(
-                              'Spotifin',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    destinations: _destinations
-                        .map(
-                          (item) => NavigationRailDestination(
-                            icon: Icon(item.icon),
-                            selectedIcon: Icon(item.selectedIcon),
-                            label: Text(item.label),
-                          ),
-                        )
-                        .toList(),
+                    destinations: _destinations,
                   ),
                   Expanded(
                     child: Row(
@@ -201,20 +172,28 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   );
 }
 
-const _destinations = [
-  (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Home'),
-  (icon: Icons.search_rounded, selectedIcon: Icons.search, label: 'Search'),
-  (
+const _destinations = <SpotifinSidebarDestination>[
+  SpotifinSidebarDestination(
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    label: 'Home',
+  ),
+  SpotifinSidebarDestination(
+    icon: Icons.search_rounded,
+    selectedIcon: Icons.search,
+    label: 'Search',
+  ),
+  SpotifinSidebarDestination(
     icon: Icons.library_music_outlined,
     selectedIcon: Icons.library_music_rounded,
     label: 'Library',
   ),
-  (
+  SpotifinSidebarDestination(
     icon: Icons.download_for_offline_outlined,
     selectedIcon: Icons.download_for_offline_rounded,
     label: 'Downloads',
   ),
-  (
+  SpotifinSidebarDestination(
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings_rounded,
     label: 'Settings',
