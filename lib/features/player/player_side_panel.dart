@@ -36,14 +36,15 @@ class PlayerSidePanel extends ConsumerWidget {
                 }
                 return Column(
                   children: [
-                    Expanded(
-                      child: _PanelSection(
-                        title: 'Now playing',
-                        child: _PlayerPanel(track: track, playback: playback),
+                    if (panels.player)
+                      Expanded(
+                        child: _PanelSection(
+                          title: 'Now playing',
+                          child: _PlayerPanel(track: track, playback: playback),
+                        ),
                       ),
-                    ),
                     if (panels.lyrics) ...[
-                      const Divider(height: 1),
+                      if (panels.player) const Divider(height: 1),
                       Expanded(
                         child: _PanelSection(
                           title: 'Lyrics',
@@ -52,7 +53,8 @@ class PlayerSidePanel extends ConsumerWidget {
                       ),
                     ],
                     if (panels.queue) ...[
-                      const Divider(height: 1),
+                      if (panels.player || panels.lyrics)
+                        const Divider(height: 1),
                       Expanded(
                         child: _PanelSection(
                           title: 'Queue',
@@ -84,8 +86,8 @@ class _PanelHeader extends ConsumerWidget {
         _PanelTab(
           label: 'Player',
           icon: Icons.album_rounded,
-          selected: true,
-          onPressed: () {},
+          selected: panels.player,
+          onPressed: ref.read(playerPanelProvider.notifier).togglePlayer,
         ),
         _PanelTab(
           label: 'Queue',

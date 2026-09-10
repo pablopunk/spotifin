@@ -25,9 +25,9 @@ class PlayerBar extends ConsumerWidget {
         if (track == null) return const SizedBox.shrink();
         final useSidePanel =
             MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.playerPanel;
-        void showPlayer() {
-          if (!useSidePanel) _showNowPlaying(context, playback);
-        }
+        void showPlayer() => useSidePanel
+            ? ref.read(playerPanelProvider.notifier).togglePlayer()
+            : _showNowPlaying(context, playback);
 
         void showQueue() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleQueue()

@@ -60,8 +60,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     });
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
+    final playerPanels = ref.watch(playerPanelProvider);
     final showPlayerPanel =
         width >= SpotifinBreakpoints.playerPanel &&
+        !playerPanels.isEmpty &&
         _playback.currentTrack != null;
     final content = Stack(
       children: [
