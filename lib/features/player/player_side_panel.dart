@@ -291,6 +291,7 @@ class _QueuePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ReorderableListView.builder(
     padding: const EdgeInsets.fromLTRB(8, 8, 8, 112),
+    buildDefaultDragHandles: false,
     itemCount: playback.queue.length,
     onReorderItem: playback.reorder,
     itemBuilder: (context, index) {
@@ -300,10 +301,22 @@ class _QueuePanel extends StatelessWidget {
         selected: index == playback.currentIndex,
         selectedColor: SpotifinColors.accent,
         selectedTileColor: SpotifinColors.interactive,
-        leading: Artwork(
-          itemId: track.id,
-          size: 44,
-          borderRadius: SpotifinRadii.small,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Icon(Icons.drag_handle_rounded),
+              ),
+            ),
+            Artwork(
+              itemId: track.id,
+              size: 44,
+              borderRadius: SpotifinRadii.small,
+            ),
+          ],
         ),
         title: Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
