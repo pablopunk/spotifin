@@ -4,6 +4,11 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 
 > ⚠️ This is a work in progress. Not even in alpha. Use at your own risk. No apps builds for now, only web.
 
+| Column 1 | Column 2 |
+| -------- | -------- |
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+
 ## Run
 
 Install the pinned toolchain with [mise](https://mise.jdx.dev/), then run:
