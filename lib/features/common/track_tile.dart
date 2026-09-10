@@ -32,7 +32,7 @@ class TrackTile extends ConsumerWidget {
               minTileHeight: 64,
               contentPadding: const EdgeInsets.only(left: SpotifinSpacing.xs),
               leading: Artwork(
-                itemId: track.id,
+                itemId: track.albumId ?? track.id,
                 size: 48,
                 borderRadius: SpotifinRadii.small,
               ),

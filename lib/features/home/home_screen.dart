@@ -188,7 +188,7 @@ class _HorizontalSection extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Artwork(
-                            itemId: track.id,
+                            itemId: track.albumId ?? track.id,
                             size: 140,
                             borderRadius: SpotifinRadii.small,
                           ),

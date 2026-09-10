@@ -91,7 +91,7 @@ class MobilePlayerBar extends StatelessWidget {
             ListTile(
               minTileHeight: 72,
               leading: Artwork(
-                itemId: track.id,
+                itemId: track.albumId ?? track.id,
                 size: 48,
                 borderRadius: SpotifinRadii.small,
               ),
@@ -150,7 +150,7 @@ class _TrackSummary extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Artwork(
-            itemId: track.id,
+            itemId: track.albumId ?? track.id,
             size: 56,
             borderRadius: SpotifinRadii.small,
           ),

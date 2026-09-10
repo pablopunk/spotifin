@@ -163,7 +163,7 @@ class _PlayerPanel extends StatelessWidget {
       AspectRatio(
         aspectRatio: 1,
         child: Artwork(
-          itemId: track.id,
+          itemId: track.albumId ?? track.id,
           size: 420,
           borderRadius: SpotifinRadii.card,
         ),
@@ -312,7 +312,7 @@ class _QueuePanel extends StatelessWidget {
               ),
             ),
             Artwork(
-              itemId: track.id,
+              itemId: track.albumId ?? track.id,
               size: 44,
               borderRadius: SpotifinRadii.small,
             ),

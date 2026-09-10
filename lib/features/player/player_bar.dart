@@ -124,7 +124,7 @@ class _NowPlaying extends ConsumerWidget {
                         child: AspectRatio(
                           aspectRatio: 1,
                           child: Artwork(
-                            itemId: track.id,
+                            itemId: track.albumId ?? track.id,
                             size: 420,
                             borderRadius: SpotifinRadii.card,
                           ),
@@ -269,7 +269,7 @@ class _NowPlaying extends ConsumerWidget {
                         selectedTileColor: SpotifinColors.interactive,
                         selectedColor: SpotifinColors.accent,
                         leading: Artwork(
-                          itemId: item.id,
+                          itemId: item.albumId ?? item.id,
                           size: 42,
                           borderRadius: SpotifinRadii.small,
                         ),
