@@ -13,6 +13,7 @@ class DesktopPlayerBar extends StatelessWidget {
     required this.track,
     required this.playback,
     required this.onOpenPlayer,
+    required this.onOpenQueue,
     required this.onOpenLyrics,
     super.key,
   });
@@ -20,6 +21,7 @@ class DesktopPlayerBar extends StatelessWidget {
   final Track track;
   final PlaybackService playback;
   final VoidCallback onOpenPlayer;
+  final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
 
   @override
@@ -47,7 +49,7 @@ class DesktopPlayerBar extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: _DesktopUtilities(
                     playback: playback,
-                    onOpenPlayer: onOpenPlayer,
+                    onOpenQueue: onOpenQueue,
                     onOpenLyrics: onOpenLyrics,
                   ),
                 ),
@@ -331,12 +333,12 @@ class _TimeLabel extends StatelessWidget {
 class _DesktopUtilities extends StatelessWidget {
   const _DesktopUtilities({
     required this.playback,
-    required this.onOpenPlayer,
+    required this.onOpenQueue,
     required this.onOpenLyrics,
   });
 
   final PlaybackService playback;
-  final VoidCallback onOpenPlayer;
+  final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
 
   @override
@@ -350,7 +352,7 @@ class _DesktopUtilities extends StatelessWidget {
       ),
       IconButton(
         tooltip: 'Queue',
-        onPressed: onOpenPlayer,
+        onPressed: onOpenQueue,
         icon: const Icon(Icons.queue_music_rounded, size: 20),
       ),
       if (AirPlayControl.isSupported) const AirPlayControl(),

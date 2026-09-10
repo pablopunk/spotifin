@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/state/player_panel_controller.dart';
 import '../../app/theme.dart';
 import '../common/design_system.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
 import '../player/player_bar.dart';
+import '../player/player_side_panel.dart';
 import '../search/search_screen.dart';
 import '../settings/settings_screen.dart';
 
@@ -41,6 +43,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     });
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
+    final showPlayerPanel =
+        width >= SpotifinBreakpoints.playerPanel &&
+        ref.watch(playerPanelProvider) != PlayerPanelView.closed;
     final content = Stack(
       children: [
         Positioned.fill(child: _screens[_index]),
@@ -93,15 +98,36 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                         .toList(),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(SpotifinRadii.card),
-                        child: ColoredBox(
-                          color: SpotifinColors.background,
-                          child: _screens[_index],
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                SpotifinRadii.card,
+                              ),
+                              child: ColoredBox(
+                                color: SpotifinColors.background,
+                                child: _screens[_index],
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (showPlayerPanel)
+                          const SizedBox(
+                            width: 420,
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(0, 8, 8, 88),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(SpotifinRadii.card),
+                                ),
+                                child: PlayerSidePanel(),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../app/providers.dart';
+import '../../app/state/player_panel_controller.dart';
 import '../../app/theme.dart';
 import '../../platform/airplay_control.dart';
 import '../../services/playback/playback_service.dart';
@@ -23,8 +24,21 @@ class PlayerBar extends ConsumerWidget {
       builder: (context, _) {
         final track = playback.currentTrack;
         if (track == null) return const SizedBox.shrink();
-        void showPlayer() => _showNowPlaying(context, playback);
-        void showLyrics() => _showLyrics(context, track, playback);
+        final useSidePanel =
+            MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.playerPanel;
+        void showPlayer() => useSidePanel
+            ? ref
+                  .read(playerPanelProvider.notifier)
+                  .show(PlayerPanelView.player)
+            : _showNowPlaying(context, playback);
+        void showQueue() => useSidePanel
+            ? ref.read(playerPanelProvider.notifier).show(PlayerPanelView.queue)
+            : _showNowPlaying(context, playback);
+        void showLyrics() => useSidePanel
+            ? ref
+                  .read(playerPanelProvider.notifier)
+                  .show(PlayerPanelView.lyrics)
+            : _showLyrics(context, track, playback);
         return LayoutBuilder(
           builder: (context, constraints) =>
               constraints.maxWidth >= SpotifinBreakpoints.rail
@@ -32,6 +46,7 @@ class PlayerBar extends ConsumerWidget {
                   track: track,
                   playback: playback,
                   onOpenPlayer: showPlayer,
+                  onOpenQueue: showQueue,
                   onOpenLyrics: showLyrics,
                 )
               : MobilePlayerBar(

@@ -10,6 +10,7 @@ import '../platform/download_store.dart';
 import '../platform/carplay_service.dart';
 import '../storage/database.dart';
 import 'state/app_controller.dart';
+import 'state/player_panel_controller.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
@@ -53,5 +54,10 @@ final playbackProvider = Provider<PlaybackService>((ref) {
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
 );
+
+final playerPanelProvider =
+    NotifierProvider<PlayerPanelController, PlayerPanelView>(
+      PlayerPanelController.new,
+    );
 
 final carPlayProvider = Provider<CarPlayService>((ref) => CarPlayService());

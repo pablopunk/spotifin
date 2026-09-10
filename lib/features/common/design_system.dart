@@ -16,6 +16,7 @@ abstract final class SpotifinBreakpoints {
   static const mobile = 576.0;
   static const rail = 896.0;
   static const extendedRail = 1150.0;
+  static const playerPanel = 1400.0;
 }
 
 class SpotifinPageTitle extends StatelessWidget {
