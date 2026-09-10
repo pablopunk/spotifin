@@ -95,16 +95,16 @@ class _PanelHeader extends ConsumerWidget {
           onPressed: ref.read(playerPanelProvider.notifier).togglePlayer,
         ),
         _PanelTab(
-          label: 'Queue',
-          icon: Icons.queue_music_rounded,
-          selected: panels.queue,
-          onPressed: ref.read(playerPanelProvider.notifier).toggleQueue,
-        ),
-        _PanelTab(
           label: 'Lyrics',
           icon: Icons.lyrics_outlined,
           selected: panels.lyrics,
           onPressed: ref.read(playerPanelProvider.notifier).toggleLyrics,
+        ),
+        _PanelTab(
+          label: 'Queue',
+          icon: Icons.queue_music_rounded,
+          selected: panels.queue,
+          onPressed: ref.read(playerPanelProvider.notifier).toggleQueue,
         ),
         const Spacer(),
       ],
@@ -166,13 +166,19 @@ class _PanelTab extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: label,
-    isSelected: selected,
-    color: SpotifinColors.textMuted,
-    selectedIcon: Icon(icon, color: SpotifinColors.accent),
+  Widget build(BuildContext context) => TextButton.icon(
     onPressed: onPressed,
-    icon: Icon(icon),
+    icon: Icon(icon, size: 18),
+    label: Text(label),
+    style: TextButton.styleFrom(
+      foregroundColor: selected
+          ? SpotifinColors.accent
+          : SpotifinColors.textMuted,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      minimumSize: const Size(0, 36),
+      visualDensity: VisualDensity.compact,
+      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+    ),
   );
 }
 
