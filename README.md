@@ -1,4 +1,4 @@
-# <img src="build/web/icons/Icon-192.png" width="24" /> Spotifin
+# <img src="./web/icons/Icon-192.png" width="24" /> Spotifin
 
 Spotifin is a free, open-source, Spotify-style music player that connects to your existing Jellyfin library. It aims to be your goto player EVERYWHERE.
 
