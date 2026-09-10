@@ -10,7 +10,9 @@ import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({required this.focusNode, super.key});
+
+  final FocusNode focusNode;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -66,6 +68,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   child: SearchBar(
+                    focusNode: widget.focusNode,
                     autoFocus: false,
                     hintText: 'What do you want to listen to?',
                     leading: const Icon(
