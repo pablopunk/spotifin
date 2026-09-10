@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../services/playback/playback_service.dart';
 import '../common/design_system.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
@@ -21,6 +22,7 @@ class ShellScreen extends ConsumerStatefulWidget {
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
   int _index = 0;
+  late final PlaybackService _playback;
   static const _screens = <Widget>[
     HomeScreen(),
     SearchScreen(),
@@ -28,6 +30,22 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     DownloadsScreen(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _playback = ref.read(playbackProvider)..addListener(_refreshPlaybackLayout);
+  }
+
+  @override
+  void dispose() {
+    _playback.removeListener(_refreshPlaybackLayout);
+    super.dispose();
+  }
+
+  void _refreshPlaybackLayout() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +60,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     });
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
-    final showPlayerPanel = width >= SpotifinBreakpoints.playerPanel;
+    final showPlayerPanel =
+        width >= SpotifinBreakpoints.playerPanel &&
+        _playback.currentTrack != null;
     final content = Stack(
       children: [
         Positioned.fill(child: _screens[_index]),
