@@ -24,14 +24,8 @@ class LibraryScreen extends ConsumerWidget {
         appBar: AppBar(
           title: desktop ? null : const Text('Your library'),
           toolbarHeight: desktop ? 0 : kToolbarHeight,
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Songs'),
-              Tab(text: 'Albums'),
-              Tab(text: 'Artists'),
-              Tab(text: 'Playlists'),
-            ],
+          bottom: const SpotifinTabBar(
+            labels: ['Songs', 'Albums', 'Artists', 'Playlists'],
           ),
         ),
         body: StreamBuilder<List<Track>>(
@@ -116,7 +110,7 @@ class _GroupedList extends StatelessWidget {
           subtitle: '${entry.value.length} songs',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => _CollectionScreen(
+              builder: (_) => CollectionScreen(
                 title: entry.key,
                 tracks: entry.value,
                 icon: icon,
@@ -173,7 +167,7 @@ class _PlaylistsTab extends ConsumerWidget {
                 subtitle: '${playlistTracks.length} songs',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => _CollectionScreen(
+                    builder: (_) => CollectionScreen(
                       title: playlist.name,
                       tracks: playlistTracks,
                       icon: Icons.queue_music_rounded,
@@ -187,11 +181,12 @@ class _PlaylistsTab extends ConsumerWidget {
       );
 }
 
-class _CollectionScreen extends ConsumerWidget {
-  const _CollectionScreen({
+class CollectionScreen extends ConsumerWidget {
+  const CollectionScreen({
     required this.title,
     required this.tracks,
     required this.icon,
+    super.key,
   });
   final String title;
   final List<Track> tracks;
@@ -248,15 +243,23 @@ class _CollectionScreen extends ConsumerWidget {
                           title,
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
-                        const SizedBox(height: SpotifinSpacing.xs),
-                        SpotifinCountLabel(tracks.length),
+                        const SizedBox(height: SpotifinSpacing.md),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SpotifinCountLabel(tracks.length),
+                            const SizedBox(width: SpotifinSpacing.md),
+                            SpotifinPlayButton(
+                              onPressed: tracks.isEmpty
+                                  ? null
+                                  : () => ref
+                                        .read(playbackProvider)
+                                        .replaceQueue(tracks),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ),
-                  SpotifinPlayButton(
-                    onPressed: tracks.isEmpty
-                        ? null
-                        : () => ref.read(playbackProvider).replaceQueue(tracks),
                   ),
                 ],
               ),

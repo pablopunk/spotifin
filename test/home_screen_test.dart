@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
+import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/home/home_screen.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -42,6 +43,15 @@ void main() {
     expect(find.byType(SearchBar), findsOneWidget);
     expect(find.byType(ListTile), findsOneWidget);
     expect(find.text('Recently added'), findsNothing);
+
+    await tester.enterText(find.byType(SearchBar), 'Artist');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(Tab, 'Artists'));
+    await tester.pump();
+
+    expect(find.byType(SpotifinCollectionCard), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

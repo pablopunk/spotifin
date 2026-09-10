@@ -10,6 +10,9 @@ import '../../services/mixes/mix_generator.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/track_tile.dart';
+import '../library/library_screen.dart';
+
+enum _SearchFilter { all, songs, artists, albums }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({this.searchFocusNode, super.key});
@@ -26,6 +29,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final FocusNode _searchFocusNode;
   Timer? _searchDebounce;
   String _query = '';
+  _SearchFilter _searchFilter = _SearchFilter.all;
   Stream<List<Track>> _searchResults = const Stream.empty();
 
   @override
@@ -44,7 +48,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _search(String value) {
     _searchDebounce?.cancel();
     final query = value.trim();
-    setState(() => _query = query);
+    setState(() {
+      _query = query;
+      if (query.isEmpty) _searchFilter = _SearchFilter.all;
+    });
     if (query.isEmpty) {
       setState(() => _searchResults = const Stream.empty());
       return;
@@ -109,9 +116,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(width: 8),
               ],
             ),
-            if (_query.isNotEmpty)
-              _SearchResults(results: _searchResults)
-            else if (tracks.isEmpty)
+            if (_query.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: _SearchFilters(
+                  selected: _searchFilter,
+                  onSelected: (filter) =>
+                      setState(() => _searchFilter = filter),
+                ),
+              ),
+              _SearchResults(
+                query: _query,
+                filter: _searchFilter,
+                results: _searchResults,
+              ),
+            ] else if (tracks.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: _EmptyCatalog(),
@@ -167,8 +185,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _SearchResults extends StatelessWidget {
-  const _SearchResults({required this.results});
+  const _SearchResults({
+    required this.query,
+    required this.filter,
+    required this.results,
+  });
 
+  final String query;
+  final _SearchFilter filter;
   final Stream<List<Track>> results;
 
   @override
@@ -176,7 +200,20 @@ class _SearchResults extends StatelessWidget {
     stream: results,
     builder: (context, snapshot) {
       final tracks = snapshot.data ?? const [];
-      if (tracks.isEmpty) {
+      final artists = _matchingGroups(
+        tracks,
+        query,
+        (track) => track.artist.split(';'),
+      );
+      final albums = _matchingGroups(tracks, query, (track) => [track.album]);
+      final hasResults = switch (filter) {
+        _SearchFilter.all =>
+          tracks.isNotEmpty || artists.isNotEmpty || albums.isNotEmpty,
+        _SearchFilter.songs => tracks.isNotEmpty,
+        _SearchFilter.artists => artists.isNotEmpty,
+        _SearchFilter.albums => albums.isNotEmpty,
+      };
+      if (!hasResults) {
         return const SliverFillRemaining(
           hasScrollBody: false,
           child: SpotifinEmptyState(
@@ -186,14 +223,142 @@ class _SearchResults extends StatelessWidget {
           ),
         );
       }
-      return SliverList.builder(
-        itemCount: tracks.length,
-        itemBuilder: (context, index) =>
-            TrackTile(track: tracks[index], contextTracks: tracks),
+      return SliverMainAxisGroup(
+        slivers: switch (filter) {
+          _SearchFilter.all => [
+            if (artists.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: SpotifinPageTitle('Artists')),
+              _CollectionResults(
+                entries: artists.take(4).toList(),
+                artist: true,
+              ),
+            ],
+            if (albums.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: SpotifinPageTitle('Albums')),
+              _CollectionResults(entries: albums.take(4).toList()),
+            ],
+            if (tracks.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: SpotifinPageTitle('Songs')),
+              _SongResults(tracks: tracks),
+            ],
+          ],
+          _SearchFilter.songs => [_SongResults(tracks: tracks)],
+          _SearchFilter.artists => [
+            _CollectionResults(entries: artists, artist: true),
+          ],
+          _SearchFilter.albums => [_CollectionResults(entries: albums)],
+        },
       );
     },
   );
 }
+
+class _SearchFilters extends StatelessWidget {
+  const _SearchFilters({required this.selected, required this.onSelected});
+
+  final _SearchFilter selected;
+  final ValueChanged<_SearchFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
+    child: DefaultTabController(
+      length: _SearchFilter.values.length,
+      initialIndex: selected.index,
+      child: SpotifinTabBar(
+        labels: _SearchFilter.values.map(_filterLabel).toList(),
+        onTap: (index) => onSelected(_SearchFilter.values[index]),
+      ),
+    ),
+  );
+}
+
+class _SongResults extends StatelessWidget {
+  const _SongResults({required this.tracks});
+
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context) => SliverList.builder(
+    itemCount: tracks.length,
+    itemBuilder: (context, index) =>
+        TrackTile(track: tracks[index], contextTracks: tracks),
+  );
+}
+
+class _CollectionResults extends StatelessWidget {
+  const _CollectionResults({required this.entries, this.artist = false});
+
+  final List<MapEntry<String, List<Track>>> entries;
+  final bool artist;
+
+  @override
+  Widget build(BuildContext context) => SliverPadding(
+    padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
+    sliver: SliverGrid.builder(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        mainAxisExtent: 238,
+        crossAxisSpacing: SpotifinSpacing.md,
+        mainAxisSpacing: SpotifinSpacing.md,
+      ),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        final first = entry.value.first;
+        return SpotifinCollectionCard(
+          artwork: LayoutBuilder(
+            builder: (context, constraints) => Artwork(
+              itemId: first.albumId ?? first.id,
+              size: constraints.biggest.shortestSide,
+              borderRadius: artist
+                  ? constraints.biggest.shortestSide / 2
+                  : SpotifinRadii.small,
+            ),
+          ),
+          title: entry.key,
+          subtitle: '${entry.value.length} songs',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CollectionScreen(
+                title: entry.key,
+                tracks: entry.value,
+                icon: artist ? Icons.person_rounded : Icons.album_rounded,
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+List<MapEntry<String, List<Track>>> _matchingGroups(
+  List<Track> tracks,
+  String query,
+  Iterable<String> Function(Track) names,
+) {
+  final words = query.toLowerCase().split(RegExp(r'\s+'));
+  final groups = <String, List<Track>>{};
+  for (final track in tracks) {
+    for (final rawName in names(track)) {
+      final name = rawName.trim();
+      final normalized = name.toLowerCase();
+      if (name.isEmpty || !words.every(normalized.contains)) continue;
+      groups.putIfAbsent(name, () => []).add(track);
+    }
+  }
+  final entries = groups.entries.toList();
+  entries.sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
+  return entries;
+}
+
+String _filterLabel(_SearchFilter filter) => switch (filter) {
+  _SearchFilter.all => 'All',
+  _SearchFilter.songs => 'Songs',
+  _SearchFilter.artists => 'Artists',
+  _SearchFilter.albums => 'Albums',
+};
 
 class _HomeCatalog {
   const _HomeCatalog({
