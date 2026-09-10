@@ -9,11 +9,15 @@ class DownloadStore {
     String trackId,
     Uri source,
     Map<String, String> headers,
+    String extension,
   ) async {
     final root = await getApplicationDocumentsDirectory();
     final directory = Directory('${root.path}/downloads/$accountId');
     await directory.create(recursive: true);
-    final target = File('${directory.path}/$trackId.audio');
+    final safeExtension = extension.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
+    final target = File(
+      '${directory.path}/$trackId.${safeExtension.isEmpty ? 'mp3' : safeExtension}',
+    );
     final temporary = File('${target.path}.partial');
     final request = http.Request('GET', source)..headers.addAll(headers);
     final response = await http.Client().send(request);

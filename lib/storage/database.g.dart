@@ -102,6 +102,18 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _containerMeta = const VerificationMeta(
+    'container',
+  );
+  @override
+  late final GeneratedColumn<String> container = GeneratedColumn<String>(
+    'container',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('mp3'),
+  );
   static const VerificationMeta _favoriteMeta = const VerificationMeta(
     'favorite',
   );
@@ -185,6 +197,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     labels,
     durationTicks,
     imageTag,
+    container,
     favorite,
     playCount,
     normalizationGain,
@@ -260,6 +273,12 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
       context.handle(
         _imageTagMeta,
         imageTag.isAcceptableOrUnknown(data['image_tag']!, _imageTagMeta),
+      );
+    }
+    if (data.containsKey('container')) {
+      context.handle(
+        _containerMeta,
+        container.isAcceptableOrUnknown(data['container']!, _containerMeta),
       );
     }
     if (data.containsKey('favorite')) {
@@ -352,6 +371,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.string,
         data['${effectivePrefix}image_tag'],
       ),
+      container: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}container'],
+      )!,
       favorite: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}favorite'],
@@ -395,6 +418,7 @@ class Track extends DataClass implements Insertable<Track> {
   final String labels;
   final int durationTicks;
   final String? imageTag;
+  final String container;
   final bool favorite;
   final int playCount;
   final double? normalizationGain;
@@ -411,6 +435,7 @@ class Track extends DataClass implements Insertable<Track> {
     required this.labels,
     required this.durationTicks,
     this.imageTag,
+    required this.container,
     required this.favorite,
     required this.playCount,
     this.normalizationGain,
@@ -434,6 +459,7 @@ class Track extends DataClass implements Insertable<Track> {
     if (!nullToAbsent || imageTag != null) {
       map['image_tag'] = Variable<String>(imageTag);
     }
+    map['container'] = Variable<String>(container);
     map['favorite'] = Variable<bool>(favorite);
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || normalizationGain != null) {
@@ -468,6 +494,7 @@ class Track extends DataClass implements Insertable<Track> {
       imageTag: imageTag == null && nullToAbsent
           ? const Value.absent()
           : Value(imageTag),
+      container: Value(container),
       favorite: Value(favorite),
       playCount: Value(playCount),
       normalizationGain: normalizationGain == null && nullToAbsent
@@ -500,6 +527,7 @@ class Track extends DataClass implements Insertable<Track> {
       labels: serializer.fromJson<String>(json['labels']),
       durationTicks: serializer.fromJson<int>(json['durationTicks']),
       imageTag: serializer.fromJson<String?>(json['imageTag']),
+      container: serializer.fromJson<String>(json['container']),
       favorite: serializer.fromJson<bool>(json['favorite']),
       playCount: serializer.fromJson<int>(json['playCount']),
       normalizationGain: serializer.fromJson<double?>(
@@ -525,6 +553,7 @@ class Track extends DataClass implements Insertable<Track> {
       'labels': serializer.toJson<String>(labels),
       'durationTicks': serializer.toJson<int>(durationTicks),
       'imageTag': serializer.toJson<String?>(imageTag),
+      'container': serializer.toJson<String>(container),
       'favorite': serializer.toJson<bool>(favorite),
       'playCount': serializer.toJson<int>(playCount),
       'normalizationGain': serializer.toJson<double?>(normalizationGain),
@@ -546,6 +575,7 @@ class Track extends DataClass implements Insertable<Track> {
     String? labels,
     int? durationTicks,
     Value<String?> imageTag = const Value.absent(),
+    String? container,
     bool? favorite,
     int? playCount,
     Value<double?> normalizationGain = const Value.absent(),
@@ -562,6 +592,7 @@ class Track extends DataClass implements Insertable<Track> {
     labels: labels ?? this.labels,
     durationTicks: durationTicks ?? this.durationTicks,
     imageTag: imageTag.present ? imageTag.value : this.imageTag,
+    container: container ?? this.container,
     favorite: favorite ?? this.favorite,
     playCount: playCount ?? this.playCount,
     normalizationGain: normalizationGain.present
@@ -586,6 +617,7 @@ class Track extends DataClass implements Insertable<Track> {
           ? data.durationTicks.value
           : this.durationTicks,
       imageTag: data.imageTag.present ? data.imageTag.value : this.imageTag,
+      container: data.container.present ? data.container.value : this.container,
       favorite: data.favorite.present ? data.favorite.value : this.favorite,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       normalizationGain: data.normalizationGain.present
@@ -615,6 +647,7 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('labels: $labels, ')
           ..write('durationTicks: $durationTicks, ')
           ..write('imageTag: $imageTag, ')
+          ..write('container: $container, ')
           ..write('favorite: $favorite, ')
           ..write('playCount: $playCount, ')
           ..write('normalizationGain: $normalizationGain, ')
@@ -636,6 +669,7 @@ class Track extends DataClass implements Insertable<Track> {
     labels,
     durationTicks,
     imageTag,
+    container,
     favorite,
     playCount,
     normalizationGain,
@@ -656,6 +690,7 @@ class Track extends DataClass implements Insertable<Track> {
           other.labels == this.labels &&
           other.durationTicks == this.durationTicks &&
           other.imageTag == this.imageTag &&
+          other.container == this.container &&
           other.favorite == this.favorite &&
           other.playCount == this.playCount &&
           other.normalizationGain == this.normalizationGain &&
@@ -674,6 +709,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<String> labels;
   final Value<int> durationTicks;
   final Value<String?> imageTag;
+  final Value<String> container;
   final Value<bool> favorite;
   final Value<int> playCount;
   final Value<double?> normalizationGain;
@@ -691,6 +727,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.labels = const Value.absent(),
     this.durationTicks = const Value.absent(),
     this.imageTag = const Value.absent(),
+    this.container = const Value.absent(),
     this.favorite = const Value.absent(),
     this.playCount = const Value.absent(),
     this.normalizationGain = const Value.absent(),
@@ -709,6 +746,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.labels = const Value.absent(),
     this.durationTicks = const Value.absent(),
     this.imageTag = const Value.absent(),
+    this.container = const Value.absent(),
     this.favorite = const Value.absent(),
     this.playCount = const Value.absent(),
     this.normalizationGain = const Value.absent(),
@@ -728,6 +766,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<String>? labels,
     Expression<int>? durationTicks,
     Expression<String>? imageTag,
+    Expression<String>? container,
     Expression<bool>? favorite,
     Expression<int>? playCount,
     Expression<double>? normalizationGain,
@@ -746,6 +785,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (labels != null) 'labels': labels,
       if (durationTicks != null) 'duration_ticks': durationTicks,
       if (imageTag != null) 'image_tag': imageTag,
+      if (container != null) 'container': container,
       if (favorite != null) 'favorite': favorite,
       if (playCount != null) 'play_count': playCount,
       if (normalizationGain != null) 'normalization_gain': normalizationGain,
@@ -767,6 +807,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<String>? labels,
     Value<int>? durationTicks,
     Value<String?>? imageTag,
+    Value<String>? container,
     Value<bool>? favorite,
     Value<int>? playCount,
     Value<double?>? normalizationGain,
@@ -785,6 +826,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       labels: labels ?? this.labels,
       durationTicks: durationTicks ?? this.durationTicks,
       imageTag: imageTag ?? this.imageTag,
+      container: container ?? this.container,
       favorite: favorite ?? this.favorite,
       playCount: playCount ?? this.playCount,
       normalizationGain: normalizationGain ?? this.normalizationGain,
@@ -826,6 +868,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (imageTag.present) {
       map['image_tag'] = Variable<String>(imageTag.value);
     }
+    if (container.present) {
+      map['container'] = Variable<String>(container.value);
+    }
     if (favorite.present) {
       map['favorite'] = Variable<bool>(favorite.value);
     }
@@ -864,6 +909,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('labels: $labels, ')
           ..write('durationTicks: $durationTicks, ')
           ..write('imageTag: $imageTag, ')
+          ..write('container: $container, ')
           ..write('favorite: $favorite, ')
           ..write('playCount: $playCount, ')
           ..write('normalizationGain: $normalizationGain, ')
@@ -1985,6 +2031,7 @@ typedef $$TracksTableCreateCompanionBuilder = TracksCompanion Function({
   Value<String> labels,
   Value<int> durationTicks,
   Value<String?> imageTag,
+  Value<String> container,
   Value<bool> favorite,
   Value<int> playCount,
   Value<double?> normalizationGain,
@@ -2003,6 +2050,7 @@ typedef $$TracksTableUpdateCompanionBuilder = TracksCompanion Function({
   Value<String> labels,
   Value<int> durationTicks,
   Value<String?> imageTag,
+  Value<String> container,
   Value<bool> favorite,
   Value<int> playCount,
   Value<double?> normalizationGain,
@@ -2063,6 +2111,11 @@ class $$TracksTableFilterComposer
 
   ColumnFilters<String> get imageTag => $composableBuilder(
     column: $table.imageTag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get container => $composableBuilder(
+    column: $table.container,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2151,6 +2204,11 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get container => $composableBuilder(
+    column: $table.container,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get favorite => $composableBuilder(
     column: $table.favorite,
     builder: (column) => ColumnOrderings(column),
@@ -2220,6 +2278,9 @@ class $$TracksTableAnnotationComposer
   GeneratedColumn<String> get imageTag =>
       $composableBuilder(column: $table.imageTag, builder: (column) => column);
 
+  GeneratedColumn<String> get container =>
+      $composableBuilder(column: $table.container, builder: (column) => column);
+
   GeneratedColumn<bool> get favorite =>
       $composableBuilder(column: $table.favorite, builder: (column) => column);
 
@@ -2284,6 +2345,7 @@ class $$TracksTableTableManager
                 Value<String> labels = const Value.absent(),
                 Value<int> durationTicks = const Value.absent(),
                 Value<String?> imageTag = const Value.absent(),
+                Value<String> container = const Value.absent(),
                 Value<bool> favorite = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<double?> normalizationGain = const Value.absent(),
@@ -2301,6 +2363,7 @@ class $$TracksTableTableManager
                 labels: labels,
                 durationTicks: durationTicks,
                 imageTag: imageTag,
+                container: container,
                 favorite: favorite,
                 playCount: playCount,
                 normalizationGain: normalizationGain,
@@ -2320,6 +2383,7 @@ class $$TracksTableTableManager
                 Value<String> labels = const Value.absent(),
                 Value<int> durationTicks = const Value.absent(),
                 Value<String?> imageTag = const Value.absent(),
+                Value<String> container = const Value.absent(),
                 Value<bool> favorite = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<double?> normalizationGain = const Value.absent(),
@@ -2337,6 +2401,7 @@ class $$TracksTableTableManager
                 labels: labels,
                 durationTicks: durationTicks,
                 imageTag: imageTag,
+                container: container,
                 favorite: favorite,
                 playCount: playCount,
                 normalizationGain: normalizationGain,

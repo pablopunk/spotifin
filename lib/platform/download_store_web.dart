@@ -10,6 +10,7 @@ class DownloadStore {
     String trackId,
     Uri source,
     Map<String, String> requestHeaders,
+    String extension,
   ) async {
     final headers = web.Headers();
     requestHeaders.forEach((name, value) => headers.append(name, value));

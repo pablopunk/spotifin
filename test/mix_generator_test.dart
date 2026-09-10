@@ -40,4 +40,5 @@ Track _track(String id, String artist, List<String> labels, int plays) => Track(
   playCount: plays,
   normalizationGain: null,
   albumNormalizationGain: null,
+  container: 'mp3',
 );

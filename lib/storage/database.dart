@@ -16,6 +16,7 @@ class Tracks extends Table {
   TextColumn get labels => text().withDefault(const Constant('[]'))();
   IntColumn get durationTicks => integer().withDefault(const Constant(0))();
   TextColumn get imageTag => text().nullable()();
+  TextColumn get container => text().withDefault(const Constant('mp3'))();
   BoolColumn get favorite => boolean().withDefault(const Constant(false))();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   RealColumn get normalizationGain => real().nullable()();
@@ -76,7 +77,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +86,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await migrator.addColumn(tracks, tracks.normalizationGain);
         await migrator.addColumn(tracks, tracks.albumNormalizationGain);
+      }
+      if (from < 3) {
+        await migrator.addColumn(tracks, tracks.container);
       }
     },
   );

@@ -338,6 +338,7 @@ class JellyfinClient {
       labels: Value(jsonEncode(labels.toList())),
       durationTicks: Value(json['RunTimeTicks'] as int? ?? 0),
       imageTag: Value(_primaryImageTag(json)),
+      container: Value(json['Container'] as String? ?? 'mp3'),
       favorite: Value(userData['IsFavorite'] as bool? ?? false),
       playCount: Value(userData['PlayCount'] as int? ?? 0),
       normalizationGain: Value((json['NormalizationGain'] as num?)?.toDouble()),

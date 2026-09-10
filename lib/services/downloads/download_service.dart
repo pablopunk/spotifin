@@ -33,6 +33,7 @@ class DownloadService extends ChangeNotifier {
         track.id,
         source,
         _client.downloadHeaders(session),
+        small ? 'm4a' : track.container,
       );
       await _database.putDownload(
         DownloadsCompanion.insert(
