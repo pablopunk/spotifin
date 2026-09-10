@@ -237,14 +237,6 @@ class _NowPlaying extends ConsumerWidget {
                       icon: const Icon(Icons.lyrics_outlined),
                       label: const Text('Lyrics'),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: queue.isEmpty
-                          ? null
-                          : () => _saveQueue(context, ref),
-                      icon: const Icon(Icons.playlist_add_rounded),
-                      label: const Text('Save queue as playlist'),
-                    ),
                     const SizedBox(height: 30),
                     Text(
                       'Queue',
@@ -305,40 +297,6 @@ class _NowPlaying extends ConsumerWidget {
     final minutes = value.inMinutes;
     final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
-  }
-
-  Future<void> _saveQueue(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController(text: 'New playlist');
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Save queue'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name != null && name.trim().isNotEmpty) {
-      await ref
-          .read(appControllerProvider.notifier)
-          .createPlaylist(
-            name,
-            playback.queue.map((track) => track.id).toList(),
-          );
-    }
   }
 }
 
