@@ -9,6 +9,7 @@ void main() {
 
     expect(theme.scaffoldBackgroundColor, SpotifinColors.background);
     expect(theme.colorScheme.primary, SpotifinColors.accent);
+    expect(theme.focusColor, const Color(0x661ED760));
     expect(theme.textTheme.headlineSmall?.fontSize, 24);
     expect(theme.textTheme.headlineSmall?.fontWeight, FontWeight.w700);
     expect(theme.textTheme.bodySmall?.color, SpotifinColors.textMuted);

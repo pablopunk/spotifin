@@ -93,6 +93,7 @@ ThemeData buildTheme() {
     textTheme: textTheme,
     visualDensity: VisualDensity.standard,
     splashFactory: InkRipple.splashFactory,
+    focusColor: const Color(0x661ED760),
     appBarTheme: const AppBarTheme(
       elevation: 0,
       scrolledUnderElevation: 0,

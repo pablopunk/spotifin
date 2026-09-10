@@ -10,22 +10,24 @@ import '../library/library_screen.dart';
 import '../player/player_bar.dart';
 import '../search/search_screen.dart';
 import '../settings/settings_screen.dart';
+import 'shell_controller.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
-  const ShellScreen({super.key});
+  const ShellScreen({required this.controller, super.key});
+
+  final ShellController controller;
 
   @override
   ConsumerState<ShellScreen> createState() => _ShellScreenState();
 }
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
-  int _index = 0;
-  static const _screens = <Widget>[
-    HomeScreen(),
-    SearchScreen(),
-    LibraryScreen(),
-    DownloadsScreen(),
-    SettingsScreen(),
+  late final List<Widget> _screens = [
+    const HomeScreen(),
+    SearchScreen(focusNode: widget.controller.searchFocusNode),
+    const LibraryScreen(),
+    const DownloadsScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -39,11 +41,19 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           .showSnackBar(SnackBar(content: Text(error)));
       ref.read(appControllerProvider.notifier).clearError();
     });
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) => _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
+    final selectedIndex = widget.controller.selectedIndex;
     final content = Stack(
       children: [
-        Positioned.fill(child: _screens[_index]),
+        Positioned.fill(child: _screens[selectedIndex]),
         const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
       ],
     );
@@ -56,9 +66,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               child: Row(
                 children: [
                   NavigationRail(
-                    selectedIndex: _index,
-                    onDestinationSelected: (index) =>
-                        setState(() => _index = index),
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: widget.controller.selectDestination,
                     extended: width >= SpotifinBreakpoints.extendedRail,
                     minWidth: 80,
                     minExtendedWidth: 220,
@@ -99,7 +108,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                         borderRadius: BorderRadius.circular(SpotifinRadii.card),
                         child: ColoredBox(
                           color: SpotifinColors.background,
-                          child: _screens[_index],
+                          child: _screens[selectedIndex],
                         ),
                       ),
                     ),
@@ -115,8 +124,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     return Scaffold(
       body: content,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
+        selectedIndex: selectedIndex,
+        onDestinationSelected: widget.controller.selectDestination,
         destinations: _destinations
             .map(
               (item) => NavigationDestination(
