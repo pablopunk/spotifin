@@ -24,7 +24,11 @@ class ShellScreen extends ConsumerStatefulWidget {
 }
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
+  static const _defaultPlayerPanelWidth = 420.0;
+  static const _minimumPlayerPanelWidth = 320.0;
+
   late final PlaybackService _playback;
+  double _playerPanelWidth = _defaultPlayerPanelWidth;
   final _desktopNavigatorKeys = List.generate(
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
@@ -78,6 +82,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         width >= SpotifinBreakpoints.playerPanel &&
         !playerPanels.isEmpty &&
         _playback.currentTrack != null;
+    final playerPanelWidth = _playerPanelWidth.clamp(
+      _minimumPlayerPanelWidth,
+      width * 0.5,
+    );
     final selectedIndex = widget.controller.selectedIndex;
     _visitedDestinations.add(selectedIndex);
     final content = Stack(
@@ -127,16 +135,31 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                           ),
                         ),
                         if (showPlayerPanel)
-                          const SizedBox(
-                            width: 420,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(0, 8, 8, 88),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(SpotifinRadii.card),
+                          SizedBox(
+                            width: playerPanelWidth,
+                            child: Row(
+                              children: [
+                                _PanelResizeHandle(
+                                  onDrag: (delta) => setState(() {
+                                    _playerPanelWidth =
+                                        (_playerPanelWidth - delta).clamp(
+                                          _minimumPlayerPanelWidth,
+                                          width * 0.5,
+                                        );
+                                  }),
                                 ),
-                                child: PlayerSidePanel(),
-                              ),
+                                const Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.fromLTRB(0, 8, 8, 88),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.all(
+                                        Radius.circular(SpotifinRadii.card),
+                                      ),
+                                      child: PlayerSidePanel(),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],
@@ -172,6 +195,36 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     key: _desktopNavigatorKeys[index],
     onGenerateRoute: (_) =>
         MaterialPageRoute<void>(builder: (_) => _screens[index]),
+  );
+}
+
+class _PanelResizeHandle extends StatelessWidget {
+  const _PanelResizeHandle({required this.onDrag});
+
+  final ValueChanged<double> onDrag;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.resizeColumn,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragUpdate: (details) => onDrag(details.delta.dx),
+      child: const SizedBox(
+        width: 8,
+        child: Center(
+          child: SizedBox(
+            width: 2,
+            height: 40,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: SpotifinColors.border,
+                borderRadius: BorderRadius.all(Radius.circular(2)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
   );
 }
 

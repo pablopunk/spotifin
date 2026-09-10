@@ -18,6 +18,7 @@ class PlayerSidePanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
     final panels = ref.watch(playerPanelProvider);
+    final panelController = ref.read(playerPanelProvider.notifier);
     return Material(
       color: SpotifinColors.surface,
       child: Column(
@@ -41,6 +42,7 @@ class PlayerSidePanel extends ConsumerWidget {
                         flex: panels.queue && panels.lyrics ? 2 : 1,
                         child: _PanelSection(
                           title: 'Now playing',
+                          onClose: panelController.togglePlayer,
                           child: _PlayerPanel(track: track, playback: playback),
                         ),
                       ),
@@ -49,6 +51,7 @@ class PlayerSidePanel extends ConsumerWidget {
                       Expanded(
                         child: _PanelSection(
                           title: 'Lyrics',
+                          onClose: panelController.toggleLyrics,
                           child: _LyricsPanel(track: track, playback: playback),
                         ),
                       ),
@@ -59,6 +62,7 @@ class PlayerSidePanel extends ConsumerWidget {
                       Expanded(
                         child: _PanelSection(
                           title: 'Queue',
+                          onClose: panelController.toggleQueue,
                           child: _QueuePanel(playback: playback),
                         ),
                       ),
@@ -109,9 +113,14 @@ class _PanelHeader extends ConsumerWidget {
 }
 
 class _PanelSection extends StatelessWidget {
-  const _PanelSection({required this.title, required this.child});
+  const _PanelSection({
+    required this.title,
+    required this.onClose,
+    required this.child,
+  });
 
   final String title;
+  final VoidCallback onClose;
   final Widget child;
 
   @override
@@ -119,8 +128,24 @@ class _PanelSection extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+        padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+            ),
+            IconButton(
+              tooltip: 'Close $title',
+              onPressed: onClose,
+              icon: const Icon(Icons.close_rounded),
+              iconSize: 17,
+              color: SpotifinColors.textMuted,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
       ),
       Expanded(child: child),
     ],
