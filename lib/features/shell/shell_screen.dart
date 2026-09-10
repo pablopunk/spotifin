@@ -97,10 +97,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         width >= SpotifinBreakpoints.playerPanel &&
         !playerPanels.isEmpty &&
         _playback.currentTrack != null;
-    final playerPanelWidth = _playerPanelWidth.clamp(
-      _minimumPlayerPanelWidth,
-      width * 0.5,
-    );
+    final playerPanelWidth = showPlayerPanel
+        ? _playerPanelWidth.clamp(_minimumPlayerPanelWidth, width * 0.5)
+        : 0.0;
     final selectedIndex = widget.controller.selectedIndex;
     _visitedDestinations.add(selectedIndex);
     final content = Stack(
