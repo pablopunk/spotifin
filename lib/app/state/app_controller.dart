@@ -204,11 +204,27 @@ class AppController extends Notifier<AppState> {
 
   Future<void> createPlaylist(String name, List<String> trackIds) async {
     final session = state.session;
-    if (session == null || name.trim().isEmpty || trackIds.isEmpty) return;
+    if (session == null || name.trim().isEmpty) return;
     try {
       await ref
           .read(jellyfinClientProvider)
           .createPlaylist(session, name.trim(), trackIds);
+      final playlists = await ref
+          .read(jellyfinClientProvider)
+          .fetchPlaylists(session);
+      await ref.read(databaseProvider).replacePlaylists(playlists);
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
+  Future<void> renamePlaylist(String playlistId, String name) async {
+    final session = state.session;
+    if (session == null || name.trim().isEmpty) return;
+    try {
+      await ref
+          .read(jellyfinClientProvider)
+          .renamePlaylist(session, playlistId, name.trim());
       final playlists = await ref
           .read(jellyfinClientProvider)
           .fetchPlaylists(session);

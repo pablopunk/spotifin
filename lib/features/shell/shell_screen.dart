@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../services/playback/playback_service.dart';
+import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
@@ -13,6 +14,7 @@ import '../player/player_side_panel.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
+import 'sidebar_playlists.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
   const ShellScreen({required this.controller, super.key});
@@ -55,6 +57,19 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   void _refreshPlaybackLayout() {
     if (mounted) setState(() {});
+  }
+
+  void _openPlaylist(Playlist playlist) {
+    _visitedDestinations.add(1);
+    widget.controller.selectDestination(1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _desktopNavigatorKeys[1].currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) => PlaylistScreen(playlistId: playlist.id),
+        ),
+      );
+    });
   }
 
   @override
@@ -107,6 +122,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                     onDestinationSelected: widget.controller.selectDestination,
                     extended: width >= SpotifinBreakpoints.extendedRail,
                     destinations: _destinations,
+                    extendedContent: SidebarPlaylists(
+                      onSelected: _openPlaylist,
+                    ),
                   ),
                   Expanded(
                     child: Row(

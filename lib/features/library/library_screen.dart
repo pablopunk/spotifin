@@ -181,6 +181,51 @@ class _PlaylistsTab extends ConsumerWidget {
       );
 }
 
+class PlaylistScreen extends ConsumerWidget {
+  const PlaylistScreen({required this.playlistId, super.key});
+
+  final String playlistId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      StreamBuilder<List<Playlist>>(
+        stream: ref.watch(databaseProvider).watchPlaylists(),
+        builder: (context, playlistSnapshot) {
+          final playlist = playlistSnapshot.data?.firstWhereOrNull(
+            (item) => item.id == playlistId,
+          );
+          if (playlist == null) {
+            return const Scaffold(
+              body: SpotifinEmptyState(
+                icon: Icons.queue_music_rounded,
+                title: 'Playlist unavailable',
+              ),
+            );
+          }
+          return StreamBuilder<List<Track>>(
+            stream: ref.watch(databaseProvider).watchTracks(),
+            builder: (context, trackSnapshot) {
+              final byId = {
+                for (final track in trackSnapshot.data ?? const <Track>[])
+                  track.id: track,
+              };
+              final ids = (jsonDecode(playlist.trackIds) as List<dynamic>)
+                  .cast<String>();
+              final tracks = ids
+                  .map((id) => byId[id])
+                  .whereType<Track>()
+                  .toList();
+              return CollectionScreen(
+                title: playlist.name,
+                tracks: tracks,
+                icon: Icons.queue_music_rounded,
+              );
+            },
+          );
+        },
+      );
+}
+
 class CollectionScreen extends ConsumerWidget {
   const CollectionScreen({
     required this.title,

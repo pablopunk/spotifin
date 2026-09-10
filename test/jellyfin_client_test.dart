@@ -127,4 +127,28 @@ void main() {
     expect(uri.queryParameters['deviceId'], 'spotifin-server');
     expect(uri.queryParameters['static'], 'true');
   });
+
+  test('renames a playlist with the playlist update endpoint', () async {
+    late http.Request captured;
+    final client = JellyfinClient(
+      httpClient: MockClient((request) async {
+        captured = request;
+        return http.Response('', 204);
+      }),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await client.renamePlaylist(session, 'playlist-id', 'New name');
+
+    expect(captured.method, 'POST');
+    expect(captured.url.path, '/Playlists/playlist-id');
+    expect(jsonDecode(captured.body), {'Name': 'New name'});
+  });
 }

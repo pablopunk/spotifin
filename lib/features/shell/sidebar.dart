@@ -22,6 +22,7 @@ class SpotifinSidebar extends StatelessWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.extended,
+    this.extendedContent,
     super.key,
   });
 
@@ -29,6 +30,7 @@ class SpotifinSidebar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final bool extended;
+  final Widget? extendedContent;
 
   @override
   Widget build(BuildContext context) => ColoredBox(
@@ -48,6 +50,8 @@ class SpotifinSidebar extends StatelessWidget {
               onTap: () => onDestinationSelected(index),
             ),
           ),
+          if (extended && extendedContent != null)
+            Expanded(child: extendedContent!),
         ],
       ),
     ),

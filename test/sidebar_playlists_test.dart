@@ -1,0 +1,86 @@
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:spotifin/app/providers.dart';
+import 'package:spotifin/features/common/track_tile.dart';
+import 'package:spotifin/features/shell/sidebar_playlists.dart';
+import 'package:spotifin/storage/database.dart';
+
+void main() {
+  testWidgets('shows playlists with drag, open, create, and rename controls', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.replacePlaylists([
+      PlaylistsCompanion.insert(id: 'playlist', name: 'Road trip'),
+    ]);
+    final track = Track(
+      id: 'track',
+      name: 'Song',
+      album: 'Album',
+      artist: 'Artist',
+      artistIds: '[]',
+      labels: '[]',
+      durationTicks: 1,
+      container: 'mp3',
+      favorite: false,
+      playCount: 0,
+      normalizationGain: null,
+      albumNormalizationGain: null,
+    );
+    Playlist? selected;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(1200, 800)),
+            child: Scaffold(
+              body: Row(
+                children: [
+                  SizedBox(
+                    width: 220,
+                    child: SidebarPlaylists(
+                      onSelected: (playlist) => selected = playlist,
+                    ),
+                  ),
+                  Expanded(
+                    child: TrackTile(track: track, contextTracks: [track]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Road trip'), findsOneWidget);
+    expect(find.byType(DragTarget<Track>), findsOneWidget);
+    expect(find.byType(Draggable<Track>), findsOneWidget);
+    await tester.tap(find.text('Road trip'));
+    expect(selected?.id, 'playlist');
+
+    await tester.tap(find.byTooltip('Create playlist'));
+    await tester.pumpAndSettle();
+    expect(find.text('Create playlist'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Playlist options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename playlist'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+}

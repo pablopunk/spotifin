@@ -174,6 +174,19 @@ class JellyfinClient {
     _ensureSuccess(response);
   }
 
+  Future<void> renamePlaylist(
+    JellyfinSession session,
+    String playlistId,
+    String name,
+  ) async {
+    final response = await _http.post(
+      _uri(session, '/Playlists/$playlistId'),
+      headers: {..._headers(session), 'Content-Type': 'application/json'},
+      body: jsonEncode({'Name': name}),
+    );
+    _ensureSuccess(response);
+  }
+
   Future<void> logout(JellyfinSession session) async {
     final response = await _http.post(
       _uri(session, '/Sessions/Logout'),
