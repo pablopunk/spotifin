@@ -27,6 +27,7 @@ class PlaybackService extends ChangeNotifier {
     );
     _subscriptions.add(
       _player.currentIndexStream.listen((_) {
+        if (_loadingSources) return;
         _handleTrackChange();
         _saveQueue();
         notifyListeners();
@@ -50,6 +51,8 @@ class PlaybackService extends ChangeNotifier {
   final List<StreamSubscription<Object?>> _subscriptions = [];
   JellyfinSession? _session;
   List<Track> _queue = [];
+  final Map<String, Track> _tracksById = {};
+  bool _loadingSources = false;
   bool _smallStreaming = false;
   bool _normalization = true;
   bool _shuffle = false;
@@ -74,6 +77,11 @@ class PlaybackService extends ChangeNotifier {
   LoopMode get loopMode => _loopMode;
   int? get currentIndex => _player.currentIndex;
   Track? get currentTrack {
+    final tag = _player.sequenceState.currentSource?.tag;
+    if (tag is MediaItem) {
+      final sourceTrack = _tracksById[tag.id];
+      if (sourceTrack != null) return sourceTrack;
+    }
     final index = currentIndex;
     return index == null || index < 0 || index >= _queue.length
         ? null
@@ -99,6 +107,7 @@ class PlaybackService extends ChangeNotifier {
     _context = List.of(tracks);
     _contextEnd = math.min(tracks.length, start + _initialQueueSize);
     _queue = _context.sublist(start, _contextEnd);
+    _rememberTracks(_queue);
     await _loadSources(initialIndex: safeIndex - start);
     await _player.play();
   }
@@ -113,6 +122,7 @@ class PlaybackService extends ChangeNotifier {
     if (session == null) return;
     _stopAutomaticQueueExpansion();
     _queue = [..._queue, track];
+    _rememberTracks([track]);
     final sources = await _sources(session, [track]);
     await _player.addAudioSource(sources.single);
     await _saveQueue();
@@ -176,6 +186,7 @@ class PlaybackService extends ChangeNotifier {
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
+    _rememberTracks(_queue);
     _context = List.of(_queue);
     _contextEnd = _context.length;
     final index = preferences.getInt('queueIndex') ?? 0;
@@ -191,6 +202,7 @@ class PlaybackService extends ChangeNotifier {
     await _reportStop();
     await _player.stop();
     _queue = [];
+    _tracksById.clear();
     _context = const [];
     _contextEnd = 0;
     _session = null;
@@ -206,12 +218,20 @@ class PlaybackService extends ChangeNotifier {
     Duration initialPosition = Duration.zero,
   }) async {
     final session = _session!;
-    await _player.setAudioSources(
-      await _sources(session, _queue),
-      initialIndex: initialIndex,
-      initialPosition: initialPosition,
-    );
+    _loadingSources = true;
+    try {
+      await _player.setAudioSources(
+        await _sources(session, _queue),
+        initialIndex: initialIndex,
+        initialPosition: initialPosition,
+      );
+      await _player.seek(initialPosition, index: initialIndex);
+    } finally {
+      _loadingSources = false;
+    }
+    await _handleTrackChange();
     await _saveQueue();
+    notifyListeners();
   }
 
   Future<List<AudioSource>> _sources(
@@ -290,6 +310,7 @@ class PlaybackService extends ChangeNotifier {
     try {
       final end = math.min(_context.length, _contextEnd + _queueExtensionSize);
       final tracks = _context.sublist(_contextEnd, end);
+      _rememberTracks(tracks);
       await _player.addAudioSources(await _sources(session, tracks));
       _queue = [..._queue, ...tracks];
       _contextEnd = end;
@@ -303,6 +324,12 @@ class PlaybackService extends ChangeNotifier {
   void _stopAutomaticQueueExpansion() {
     _context = const [];
     _contextEnd = 0;
+  }
+
+  void _rememberTracks(Iterable<Track> tracks) {
+    for (final track in tracks) {
+      _tracksById[track.id] = track;
+    }
   }
 
   Future<void> _applyGain(Track track) async {
