@@ -17,12 +17,12 @@ class PlayerSidePanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
-    final view = ref.watch(playerPanelProvider);
+    final panels = ref.watch(playerPanelProvider);
     return Material(
       color: SpotifinColors.surface,
       child: Column(
         children: [
-          _PanelHeader(view: view),
+          _PanelHeader(panels: panels),
           Expanded(
             child: ListenableBuilder(
               listenable: playback,
@@ -34,14 +34,34 @@ class PlayerSidePanel extends ConsumerWidget {
                     title: 'Nothing playing',
                   );
                 }
-                return switch (view) {
-                  PlayerPanelView.queue => _QueuePanel(playback: playback),
-                  PlayerPanelView.lyrics => _LyricsPanel(
-                    track: track,
-                    playback: playback,
-                  ),
-                  _ => _PlayerPanel(track: track, playback: playback),
-                };
+                return Column(
+                  children: [
+                    Expanded(
+                      child: _PanelSection(
+                        title: 'Now playing',
+                        child: _PlayerPanel(track: track, playback: playback),
+                      ),
+                    ),
+                    if (panels.lyrics) ...[
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _PanelSection(
+                          title: 'Lyrics',
+                          child: _LyricsPanel(track: track, playback: playback),
+                        ),
+                      ),
+                    ],
+                    if (panels.queue) ...[
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _PanelSection(
+                          title: 'Queue',
+                          child: _QueuePanel(playback: playback),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
               },
             ),
           ),
@@ -52,9 +72,9 @@ class PlayerSidePanel extends ConsumerWidget {
 }
 
 class _PanelHeader extends ConsumerWidget {
-  const _PanelHeader({required this.view});
+  const _PanelHeader({required this.panels});
 
-  final PlayerPanelView view;
+  final PlayerPanelState panels;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Padding(
@@ -64,35 +84,43 @@ class _PanelHeader extends ConsumerWidget {
         _PanelTab(
           label: 'Player',
           icon: Icons.album_rounded,
-          selected: view == PlayerPanelView.player,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .show(PlayerPanelView.player),
+          selected: true,
+          onPressed: () {},
         ),
         _PanelTab(
           label: 'Queue',
           icon: Icons.queue_music_rounded,
-          selected: view == PlayerPanelView.queue,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .show(PlayerPanelView.queue),
+          selected: panels.queue,
+          onPressed: ref.read(playerPanelProvider.notifier).toggleQueue,
         ),
         _PanelTab(
           label: 'Lyrics',
           icon: Icons.lyrics_outlined,
-          selected: view == PlayerPanelView.lyrics,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .show(PlayerPanelView.lyrics),
+          selected: panels.lyrics,
+          onPressed: ref.read(playerPanelProvider.notifier).toggleLyrics,
         ),
         const Spacer(),
-        IconButton(
-          tooltip: 'Close',
-          onPressed: ref.read(playerPanelProvider.notifier).close,
-          icon: const Icon(Icons.close_rounded),
-        ),
       ],
     ),
+  );
+}
+
+class _PanelSection extends StatelessWidget {
+  const _PanelSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+      ),
+      Expanded(child: child),
+    ],
   );
 }
 

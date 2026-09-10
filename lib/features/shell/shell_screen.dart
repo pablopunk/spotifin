@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
-import '../../app/state/player_panel_controller.dart';
 import '../../app/theme.dart';
 import '../common/design_system.dart';
 import '../downloads/downloads_screen.dart';
@@ -43,9 +42,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     });
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
-    final showPlayerPanel =
-        width >= SpotifinBreakpoints.playerPanel &&
-        ref.watch(playerPanelProvider) != PlayerPanelView.closed;
+    final showPlayerPanel = width >= SpotifinBreakpoints.playerPanel;
     final content = Stack(
       children: [
         Positioned.fill(child: _screens[_index]),

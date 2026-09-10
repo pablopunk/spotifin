@@ -56,7 +56,7 @@ final appControllerProvider = NotifierProvider<AppController, AppState>(
 );
 
 final playerPanelProvider =
-    NotifierProvider<PlayerPanelController, PlayerPanelView>(
+    NotifierProvider<PlayerPanelController, PlayerPanelState>(
       PlayerPanelController.new,
     );
 

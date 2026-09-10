@@ -1,12 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum PlayerPanelView { closed, player, queue, lyrics }
+class PlayerPanelState {
+  const PlayerPanelState({this.queue = false, this.lyrics = false});
 
-class PlayerPanelController extends Notifier<PlayerPanelView> {
+  final bool queue;
+  final bool lyrics;
+
+  PlayerPanelState copyWith({bool? queue, bool? lyrics}) => PlayerPanelState(
+    queue: queue ?? this.queue,
+    lyrics: lyrics ?? this.lyrics,
+  );
+}
+
+class PlayerPanelController extends Notifier<PlayerPanelState> {
   @override
-  PlayerPanelView build() => PlayerPanelView.closed;
+  PlayerPanelState build() => const PlayerPanelState();
 
-  void show(PlayerPanelView view) => state = view;
+  void toggleQueue() => state = state.copyWith(queue: !state.queue);
 
-  void close() => state = PlayerPanelView.closed;
+  void toggleLyrics() => state = state.copyWith(lyrics: !state.lyrics);
 }
