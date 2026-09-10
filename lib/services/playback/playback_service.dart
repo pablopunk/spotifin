@@ -48,6 +48,8 @@ class PlaybackService extends ChangeNotifier {
   final JellyfinClient _client;
   final DownloadService _downloads;
   final AudioPlayer _player = AudioPlayer();
+  final StreamController<double> _volumeController =
+      StreamController<double>.broadcast();
   final List<StreamSubscription<Object?>> _subscriptions = [];
   JellyfinSession? _session;
   List<Track> _queue = [];
@@ -55,6 +57,8 @@ class PlaybackService extends ChangeNotifier {
   bool _loadingSources = false;
   bool _smallStreaming = false;
   bool _normalization = true;
+  double _userVolume = 1;
+  double _normalizationMultiplier = 1;
   bool _shuffle = false;
   LoopMode _loopMode = LoopMode.off;
   String? _reportedTrackId;
@@ -71,6 +75,8 @@ class PlaybackService extends ChangeNotifier {
   static const _queueExtensionThreshold = 15;
 
   AudioPlayer get player => _player;
+  double get volume => _userVolume;
+  Stream<double> get volumeStream => _volumeController.stream;
   List<Track> get queue => UnmodifiableListView(_queue);
   bool get playing => _player.playing;
   bool get shuffle => _shuffle;
@@ -98,6 +104,8 @@ class PlaybackService extends ChangeNotifier {
     _normalization = normalization;
     final audioSession = await AudioSession.instance;
     await audioSession.configure(const AudioSessionConfiguration.music());
+    final track = currentTrack;
+    if (track != null) await _applyGain(track);
   }
 
   Future<void> replaceQueue(List<Track> tracks, {int startIndex = 0}) async {
@@ -158,6 +166,12 @@ class PlaybackService extends ChangeNotifier {
   }
 
   Future<void> seek(Duration position) => _player.seek(position);
+
+  Future<void> setVolume(double volume) async {
+    _userVolume = volume.clamp(0.0, 1.0);
+    _volumeController.add(_userVolume);
+    await _updateOutputVolume();
+  }
 
   Future<void> toggleShuffle() async {
     _shuffle = !_shuffle;
@@ -336,7 +350,8 @@ class PlaybackService extends ChangeNotifier {
 
   Future<void> _applyGain(Track track) async {
     if (!_normalization) {
-      await _player.setVolume(1);
+      _normalizationMultiplier = 1;
+      await _updateOutputVolume();
       return;
     }
     final albumQueue =
@@ -348,16 +363,20 @@ class PlaybackService extends ChangeNotifier {
         ? track.albumNormalizationGain
         : track.normalizationGain;
     if (gain == null) {
-      await _player.setVolume(1);
+      _normalizationMultiplier = 1;
+      await _updateOutputVolume();
       return;
     }
-    final multiplier = math
+    _normalizationMultiplier = math
         .pow(10, gain / 20)
         .toDouble()
         .clamp(0.0, 1.0)
         .toDouble();
-    await _player.setVolume(multiplier);
+    await _updateOutputVolume();
   }
+
+  Future<void> _updateOutputVolume() =>
+      _player.setVolume(_userVolume * _normalizationMultiplier);
 
   Future<void> _reportProgress() async {
     final session = _session;
@@ -402,6 +421,7 @@ class PlaybackService extends ChangeNotifier {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+    _volumeController.close();
     _player.dispose();
     super.dispose();
   }

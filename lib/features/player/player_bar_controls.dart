@@ -361,12 +361,12 @@ class _DesktopUtilities extends StatelessWidget {
       SizedBox(
         width: 144,
         child: StreamBuilder<double>(
-          stream: playback.player.volumeStream,
-          initialData: playback.player.volume,
+          stream: playback.volumeStream,
+          initialData: playback.volume,
           builder: (context, snapshot) => Slider(
             value: sliderFromVolume(snapshot.data ?? 1),
             onChanged: (position) =>
-                playback.player.setVolume(volumeFromSlider(position)),
+                playback.setVolume(volumeFromSlider(position)),
           ),
         ),
       ),
