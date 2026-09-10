@@ -2,9 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/features/player/volume_scale.dart';
 
 void main() {
-  test('uses a perceptual volume curve with precise low-level control', () {
+  test('uses a quadratic volume curve', () {
     expect(volumeFromSlider(0), 0);
-    expect(volumeFromSlider(.5), closeTo(.0316, .0001));
+    expect(volumeFromSlider(.5), .25);
     expect(volumeFromSlider(1), 1);
   });
 
