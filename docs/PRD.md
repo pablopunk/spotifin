@@ -51,8 +51,10 @@ Custom behavior must fill a proven gap rather than duplicate a Jellyfin feature.
 - Include volume normalization, on by default, using Jellyfin data when available.
 - Do not block playback when normalization data is absent.
 
-Queue reordering and restoration after restart are proposed baseline behavior,
-subject to review; exact queue insertion rules still need to be specified.
+Restore the saved queue and playback position after restart, but wait for the
+user to press Play.
+The architecture default is to append added songs to the queue and allow local
+queue reordering and removal.
 
 ## Audio quality
 
@@ -80,8 +82,10 @@ It must not label lossy conversion as unchanged original quality.
 - A failed or partial download must not appear ready for offline playback.
 - A song still needed by another downloaded album or playlist must remain available.
 
-Removal conflicts, ordering conflicts, duplicate playlist entries, and retry rules
-need an explicit technical design before sync is implemented.
+Use the simple conflict and retry rules in [architecture](architecture.md): keep
+server playlist order, append offline additions, and let a confirmed server
+playlist deletion take priority over pending edits.
+Verify interrupted writes and duplicate entries before release.
 Browser storage limits and eviction must be tested; permanent browser storage
 has not been established as a guarantee.
 
@@ -105,8 +109,8 @@ The agreed selection process is:
 
 Check Jellyfin's mix endpoints before building custom selection code.
 Use them only if they meet the agreed behavior.
-The exact relationship between Jellyfin Genres and Tags, the grouping rule,
-mix size, and artist balance remain technical design work.
+Initial label grouping, mix size, and artist balance defaults are documented in
+[architecture](architecture.md) and must be checked with real library data.
 
 ## Lyrics
 
@@ -118,8 +122,9 @@ mix size, and artist balance remain technical design work.
 - Missing lyrics or a failed lookup must not interrupt playback.
 
 LRCLIB is a candidate based on Feishin's implementation.
-The provider and matching rules are not yet selected.
-Saving externally found lyrics back to Jellyfin requires a capability check.
+It is the first provider candidate in the architecture; browser access and
+matching still need checks.
+Keep externally found lyrics locally in v1.
 
 ## Out of scope for v1
 
