@@ -36,9 +36,11 @@ class PlaybackService extends ChangeNotifier {
     _subscriptions.add(
       _player.positionStream.listen((position) {
         final second = position.inSeconds;
-        if (second % 10 == 0 && second != _lastSavedSecond) {
+        if (second != _lastSavedSecond) {
           _lastSavedSecond = second;
           _savePosition(position);
+        }
+        if (second % 10 == 0) {
           _reportProgress();
         }
       }),
@@ -155,7 +157,15 @@ class PlaybackService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggle() => _player.playing ? _player.pause() : _player.play();
+  Future<void> toggle() async {
+    if (_player.playing) {
+      await _savePosition(_player.position);
+      await _player.pause();
+      return;
+    }
+    await _player.play();
+  }
+
   Future<void> next() => _player.seekToNext();
 
   Future<void> playQueueIndex(int index) async {
@@ -172,7 +182,10 @@ class PlaybackService extends ChangeNotifier {
     }
   }
 
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+    await _savePosition(position);
+  }
 
   Future<void> setVolume(double volume) async {
     _userVolume = volume.clamp(0.0, 1.0);
@@ -217,6 +230,7 @@ class PlaybackService extends ChangeNotifier {
       initialPosition: Duration(milliseconds: milliseconds),
     );
     await _player.pause();
+    await _savePosition(_player.position);
   }
 
   Future<void> clear() async {
