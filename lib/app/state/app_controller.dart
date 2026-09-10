@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/jellyfin/session.dart';
 import '../../storage/database.dart';
 import '../providers.dart';
+import 'development_login.dart';
 
 enum AppStatus { starting, signedOut, ready }
 
@@ -60,6 +61,20 @@ class AppController extends Notifier<AppState> {
     final normalization = preferences.getBool('normalization') ?? true;
     final session = await ref.read(sessionStoreProvider).load();
     if (session == null) {
+      const developmentLogin = DevelopmentLogin.fromEnvironment();
+      if (developmentLogin.canSignIn) {
+        state = AppState(
+          smallStreaming: smallStreaming,
+          smallDownloads: smallDownloads,
+          normalization: normalization,
+        );
+        await signIn(
+          developmentLogin.server,
+          developmentLogin.username,
+          developmentLogin.password,
+        );
+        return;
+      }
       state = AppState(
         status: AppStatus.signedOut,
         smallStreaming: smallStreaming,
