@@ -29,6 +29,16 @@ untrusted networks.
 For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
 `mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.
 
+## App icon
+
+`assets/branding/app_icon.png` is the source for all supported platform app
+icons and is bundled for Linux packaging. Regenerate the native and web assets
+after changing it:
+
+```sh
+scripts/generate-app-icons.sh
+```
+
 ## Checks
 
 ```sh
