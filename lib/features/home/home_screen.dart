@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,7 +12,9 @@ import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({this.searchFocusNode, super.key});
+
+  final FocusNode? searchFocusNode;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -19,6 +23,40 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<Track>? _cachedTracks;
   _HomeCatalog? _cachedCatalog;
+  late final FocusNode _searchFocusNode;
+  Timer? _searchDebounce;
+  String _query = '';
+  Stream<List<Track>> _searchResults = const Stream.empty();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocusNode = widget.searchFocusNode ?? FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    if (widget.searchFocusNode == null) _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _search(String value) {
+    _searchDebounce?.cancel();
+    final query = value.trim();
+    setState(() => _query = query);
+    if (query.isEmpty) {
+      setState(() => _searchResults = const Stream.empty());
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 40), () {
+      if (!mounted || query != _query) return;
+      final words = query.toLowerCase().split(RegExp(r'\s+'));
+      setState(() {
+        _searchResults = ref.read(databaseProvider).searchTracks(words);
+      });
+    });
+  }
 
   _HomeCatalog _catalogFor(List<Track> tracks) {
     if (identical(_cachedTracks, tracks)) return _cachedCatalog!;
@@ -34,18 +72,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!snapshot.hasData) {
         return const Center(child: CircularProgressIndicator());
       }
-      if (tracks.isEmpty) return const _EmptyCatalog();
       final catalog = _catalogFor(tracks);
       return RefreshIndicator(
         onRefresh: ref.read(appControllerProvider.notifier).refresh,
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 112,
               pinned: true,
-              flexibleSpace: const FlexibleSpaceBar(
-                titlePadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
-                title: Text('Good listening'),
+              toolbarHeight: 80,
+              titleSpacing: SpotifinSpacing.lg,
+              title: Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: SearchBar(
+                    focusNode: _searchFocusNode,
+                    hintText: 'What do you want to listen to?',
+                    leading: const Icon(Icons.search_rounded),
+                    onChanged: _search,
+                  ),
+                ),
               ),
               actions: [
                 IconButton(
@@ -63,49 +109,87 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(width: 8),
               ],
             ),
-            if (catalog.recent.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _HorizontalSection(
-                  title: 'Recently played',
-                  tracks: catalog.recent.take(12).toList(),
-                  contextTracks: catalog.recent,
-                ),
-              ),
-            SliverToBoxAdapter(
-              child: _HorizontalSection(
-                title: 'Recently added',
-                tracks: catalog.added.take(12).toList(),
-                contextTracks: catalog.added,
-              ),
-            ),
-            if (catalog.favorites.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _HorizontalSection(
-                  title: 'Favorites',
-                  tracks: catalog.favorites.take(12).toList(),
-                  contextTracks: catalog.favorites,
-                ),
-              ),
-            ...catalog.mixes
-                .take(3)
-                .map(
-                  (mix) => SliverToBoxAdapter(
-                    child: _HorizontalSection(
-                      title: mix.name,
-                      tracks: mix.tracks.take(12).toList(),
-                      contextTracks: mix.tracks,
-                    ),
+            if (_query.isNotEmpty)
+              _SearchResults(results: _searchResults)
+            else if (tracks.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyCatalog(),
+              )
+            else ...[
+              if (catalog.recent.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _HorizontalSection(
+                    title: 'Recently played',
+                    tracks: catalog.recent.take(12).toList(),
+                    contextTracks: catalog.recent,
                   ),
                 ),
-            const SliverToBoxAdapter(child: SpotifinPageTitle('All songs')),
-            SliverList.builder(
-              itemCount: tracks.length,
-              itemBuilder: (context, index) =>
-                  TrackTile(track: tracks[index], contextTracks: tracks),
-            ),
+              SliverToBoxAdapter(
+                child: _HorizontalSection(
+                  title: 'Recently added',
+                  tracks: catalog.added.take(12).toList(),
+                  contextTracks: catalog.added,
+                ),
+              ),
+              if (catalog.favorites.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _HorizontalSection(
+                    title: 'Favorites',
+                    tracks: catalog.favorites.take(12).toList(),
+                    contextTracks: catalog.favorites,
+                  ),
+                ),
+              ...catalog.mixes
+                  .take(3)
+                  .map(
+                    (mix) => SliverToBoxAdapter(
+                      child: _HorizontalSection(
+                        title: mix.name,
+                        tracks: mix.tracks.take(12).toList(),
+                        contextTracks: mix.tracks,
+                      ),
+                    ),
+                  ),
+              const SliverToBoxAdapter(child: SpotifinPageTitle('All songs')),
+              SliverList.builder(
+                itemCount: tracks.length,
+                itemBuilder: (context, index) =>
+                    TrackTile(track: tracks[index], contextTracks: tracks),
+              ),
+            ],
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
+      );
+    },
+  );
+}
+
+class _SearchResults extends StatelessWidget {
+  const _SearchResults({required this.results});
+
+  final Stream<List<Track>> results;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<List<Track>>(
+    stream: results,
+    builder: (context, snapshot) {
+      final tracks = snapshot.data ?? const [];
+      if (tracks.isEmpty) {
+        return const SliverFillRemaining(
+          hasScrollBody: false,
+          child: SpotifinEmptyState(
+            icon: Icons.search_off_rounded,
+            title: 'No matches',
+            message: 'Try another song, artist, or album.',
+          ),
+        );
+      }
+      return SliverList.builder(
+        itemCount: tracks.length,
+        itemBuilder: (context, index) =>
+            TrackTile(track: tracks[index], contextTracks: tracks),
       );
     },
   );

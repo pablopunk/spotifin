@@ -10,7 +10,6 @@ import '../home/home_screen.dart';
 import '../library/library_screen.dart';
 import '../player/player_bar.dart';
 import '../player/player_side_panel.dart';
-import '../search/search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
@@ -32,8 +31,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   );
   final _visitedDestinations = <int>{0};
   late final List<Widget> _screens = [
-    const HomeScreen(),
-    SearchScreen(focusNode: widget.controller.searchFocusNode),
+    HomeScreen(searchFocusNode: widget.controller.searchFocusNode),
     const LibraryScreen(),
     const DownloadsScreen(),
     const SettingsScreen(),
@@ -182,11 +180,6 @@ const _destinations = <SpotifinSidebarDestination>[
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_rounded,
     label: 'Home',
-  ),
-  SpotifinSidebarDestination(
-    icon: Icons.search_rounded,
-    selectedIcon: Icons.search,
-    label: 'Search',
   ),
   SpotifinSidebarDestination(
     icon: Icons.library_music_outlined,

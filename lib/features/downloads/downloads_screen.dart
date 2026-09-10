@@ -12,7 +12,9 @@ class DownloadsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Downloads')),
+    appBar: MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail
+        ? null
+        : AppBar(title: const Text('Downloads')),
     body: StreamBuilder<List<Track>>(
       stream: ref.watch(databaseProvider).watchTracks(),
       builder: (context, trackSnapshot) => StreamBuilder<List<Download>>(

@@ -13,7 +13,7 @@ class ShellController extends ChangeNotifier {
   }
 
   void openSearch() {
-    selectDestination(1);
+    selectDestination(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       searchFocusNode.requestFocus();
     });

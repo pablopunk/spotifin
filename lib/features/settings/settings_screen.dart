@@ -12,8 +12,10 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
     final session = state.session;
+    final desktop =
+        MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: desktop ? null : AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 120),
         children: [

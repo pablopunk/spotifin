@@ -32,6 +32,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Rock mix'), findsOneWidget);
+    expect(find.text('Good listening'), findsNothing);
+    expect(find.byType(SearchBar), findsOneWidget);
+
+    await tester.enterText(find.byType(SearchBar), 'Track 1');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump();
+
+    expect(find.byType(SearchBar), findsOneWidget);
+    expect(find.byType(ListTile), findsOneWidget);
+    expect(find.text('Recently added'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

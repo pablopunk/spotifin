@@ -15,45 +15,50 @@ class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => DefaultTabController(
-    length: 4,
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Your library'),
-        bottom: const TabBar(
-          isScrollable: true,
-          tabs: [
-            Tab(text: 'Songs'),
-            Tab(text: 'Albums'),
-            Tab(text: 'Artists'),
-            Tab(text: 'Playlists'),
-          ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final desktop =
+        MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: desktop ? null : const Text('Your library'),
+          toolbarHeight: desktop ? 0 : kToolbarHeight,
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Songs'),
+              Tab(text: 'Albums'),
+              Tab(text: 'Artists'),
+              Tab(text: 'Playlists'),
+            ],
+          ),
+        ),
+        body: StreamBuilder<List<Track>>(
+          stream: ref.watch(databaseProvider).watchTracks(),
+          builder: (context, trackSnapshot) {
+            final tracks = trackSnapshot.data ?? const [];
+            return TabBarView(
+              children: [
+                _TrackList(tracks: tracks),
+                _GroupedList(
+                  tracks: tracks,
+                  groupName: _albumName,
+                  icon: Icons.album_rounded,
+                ),
+                _GroupedList(
+                  tracks: tracks,
+                  groupName: _artistName,
+                  icon: Icons.person_rounded,
+                ),
+                _PlaylistsTab(tracks: tracks),
+              ],
+            );
+          },
         ),
       ),
-      body: StreamBuilder<List<Track>>(
-        stream: ref.watch(databaseProvider).watchTracks(),
-        builder: (context, trackSnapshot) {
-          final tracks = trackSnapshot.data ?? const [];
-          return TabBarView(
-            children: [
-              _TrackList(tracks: tracks),
-              _GroupedList(
-                tracks: tracks,
-                groupName: _albumName,
-                icon: Icons.album_rounded,
-              ),
-              _GroupedList(
-                tracks: tracks,
-                groupName: _artistName,
-                icon: Icons.person_rounded,
-              ),
-              _PlaylistsTab(tracks: tracks),
-            ],
-          );
-        },
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class _TrackList extends StatelessWidget {
