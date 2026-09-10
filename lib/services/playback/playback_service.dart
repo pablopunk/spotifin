@@ -220,6 +220,8 @@ class PlaybackService extends ChangeNotifier {
     final session = _session!;
     _loadingSources = true;
     try {
+      await _player.stop();
+      await _player.clearAudioSources();
       await _player.setAudioSources(
         await _sources(session, _queue),
         initialIndex: initialIndex,
