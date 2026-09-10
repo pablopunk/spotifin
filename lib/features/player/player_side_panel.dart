@@ -376,17 +376,26 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 112),
             itemCount: lines.length,
-            itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                lines[index].text,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: index == active
-                      ? SpotifinColors.text
-                      : SpotifinColors.textMuted,
+            itemBuilder: (context, index) {
+              final line = lines[index];
+              return InkWell(
+                onTap: line.start == null
+                    ? null
+                    : () => widget.playback.seek(line.start!),
+                borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    line.text,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: index == active
+                          ? SpotifinColors.text
+                          : SpotifinColors.textMuted,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       );

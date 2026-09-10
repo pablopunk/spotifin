@@ -373,21 +373,32 @@ class _LyricsSheet extends ConsumerWidget {
                       return ListView.builder(
                         padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
                         itemCount: lines.length,
-                        itemBuilder: (context, index) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            lines[index].text,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: index == active
-                                      ? SpotifinColors.accent
-                                      : SpotifinColors.textMuted,
-                                  fontWeight: index == active
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                          ),
-                        ),
+                        itemBuilder: (context, index) {
+                          final line = lines[index];
+                          return InkWell(
+                            onTap: line.start == null
+                                ? null
+                                : () => playback.seek(line.start!),
+                            borderRadius: BorderRadius.circular(
+                              SpotifinRadii.small,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                line.text,
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: index == active
+                                          ? SpotifinColors.accent
+                                          : SpotifinColors.textMuted,
+                                      fontWeight: index == active
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
