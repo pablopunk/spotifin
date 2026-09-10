@@ -23,115 +23,86 @@ class TrackTile extends ConsumerWidget {
     child: Row(
       children: [
         Expanded(
-          child: Semantics(
-            container: true,
-            button: true,
-            label: '${track.name}, ${track.artist}',
-            child: ExcludeSemantics(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () =>
-                    ref.read(playbackProvider).playTrack(track, contextTracks),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Row(
-                    children: [
-                      Artwork(itemId: track.id),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              track.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              [
-                                track.artist,
-                                if (showAlbum && track.album.isNotEmpty)
-                                  track.album,
-                              ].join(' • '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.white60),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Artwork(itemId: track.id),
+            title: Text(
+              track.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+            subtitle: Text(
+              [
+                track.artist,
+                if (showAlbum && track.album.isNotEmpty) track.album,
+              ].join(' • '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () =>
+                ref.read(playbackProvider).playTrack(track, contextTracks),
           ),
         ),
-        Semantics(
-          container: true,
-          child: PopupMenuButton<String>(
-            tooltip: 'More options',
-            onSelected: (action) async {
-              if (action == 'favorite') {
+        PopupMenuButton<String>(
+          tooltip: 'More options',
+          onSelected: (action) async {
+            if (action == 'favorite') {
+              await ref
+                  .read(appControllerProvider.notifier)
+                  .toggleFavorite(track.id, !track.favorite);
+            } else if (action == 'queue') {
+              await ref.read(playbackProvider).addToQueue(track);
+            } else if (action == 'download') {
+              final session = ref.read(appControllerProvider).session;
+              if (session != null) {
                 await ref
-                    .read(appControllerProvider.notifier)
-                    .toggleFavorite(track.id, !track.favorite);
-              } else if (action == 'queue') {
-                await ref.read(playbackProvider).addToQueue(track);
-              } else if (action == 'download') {
-                final session = ref.read(appControllerProvider).session;
-                if (session != null) {
-                  await ref
-                      .read(downloadProvider)
-                      .download(
-                        session,
-                        track,
-                        small: ref.read(appControllerProvider).smallDownloads,
-                      );
-                }
-              } else if (action == 'playlist') {
-                await _addToPlaylist(context, ref);
+                    .read(downloadProvider)
+                    .download(
+                      session,
+                      track,
+                      small: ref.read(appControllerProvider).smallDownloads,
+                    );
               }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'favorite',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    track.favorite ? Icons.favorite : Icons.favorite_border,
-                  ),
-                  title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
+            } else if (action == 'playlist') {
+              await _addToPlaylist(context, ref);
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'favorite',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  track.favorite ? Icons.favorite : Icons.favorite_border,
                 ),
+                title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
               ),
-              const PopupMenuItem(
-                value: 'playlist',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.library_add_rounded),
-                  title: Text('Add to playlist'),
-                ),
+            ),
+            const PopupMenuItem(
+              value: 'playlist',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.library_add_rounded),
+                title: Text('Add to playlist'),
               ),
-              const PopupMenuItem(
-                value: 'queue',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.playlist_add_rounded),
-                  title: Text('Add to queue'),
-                ),
+            ),
+            const PopupMenuItem(
+              value: 'queue',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.playlist_add_rounded),
+                title: Text('Add to queue'),
               ),
-              const PopupMenuItem(
-                value: 'download',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.download_rounded),
-                  title: Text('Download'),
-                ),
+            ),
+            const PopupMenuItem(
+              value: 'download',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.download_rounded),
+                title: Text('Download'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     ),

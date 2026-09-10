@@ -112,160 +112,187 @@ class _NowPlaying extends ConsumerWidget {
         expand: false,
         initialChildSize: .92,
         minChildSize: .55,
-        builder: (context, controller) => ListView(
+        builder: (context, controller) => CustomScrollView(
           controller: controller,
-          padding: const EdgeInsets.fromLTRB(28, 12, 28, 36),
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Artwork(itemId: track.id, size: 420, borderRadius: 24),
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
-            Text(track.name, style: Theme.of(context).textTheme.headlineSmall),
-            Text(
-              track.artist,
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(color: Colors.white60),
-            ),
-            const SizedBox(height: 18),
-            StreamBuilder<Duration>(
-              stream: playback.player.positionStream,
-              builder: (context, snapshot) {
-                final position = snapshot.data ?? Duration.zero;
-                final duration = playback.player.duration ?? Duration.zero;
-                final max = duration.inMilliseconds.toDouble().clamp(
-                  1.0,
-                  double.infinity,
-                );
-                return Column(
-                  children: [
-                    Slider(
-                      value: position.inMilliseconds.toDouble().clamp(0, max),
-                      max: max,
-                      onChanged: (value) =>
-                          playback.seek(Duration(milliseconds: value.round())),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+              sliver: SliverList.list(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [Text(_time(position)), Text(_time(duration))],
+                  ),
+                  const SizedBox(height: 32),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: Artwork(
+                          itemId: track.id,
+                          size: 420,
+                          borderRadius: 24,
+                        ),
+                      ),
                     ),
-                  ],
-                );
-              },
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  tooltip: 'Shuffle',
-                  color: playback.shuffle ? SpotifinColors.accent : null,
-                  onPressed: playback.toggleShuffle,
-                  icon: const Icon(Icons.shuffle_rounded),
-                ),
-                IconButton(
-                  iconSize: 42,
-                  onPressed: playback.previous,
-                  icon: const Icon(Icons.skip_previous_rounded),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(20),
                   ),
-                  onPressed: playback.toggle,
-                  child: Icon(
-                    playback.playing
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    size: 38,
+                  const SizedBox(height: 28),
+                  Text(
+                    track.name,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                ),
-                IconButton(
-                  iconSize: 42,
-                  onPressed: playback.next,
-                  icon: const Icon(Icons.skip_next_rounded),
-                ),
-                IconButton(
-                  tooltip: 'Repeat',
-                  color: playback.loopMode == LoopMode.off
-                      ? null
-                      : SpotifinColors.accent,
-                  onPressed: playback.cycleRepeat,
-                  icon: Icon(
-                    playback.loopMode == LoopMode.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
+                  Text(
+                    track.artist,
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(color: Colors.white60),
                   ),
-                ),
-                const AirPlayControl(),
-              ],
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => _LyricsSheet(track: track, playback: playback),
+                  const SizedBox(height: 18),
+                  StreamBuilder<Duration>(
+                    stream: playback.player.positionStream,
+                    builder: (context, snapshot) {
+                      final position = snapshot.data ?? Duration.zero;
+                      final duration =
+                          playback.player.duration ?? Duration.zero;
+                      final max = duration.inMilliseconds.toDouble().clamp(
+                        1.0,
+                        double.infinity,
+                      );
+                      return Column(
+                        children: [
+                          Slider(
+                            value: position.inMilliseconds.toDouble().clamp(
+                              0,
+                              max,
+                            ),
+                            max: max,
+                            onChanged: (value) => playback.seek(
+                              Duration(milliseconds: value.round()),
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_time(position)),
+                              Text(_time(duration)),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        tooltip: 'Shuffle',
+                        color: playback.shuffle ? SpotifinColors.accent : null,
+                        onPressed: playback.toggleShuffle,
+                        icon: const Icon(Icons.shuffle_rounded),
+                      ),
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: playback.previous,
+                        icon: const Icon(Icons.skip_previous_rounded),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(20),
+                        ),
+                        onPressed: playback.toggle,
+                        child: Icon(
+                          playback.playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 38,
+                        ),
+                      ),
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: playback.next,
+                        icon: const Icon(Icons.skip_next_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Repeat',
+                        color: playback.loopMode == LoopMode.off
+                            ? null
+                            : SpotifinColors.accent,
+                        onPressed: playback.cycleRepeat,
+                        icon: Icon(
+                          playback.loopMode == LoopMode.one
+                              ? Icons.repeat_one_rounded
+                              : Icons.repeat_rounded,
+                        ),
+                      ),
+                      const AirPlayControl(),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) =>
+                          _LyricsSheet(track: track, playback: playback),
+                    ),
+                    icon: const Icon(Icons.lyrics_outlined),
+                    label: const Text('Lyrics'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: playback.queue.isEmpty
+                        ? null
+                        : () => _saveQueue(context, ref),
+                    icon: const Icon(Icons.playlist_add_rounded),
+                    label: const Text('Save queue as playlist'),
+                  ),
+                  const SizedBox(height: 30),
+                  Text('Queue', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                ],
               ),
-              icon: const Icon(Icons.lyrics_outlined),
-              label: const Text('Lyrics'),
             ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: playback.queue.isEmpty
-                  ? null
-                  : () => _saveQueue(context, ref),
-              icon: const Icon(Icons.playlist_add_rounded),
-              label: const Text('Save queue as playlist'),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              sliver: SliverReorderableList(
+                itemCount: playback.queue.length,
+                onReorderItem: playback.reorder,
+                itemBuilder: (context, index) {
+                  final item = playback.queue[index];
+                  return ReorderableDelayedDragStartListener(
+                    key: ValueKey('$index-${item.id}'),
+                    index: index,
+                    child: ListTile(
+                      selected: index == playback.currentIndex,
+                      leading: Artwork(itemId: item.id, size: 42),
+                      title: Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        item.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Remove from queue',
+                        onPressed: () => playback.removeAt(index),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-            const SizedBox(height: 30),
-            Text('Queue', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: playback.queue.length,
-              onReorderItem: playback.reorder,
-              itemBuilder: (context, index) {
-                final item = playback.queue[index];
-                return ListTile(
-                  key: ValueKey('$index-${item.id}'),
-                  selected: index == playback.currentIndex,
-                  leading: Artwork(itemId: item.id, size: 42),
-                  title: Text(
-                    item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    item.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'Remove from queue',
-                    onPressed: () => playback.removeAt(index),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                );
-              },
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 36)),
           ],
         ),
       );
