@@ -274,6 +274,7 @@ class JellyfinClient {
 
   Map<String, String> _headers(JellyfinSession session) => {
     'Accept': 'application/json',
+    'X-Emby-Token': session.accessToken,
     'Authorization': _authorization(
       session.serverId,
       token: session.accessToken,

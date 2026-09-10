@@ -87,6 +87,28 @@ void main() {
     );
   });
 
+  test('sends the dedicated Jellyfin token header', () async {
+    late http.Request request;
+    final client = JellyfinClient(
+      httpClient: MockClient((value) async {
+        request = value;
+        return http.Response(jsonEncode({'Items': <Object>[]}), 200);
+      }),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await client.fetchTracks(session);
+
+    expect(request.headers['X-Emby-Token'], 'token');
+  });
+
   test('identifies the exact media source in playback URLs', () {
     final client = JellyfinClient();
     addTearDown(client.close);
