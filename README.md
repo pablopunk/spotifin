@@ -2,6 +2,8 @@
 
 Spotifin is a free, open-source, Spotify-style music player that connects to your existing Jellyfin library. It aims to be your goto player EVERYWHERE.
 
+> ⚠️ This is a work in progress. Not even in alpha. Use at your own risk. No apps builds for now, only web.
+
 ## Run
 
 Install the pinned toolchain with [mise](https://mise.jdx.dev/), then run:
