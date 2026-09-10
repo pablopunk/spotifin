@@ -9,6 +9,7 @@ import '../../services/playback/playback_service.dart';
 import '../../services/lyrics/lyric_line.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
+import '../common/design_system.dart';
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({super.key});
@@ -22,11 +23,15 @@ class PlayerBar extends ConsumerWidget {
         final track = playback.currentTrack;
         if (track == null) return const SizedBox.shrink();
         return Material(
-          color: SpotifinColors.raised,
+          color: SpotifinColors.surface,
+          elevation: 16,
+          shadowColor: Colors.black,
           child: InkWell(
             onTap: () => showModalBottomSheet<void>(
               context: context,
               isScrollControlled: true,
+              useSafeArea: true,
+              constraints: const BoxConstraints(maxWidth: 720),
               backgroundColor: SpotifinColors.surface,
               builder: (_) => _NowPlaying(playback: playback),
             ),
@@ -52,16 +57,23 @@ class PlayerBar extends ConsumerWidget {
                     },
                   ),
                   ListTile(
-                    leading: Artwork(itemId: track.id, size: 48),
+                    minTileHeight: 72,
+                    leading: Artwork(
+                      itemId: track.id,
+                      size: 48,
+                      borderRadius: SpotifinRadii.small,
+                    ),
                     title: Text(
                       track.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                     subtitle: Text(
                       track.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -71,14 +83,9 @@ class PlayerBar extends ConsumerWidget {
                           onPressed: playback.previous,
                           icon: const Icon(Icons.skip_previous_rounded),
                         ),
-                        IconButton(
-                          tooltip: playback.playing ? 'Pause' : 'Play',
+                        SpotifinPlayButton(
                           onPressed: playback.toggle,
-                          icon: Icon(
-                            playback.playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                          ),
+                          playing: playback.playing,
                         ),
                         IconButton(
                           tooltip: 'Next',
@@ -113,188 +120,210 @@ class _NowPlaying extends ConsumerWidget {
         expand: false,
         initialChildSize: .92,
         minChildSize: .55,
-        builder: (context, controller) => CustomScrollView(
-          controller: controller,
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
-              sliver: SliverList.list(
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: Artwork(
-                          itemId: track.id,
-                          size: 420,
-                          borderRadius: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    track.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  Text(
-                    track.artist,
-                    style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(color: Colors.white60),
-                  ),
-                  const SizedBox(height: 18),
-                  StreamBuilder<Duration>(
-                    stream: playback.player.positionStream,
-                    builder: (context, snapshot) {
-                      final position = snapshot.data ?? Duration.zero;
-                      final duration =
-                          playback.player.duration ?? Duration.zero;
-                      final max = duration.inMilliseconds.toDouble().clamp(
-                        1.0,
-                        double.infinity,
-                      );
-                      return Column(
-                        children: [
-                          Slider(
-                            value: position.inMilliseconds.toDouble().clamp(
-                              0,
-                              max,
-                            ),
-                            max: max,
-                            onChanged: (value) => playback.seek(
-                              Duration(milliseconds: value.round()),
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_time(position)),
-                              Text(_time(duration)),
-                            ],
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButton(
-                        tooltip: 'Shuffle',
-                        color: playback.shuffle ? SpotifinColors.accent : null,
-                        onPressed: playback.toggleShuffle,
-                        icon: const Icon(Icons.shuffle_rounded),
-                      ),
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: playback.previous,
-                        icon: const Icon(Icons.skip_previous_rounded),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          shape: const CircleBorder(),
-                          padding: const EdgeInsets.all(20),
-                        ),
-                        onPressed: playback.toggle,
-                        child: Icon(
-                          playback.playing
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          size: 38,
-                        ),
-                      ),
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: playback.next,
-                        icon: const Icon(Icons.skip_next_rounded),
-                      ),
-                      IconButton(
-                        tooltip: 'Repeat',
-                        color: playback.loopMode == LoopMode.off
-                            ? null
-                            : SpotifinColors.accent,
-                        onPressed: playback.cycleRepeat,
-                        icon: Icon(
-                          playback.loopMode == LoopMode.one
-                              ? Icons.repeat_one_rounded
-                              : Icons.repeat_rounded,
-                        ),
-                      ),
-                      const AirPlayControl(),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    onPressed: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) =>
-                          _LyricsSheet(track: track, playback: playback),
-                    ),
-                    icon: const Icon(Icons.lyrics_outlined),
-                    label: const Text('Lyrics'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: queue.isEmpty
-                        ? null
-                        : () => _saveQueue(context, ref),
-                    icon: const Icon(Icons.playlist_add_rounded),
-                    label: const Text('Save queue as playlist'),
-                  ),
-                  const SizedBox(height: 30),
-                  Text('Queue', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                ],
-              ),
+        builder: (context, controller) => DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.center,
+              colors: [SpotifinColors.raised, SpotifinColors.surface],
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              sliver: SliverReorderableList(
-                itemCount: queue.length,
-                onReorderItem: playback.reorder,
-                itemBuilder: (context, index) {
-                  final item = queue[index];
-                  return ReorderableDelayedDragStartListener(
-                    key: ValueKey('$index-${item.id}'),
-                    index: index,
-                    child: ListTile(
-                      selected: index == playback.currentIndex,
-                      leading: Artwork(itemId: item.id, size: 42),
-                      title: Text(
-                        item.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        item.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Remove from queue',
-                        onPressed: () => playback.removeAt(index),
-                        icon: const Icon(Icons.close_rounded),
+          ),
+          child: CustomScrollView(
+            controller: controller,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+                sliver: SliverList.list(
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: SpotifinColors.borderStrong,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 32),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: Artwork(
+                            itemId: track.id,
+                            size: 420,
+                            borderRadius: SpotifinRadii.card,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      track.name,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                    ),
+                    Text(
+                      track.artist,
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(color: SpotifinColors.textMuted),
+                    ),
+                    const SizedBox(height: 18),
+                    StreamBuilder<Duration>(
+                      stream: playback.player.positionStream,
+                      builder: (context, snapshot) {
+                        final position = snapshot.data ?? Duration.zero;
+                        final duration =
+                            playback.player.duration ?? Duration.zero;
+                        final max = duration.inMilliseconds.toDouble().clamp(
+                          1.0,
+                          double.infinity,
+                        );
+                        return Column(
+                          children: [
+                            Slider(
+                              value: position.inMilliseconds.toDouble().clamp(
+                                0,
+                                max,
+                              ),
+                              max: max,
+                              onChanged: (value) => playback.seek(
+                                Duration(milliseconds: value.round()),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _time(position),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                Text(
+                                  _time(duration),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    Wrap(
+                      alignment: WrapAlignment.spaceEvenly,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: SpotifinSpacing.xs,
+                      children: [
+                        IconButton(
+                          tooltip: 'Shuffle',
+                          color: playback.shuffle
+                              ? SpotifinColors.accent
+                              : null,
+                          onPressed: playback.toggleShuffle,
+                          icon: const Icon(Icons.shuffle_rounded),
+                        ),
+                        IconButton(
+                          iconSize: 42,
+                          onPressed: playback.previous,
+                          icon: const Icon(Icons.skip_previous_rounded),
+                        ),
+                        SpotifinPlayButton(
+                          onPressed: playback.toggle,
+                          playing: playback.playing,
+                          large: true,
+                        ),
+                        IconButton(
+                          iconSize: 42,
+                          onPressed: playback.next,
+                          icon: const Icon(Icons.skip_next_rounded),
+                        ),
+                        IconButton(
+                          tooltip: 'Repeat',
+                          color: playback.loopMode == LoopMode.off
+                              ? null
+                              : SpotifinColors.accent,
+                          onPressed: playback.cycleRepeat,
+                          icon: Icon(
+                            playback.loopMode == LoopMode.one
+                                ? Icons.repeat_one_rounded
+                                : Icons.repeat_rounded,
+                          ),
+                        ),
+                        const AirPlayControl(),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        constraints: const BoxConstraints(maxWidth: 720),
+                        builder: (_) =>
+                            _LyricsSheet(track: track, playback: playback),
+                      ),
+                      icon: const Icon(Icons.lyrics_outlined),
+                      label: const Text('Lyrics'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: queue.isEmpty
+                          ? null
+                          : () => _saveQueue(context, ref),
+                      icon: const Icon(Icons.playlist_add_rounded),
+                      label: const Text('Save queue as playlist'),
+                    ),
+                    const SizedBox(height: 30),
+                    Text(
+                      'Queue',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 36)),
-          ],
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                sliver: SliverReorderableList(
+                  itemCount: queue.length,
+                  onReorderItem: playback.reorder,
+                  itemBuilder: (context, index) {
+                    final item = queue[index];
+                    return ReorderableDelayedDragStartListener(
+                      key: ValueKey('$index-${item.id}'),
+                      index: index,
+                      child: ListTile(
+                        selected: index == playback.currentIndex,
+                        selectedTileColor: SpotifinColors.interactive,
+                        selectedColor: SpotifinColors.accent,
+                        leading: Artwork(
+                          itemId: item.id,
+                          size: 42,
+                          borderRadius: SpotifinRadii.small,
+                        ),
+                        title: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          item.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Remove from queue',
+                          onPressed: () => playback.removeAt(index),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 36)),
+            ],
+          ),
         ),
       );
     },
@@ -380,7 +409,7 @@ class _LyricsSheet extends ConsumerWidget {
                                 ?.copyWith(
                                   color: index == active
                                       ? SpotifinColors.accent
-                                      : Colors.white54,
+                                      : SpotifinColors.textMuted,
                                   fontWeight: index == active
                                       ? FontWeight.bold
                                       : FontWeight.normal,

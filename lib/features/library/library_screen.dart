@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
+import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -84,20 +86,29 @@ class _GroupedList extends StatelessWidget {
       groupName,
     );
     final entries = groups.entries.sortedBy((entry) => entry.key.toLowerCase());
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 120),
+    if (entries.isEmpty) {
+      return const SpotifinEmptyState(
+        icon: Icons.library_music_outlined,
+        title: 'Nothing here yet',
+      );
+    }
+    return spotifinGrid(
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
         final first = entry.value.first;
-        return ListTile(
-          leading: Artwork(
-            itemId: first.albumId ?? first.id,
-            size: 58,
-            borderRadius: icon == Icons.person_rounded ? 29 : 10,
+        return SpotifinCollectionCard(
+          artwork: LayoutBuilder(
+            builder: (context, constraints) => Artwork(
+              itemId: first.albumId ?? first.id,
+              size: constraints.biggest.shortestSide,
+              borderRadius: icon == Icons.person_rounded
+                  ? constraints.biggest.shortestSide / 2
+                  : SpotifinRadii.small,
+            ),
           ),
-          title: Text(entry.key),
-          subtitle: Text('${entry.value.length} songs'),
+          title: entry.key,
+          subtitle: '${entry.value.length} songs',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => _CollectionScreen(
@@ -128,8 +139,14 @@ class _PlaylistsTab extends ConsumerWidget {
         builder: (context, snapshot) {
           final playlists = snapshot.data ?? const [];
           final byId = {for (final track in tracks) track.id: track};
-          return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 120),
+          if (playlists.isEmpty) {
+            return const SpotifinEmptyState(
+              icon: Icons.queue_music_rounded,
+              title: 'No playlists yet',
+              message: 'Save your current queue to create one.',
+            );
+          }
+          return spotifinGrid(
             itemCount: playlists.length,
             itemBuilder: (context, index) {
               final playlist = playlists[index];
@@ -139,10 +156,16 @@ class _PlaylistsTab extends ConsumerWidget {
                   .map((id) => byId[id])
                   .whereType<Track>()
                   .toList();
-              return ListTile(
-                leading: Artwork(itemId: playlist.id, size: 58),
-                title: Text(playlist.name),
-                subtitle: Text('${playlistTracks.length} songs'),
+              return SpotifinCollectionCard(
+                artwork: LayoutBuilder(
+                  builder: (context, constraints) => Artwork(
+                    itemId: playlist.id,
+                    size: constraints.biggest.shortestSide,
+                    borderRadius: SpotifinRadii.small,
+                  ),
+                ),
+                title: playlist.name,
+                subtitle: '${playlistTracks.length} songs',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => _CollectionScreen(
@@ -171,38 +194,67 @@ class _CollectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: Text(title)),
+    appBar: AppBar(title: Text(title), backgroundColor: Colors.transparent),
     body: CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(18),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [SpotifinColors.raised, SpotifinColors.background],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(SpotifinSpacing.xl),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.end,
+                spacing: SpotifinSpacing.lg,
+                runSpacing: SpotifinSpacing.lg,
+                children: [
+                  Container(
+                    width: 160,
+                    height: 160,
+                    decoration: const BoxDecoration(
+                      color: SpotifinColors.interactive,
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(SpotifinRadii.card),
+                      ),
+                      boxShadow: [SpotifinShadows.dialog],
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 72,
+                      color: SpotifinColors.textMuted,
+                    ),
                   ),
-                  child: Icon(icon, size: 54),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Text(
-                    '$title\n${tracks.length} songs',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  SizedBox(
+                    width: 320,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'COLLECTION',
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: SpotifinSpacing.xs),
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                        const SizedBox(height: SpotifinSpacing.xs),
+                        SpotifinCountLabel(tracks.length),
+                      ],
+                    ),
                   ),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: tracks.isEmpty
-                      ? null
-                      : () => ref.read(playbackProvider).replaceQueue(tracks),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Play'),
-                ),
-              ],
+                  SpotifinPlayButton(
+                    onPressed: tracks.isEmpty
+                        ? null
+                        : () => ref.read(playbackProvider).replaceQueue(tracks),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

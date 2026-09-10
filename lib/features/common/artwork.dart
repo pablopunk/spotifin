@@ -8,7 +8,7 @@ class Artwork extends ConsumerWidget {
   const Artwork({
     required this.itemId,
     this.size = 56,
-    this.borderRadius = 10,
+    this.borderRadius = SpotifinRadii.small,
     super.key,
   });
 
@@ -29,7 +29,7 @@ class Artwork extends ConsumerWidget {
       child: Icon(
         Icons.music_note_rounded,
         size: size * .42,
-        color: Colors.white38,
+        color: SpotifinColors.textMuted,
       ),
     );
     if (session == null) return fallback;

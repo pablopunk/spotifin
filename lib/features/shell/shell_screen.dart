@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
+import '../common/design_system.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
@@ -37,7 +39,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           .showSnackBar(SnackBar(content: Text(error)));
       ref.read(appControllerProvider.notifier).clearError();
     });
-    final wide = MediaQuery.sizeOf(context).width >= 850;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= SpotifinBreakpoints.rail;
     final content = Stack(
       children: [
         Positioned.fill(child: _screens[_index]),
@@ -46,26 +49,57 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     );
     if (wide) {
       return Scaffold(
+        backgroundColor: Colors.black,
         body: Row(
           children: [
             NavigationRail(
               selectedIndex: _index,
               onDestinationSelected: (index) => setState(() => _index = index),
-              extended: MediaQuery.sizeOf(context).width >= 1150,
-              leading: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Icon(Icons.graphic_eq_rounded, size: 36),
+              extended: width >= SpotifinBreakpoints.extendedRail,
+              minWidth: 80,
+              minExtendedWidth: 220,
+              leading: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.graphic_eq_rounded,
+                      size: 34,
+                      color: SpotifinColors.accent,
+                    ),
+                    if (width >= SpotifinBreakpoints.extendedRail) ...[
+                      const SizedBox(width: 10),
+                      Text(
+                        'Spotifin',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ],
+                ),
               ),
               destinations: _destinations
                   .map(
                     (item) => NavigationRailDestination(
                       icon: Icon(item.icon),
+                      selectedIcon: Icon(item.selectedIcon),
                       label: Text(item.label),
                     ),
                   )
                   .toList(),
             ),
-            Expanded(child: content),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(SpotifinRadii.card),
+                  child: ColoredBox(
+                    color: SpotifinColors.background,
+                    child: content,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -79,6 +113,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             .map(
               (item) => NavigationDestination(
                 icon: Icon(item.icon),
+                selectedIcon: Icon(item.selectedIcon),
                 label: item.label,
               ),
             )
@@ -89,9 +124,21 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 }
 
 const _destinations = [
-  (icon: Icons.home_rounded, label: 'Home'),
-  (icon: Icons.search_rounded, label: 'Search'),
-  (icon: Icons.library_music_rounded, label: 'Library'),
-  (icon: Icons.download_rounded, label: 'Downloads'),
-  (icon: Icons.settings_rounded, label: 'Settings'),
+  (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Home'),
+  (icon: Icons.search_rounded, selectedIcon: Icons.search, label: 'Search'),
+  (
+    icon: Icons.library_music_outlined,
+    selectedIcon: Icons.library_music_rounded,
+    label: 'Library',
+  ),
+  (
+    icon: Icons.download_for_offline_outlined,
+    selectedIcon: Icons.download_for_offline_rounded,
+    label: 'Downloads',
+  ),
+  (
+    icon: Icons.settings_outlined,
+    selectedIcon: Icons.settings_rounded,
+    label: 'Settings',
+  ),
 ];

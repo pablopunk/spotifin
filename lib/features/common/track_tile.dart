@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
 import 'artwork.dart';
+import 'design_system.dart';
 
 class TrackTile extends ConsumerWidget {
   const TrackTile({
@@ -19,92 +21,105 @@ class TrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-    child: Row(
-      children: [
-        Expanded(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Artwork(itemId: track.id),
-            title: Text(
-              track.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.sm),
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(SpotifinRadii.small),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: ListTile(
+              minTileHeight: 64,
+              contentPadding: const EdgeInsets.only(left: SpotifinSpacing.xs),
+              leading: Artwork(
+                itemId: track.id,
+                size: 48,
+                borderRadius: SpotifinRadii.small,
+              ),
+              title: Text(
+                track.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              subtitle: Text(
+                [
+                  track.artist,
+                  if (showAlbum && track.album.isNotEmpty) track.album,
+                ].join(' • '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              onTap: () =>
+                  ref.read(playbackProvider).playTrack(track, contextTracks),
             ),
-            subtitle: Text(
-              [
-                track.artist,
-                if (showAlbum && track.album.isNotEmpty) track.album,
-              ].join(' • '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onTap: () =>
-                ref.read(playbackProvider).playTrack(track, contextTracks),
           ),
-        ),
-        PopupMenuButton<String>(
-          tooltip: 'More options',
-          onSelected: (action) async {
-            if (action == 'favorite') {
-              await ref
-                  .read(appControllerProvider.notifier)
-                  .toggleFavorite(track.id, !track.favorite);
-            } else if (action == 'queue') {
-              await ref.read(playbackProvider).addToQueue(track);
-            } else if (action == 'download') {
-              final session = ref.read(appControllerProvider).session;
-              if (session != null) {
+          PopupMenuButton<String>(
+            color: SpotifinColors.raised,
+            tooltip: 'More options',
+            onSelected: (action) async {
+              if (action == 'favorite') {
                 await ref
-                    .read(downloadProvider)
-                    .download(
-                      session,
-                      track,
-                      small: ref.read(appControllerProvider).smallDownloads,
-                    );
+                    .read(appControllerProvider.notifier)
+                    .toggleFavorite(track.id, !track.favorite);
+              } else if (action == 'queue') {
+                await ref.read(playbackProvider).addToQueue(track);
+              } else if (action == 'download') {
+                final session = ref.read(appControllerProvider).session;
+                if (session != null) {
+                  await ref
+                      .read(downloadProvider)
+                      .download(
+                        session,
+                        track,
+                        small: ref.read(appControllerProvider).smallDownloads,
+                      );
+                }
+              } else if (action == 'playlist') {
+                await _addToPlaylist(context, ref);
               }
-            } else if (action == 'playlist') {
-              await _addToPlaylist(context, ref);
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'favorite',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  track.favorite ? Icons.favorite : Icons.favorite_border,
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'favorite',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    track.favorite ? Icons.favorite : Icons.favorite_border,
+                  ),
+                  title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
                 ),
-                title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'playlist',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.library_add_rounded),
-                title: Text('Add to playlist'),
+              const PopupMenuItem(
+                value: 'playlist',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.library_add_rounded),
+                  title: Text('Add to playlist'),
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'queue',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.playlist_add_rounded),
-                title: Text('Add to queue'),
+              const PopupMenuItem(
+                value: 'queue',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.playlist_add_rounded),
+                  title: Text('Add to queue'),
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'download',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.download_rounded),
-                title: Text('Download'),
+              const PopupMenuItem(
+                value: 'download',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.download_rounded),
+                  title: Text('Download'),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     ),
   );
 

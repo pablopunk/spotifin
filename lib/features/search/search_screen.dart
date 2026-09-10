@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
+import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -48,29 +50,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       final results = snapshot.data ?? const [];
       return CustomScrollView(
         slivers: [
-          const SliverAppBar.large(title: Text('Search')),
+          const SliverAppBar(
+            pinned: true,
+            expandedHeight: 112,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
+              title: Text('Search'),
+            ),
+          ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: SearchBar(
-                autoFocus: false,
-                hintText: 'Songs, artists, and albums',
-                leading: const Icon(Icons.search_rounded),
-                onChanged: _search,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: SearchBar(
+                    autoFocus: false,
+                    hintText: 'What do you want to listen to?',
+                    leading: const Icon(
+                      Icons.search_rounded,
+                      color: SpotifinColors.text,
+                    ),
+                    onChanged: _search,
+                  ),
+                ),
               ),
             ),
           ),
           if (_query.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: Text('Search your complete Jellyfin music library.'),
+              child: SpotifinEmptyState(
+                icon: Icons.search_rounded,
+                title: 'Find your favorites',
+                message: 'Search your complete Jellyfin music library.',
               ),
             )
           else if (results.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('No matches')),
+              child: SpotifinEmptyState(
+                icon: Icons.search_off_rounded,
+                title: 'No matches',
+                message: 'Try another song, artist, or album.',
+              ),
             )
           else
             SliverList.builder(

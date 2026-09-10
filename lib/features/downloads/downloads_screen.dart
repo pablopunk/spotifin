@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
+import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class DownloadsScreen extends ConsumerWidget {
@@ -36,7 +38,13 @@ class DownloadsScreen extends ConsumerWidget {
                 return Dismissible(
                   key: ValueKey(track.id),
                   background: Container(
-                    color: Theme.of(context).colorScheme.errorContainer,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: SpotifinSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SpotifinColors.negative.withValues(alpha: .24),
+                      borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                    ),
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 24),
                     child: const Icon(Icons.delete_outline_rounded),
@@ -88,21 +96,9 @@ class _EmptyDownloads extends StatelessWidget {
   const _EmptyDownloads();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: Padding(
-      padding: EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.download_for_offline_outlined,
-            size: 68,
-            color: Colors.white38,
-          ),
-          SizedBox(height: 18),
-          Text('Your offline music will appear here.'),
-        ],
-      ),
-    ),
+  Widget build(BuildContext context) => const SpotifinEmptyState(
+    icon: Icons.download_for_offline_outlined,
+    title: 'No downloads yet',
+    message: 'Your offline music will appear here.',
   );
 }

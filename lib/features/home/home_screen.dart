@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../../services/mixes/mix_generator.dart';
 import '../common/artwork.dart';
+import '../common/design_system.dart';
 import '../common/track_tile.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -39,9 +40,13 @@ class HomeScreen extends ConsumerWidget {
             onRefresh: ref.read(appControllerProvider.notifier).refresh,
             child: CustomScrollView(
               slivers: [
-                SliverAppBar.large(
-                  title: const Text('Good listening'),
-                  backgroundColor: SpotifinColors.background,
+                SliverAppBar(
+                  expandedHeight: 112,
+                  pinned: true,
+                  flexibleSpace: const FlexibleSpaceBar(
+                    titlePadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
+                    title: Text('Good listening'),
+                  ),
                   actions: [
                     IconButton(
                       tooltip: 'Refresh library',
@@ -58,46 +63,32 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                   ],
                 ),
-                SliverList.list(
-                  children: [
-                    if (recent.any((track) => track.lastPlayed != null))
-                      _HorizontalSection(
-                        title: 'Recently played',
-                        tracks: recent
-                            .where((track) => track.lastPlayed != null)
-                            .take(12)
-                            .toList(),
-                        contextTracks: recent,
-                      ),
-                    _HorizontalSection(
-                      title: 'Recently added',
-                      tracks: added.take(12).toList(),
-                      contextTracks: added,
+                if (recent.any((track) => track.lastPlayed != null))
+                  SliverToBoxAdapter(
+                    child: _HorizontalSection(
+                      title: 'Recently played',
+                      tracks: recent
+                          .where((track) => track.lastPlayed != null)
+                          .take(12)
+                          .toList(),
+                      contextTracks: recent,
                     ),
-                    if (favorites.isNotEmpty)
-                      _HorizontalSection(
-                        title: 'Favorites',
-                        tracks: favorites.take(12).toList(),
-                        contextTracks: favorites,
-                      ),
-                    const SizedBox(height: 18),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text(
-                        'All songs',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...tracks
-                        .take(20)
-                        .map(
-                          (track) =>
-                              TrackTile(track: track, contextTracks: tracks),
-                        ),
-                    const SizedBox(height: 120),
-                  ],
+                  ),
+                SliverToBoxAdapter(
+                  child: _HorizontalSection(
+                    title: 'Recently added',
+                    tracks: added.take(12).toList(),
+                    contextTracks: added,
+                  ),
                 ),
+                if (favorites.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _HorizontalSection(
+                      title: 'Favorites',
+                      tracks: favorites.take(12).toList(),
+                      contextTracks: favorites,
+                    ),
+                  ),
                 ...mixes
                     .take(3)
                     .map(
@@ -109,6 +100,13 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                const SliverToBoxAdapter(child: SpotifinPageTitle('All songs')),
+                SliverList.builder(
+                  itemCount: tracks.length,
+                  itemBuilder: (context, index) =>
+                      TrackTile(track: tracks[index], contextTracks: tracks),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
               ],
             ),
           );
@@ -128,50 +126,61 @@ class _HorizontalSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 28),
+    padding: const EdgeInsets.only(bottom: SpotifinSpacing.xl),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
           child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: SpotifinSpacing.sm),
         SizedBox(
-          height: 205,
+          height: 224,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
             scrollDirection: Axis.horizontal,
             itemCount: tracks.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            separatorBuilder: (_, _) =>
+                const SizedBox(width: SpotifinSpacing.md),
             itemBuilder: (context, index) {
               final track = tracks[index];
               return SizedBox(
-                width: 142,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () =>
-                      ProviderScope.containerOf(context)
-                          .read(playbackProvider)
-                          .playTrack(track, contextTracks),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Artwork(itemId: track.id, size: 142, borderRadius: 14),
-                      const SizedBox(height: 8),
-                      Text(
-                        track.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                width: 164,
+                child: Card(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(SpotifinRadii.card),
+                    onTap: () =>
+                        ProviderScope.containerOf(context)
+                            .read(playbackProvider)
+                            .playTrack(track, contextTracks),
+                    child: Padding(
+                      padding: const EdgeInsets.all(SpotifinSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Artwork(
+                            itemId: track.id,
+                            size: 140,
+                            borderRadius: SpotifinRadii.small,
+                          ),
+                          const SizedBox(height: SpotifinSpacing.sm),
+                          Text(
+                            track.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                      Text(
-                        track.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: Colors.white60),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               );
@@ -187,19 +196,9 @@ class _EmptyCatalog extends StatelessWidget {
   const _EmptyCatalog();
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: Padding(
-      padding: EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.library_music_outlined, size: 64, color: Colors.white38),
-          SizedBox(height: 16),
-          Text('No music found'),
-          SizedBox(height: 6),
-          Text('Check that this Jellyfin account can access a music library.'),
-        ],
-      ),
-    ),
+  Widget build(BuildContext context) => const SpotifinEmptyState(
+    icon: Icons.library_music_outlined,
+    title: 'No music found',
+    message: 'Check that this Jellyfin account can access a music library.',
   );
 }

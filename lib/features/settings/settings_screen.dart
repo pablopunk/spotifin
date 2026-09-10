@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
+import '../common/design_system.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -15,65 +17,94 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 120),
         children: [
-          ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_rounded)),
-            title: Text(session?.userName ?? ''),
-            subtitle: Text(session?.serverUrl ?? ''),
+          SpotifinSettingsGroup(
+            title: 'Account',
+            children: [
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: SpotifinColors.accent,
+                  foregroundColor: Colors.black,
+                  child: Icon(Icons.person_rounded),
+                ),
+                title: Text(session?.userName ?? ''),
+                subtitle: Text(session?.serverUrl ?? ''),
+              ),
+            ],
           ),
-          const Divider(),
-          SwitchListTile(
-            value: state.normalization,
-            onChanged: ref
-                .read(appControllerProvider.notifier)
-                .setNormalization,
-            title: const Text('Volume normalization'),
-            subtitle: const Text('Use Jellyfin gain data when available'),
+          SpotifinSettingsGroup(
+            title: 'Playback',
+            children: [
+              SwitchListTile(
+                value: state.normalization,
+                onChanged: ref
+                    .read(appControllerProvider.notifier)
+                    .setNormalization,
+                title: const Text('Volume normalization'),
+                subtitle: const Text('Use Jellyfin gain data when available'),
+              ),
+              const Divider(indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.high_quality_rounded),
+                title: const Text('Streaming quality'),
+                subtitle: Text(
+                  state.smallStreaming ? 'Small file' : 'Full quality',
+                ),
+                onTap: () => _chooseQuality(
+                  context,
+                  state.smallStreaming,
+                  ref.read(appControllerProvider.notifier).setSmallStreaming,
+                ),
+              ),
+              const Divider(indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.download_rounded),
+                title: const Text('Download quality'),
+                subtitle: Text(
+                  state.smallDownloads ? 'Small file' : 'Full quality',
+                ),
+                onTap: () => _chooseQuality(
+                  context,
+                  state.smallDownloads,
+                  ref.read(appControllerProvider.notifier).setSmallDownloads,
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.high_quality_rounded),
-            title: const Text('Streaming quality'),
-            subtitle: Text(
-              state.smallStreaming ? 'Small file' : 'Full quality',
-            ),
-            onTap: () => _chooseQuality(
-              context,
-              state.smallStreaming,
-              ref.read(appControllerProvider.notifier).setSmallStreaming,
-            ),
+          SpotifinSettingsGroup(
+            title: 'Library',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.refresh_rounded),
+                title: const Text('Refresh library'),
+                subtitle: Text(
+                  state.syncing ? 'Refreshing…' : 'Sync from Jellyfin',
+                ),
+                onTap: state.syncing
+                    ? null
+                    : ref.read(appControllerProvider.notifier).refresh,
+              ),
+              const Divider(indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(
+                  Icons.logout_rounded,
+                  color: SpotifinColors.negative,
+                ),
+                title: const Text('Sign out'),
+                onTap: () => _confirmSignOut(context, ref),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.download_rounded),
-            title: const Text('Download quality'),
-            subtitle: Text(
-              state.smallDownloads ? 'Small file' : 'Full quality',
-            ),
-            onTap: () => _chooseQuality(
-              context,
-              state.smallDownloads,
-              ref.read(appControllerProvider.notifier).setSmallDownloads,
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.refresh_rounded),
-            title: const Text('Refresh library'),
-            subtitle: Text(
-              state.syncing ? 'Refreshing…' : 'Sync from Jellyfin',
-            ),
-            onTap: state.syncing
-                ? null
-                : ref.read(appControllerProvider.notifier).refresh,
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded),
-            title: const Text('Sign out'),
-            onTap: () => _confirmSignOut(context, ref),
-          ),
-          const AboutListTile(
-            icon: Icon(Icons.info_outline_rounded),
-            applicationName: 'Spotifin',
-            applicationVersion: '1.0.0',
-            applicationLegalese: 'Free and open-source Jellyfin music player',
+          const SpotifinSettingsGroup(
+            title: 'About',
+            children: [
+              AboutListTile(
+                icon: Icon(Icons.info_outline_rounded),
+                applicationName: 'Spotifin',
+                applicationVersion: '1.0.0',
+                applicationLegalese:
+                    'Free and open-source Jellyfin music player',
+              ),
+            ],
           ),
         ],
       ),

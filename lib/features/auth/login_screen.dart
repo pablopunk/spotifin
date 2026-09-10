@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../common/design_system.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -37,31 +38,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 430),
-                child: Card(
-                  color: SpotifinColors.surface.withValues(alpha: 0.94),
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: SpotifinColors.surface,
+                    borderRadius: BorderRadius.all(
+                      Radius.circular(SpotifinRadii.panel),
+                    ),
+                    boxShadow: [SpotifinShadows.dialog],
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(SpotifinSpacing.xxl),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Icon(
-                            Icons.graphic_eq_rounded,
-                            size: 54,
-                            color: SpotifinColors.accent,
+                          const Center(
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: SpotifinColors.accent,
+                              foregroundColor: Colors.black,
+                              child: Icon(Icons.graphic_eq_rounded, size: 36),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Your music, simply.',
+                            'Your music. Your server.',
+                            textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Connect directly to your Jellyfin server.',
+                            textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: Colors.white60),
+                                ?.copyWith(color: SpotifinColors.textMuted),
                           ),
                           const SizedBox(height: 28),
                           TextFormField(
@@ -131,7 +143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   )
                                 : const Icon(Icons.arrow_forward_rounded),
                             label: Text(
-                              state.syncing ? 'Connecting…' : 'Connect',
+                              state.syncing ? 'CONNECTING…' : 'CONNECT',
                             ),
                           ),
                         ],
@@ -164,10 +176,10 @@ class _LoginBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: const BoxDecoration(
-      gradient: RadialGradient(
-        center: Alignment(-0.8, -0.8),
-        radius: 1.4,
-        colors: [Color(0xFF24412D), SpotifinColors.background],
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF292929), SpotifinColors.background],
       ),
     ),
   );
