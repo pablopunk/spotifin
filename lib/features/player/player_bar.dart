@@ -10,6 +10,7 @@ import '../../services/lyrics/lyric_line.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'player_bar_controls.dart';
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({super.key});
@@ -22,87 +23,47 @@ class PlayerBar extends ConsumerWidget {
       builder: (context, _) {
         final track = playback.currentTrack;
         if (track == null) return const SizedBox.shrink();
-        return Material(
-          color: SpotifinColors.surface,
-          elevation: 16,
-          shadowColor: Colors.black,
-          child: InkWell(
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              useSafeArea: true,
-              constraints: const BoxConstraints(maxWidth: 720),
-              backgroundColor: SpotifinColors.surface,
-              builder: (_) => _NowPlaying(playback: playback),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StreamBuilder<Duration>(
-                    stream: playback.player.positionStream,
-                    builder: (context, snapshot) {
-                      final duration = playback.player.duration;
-                      final maximum = duration?.inMilliseconds.toDouble() ?? 1;
-                      return LinearProgressIndicator(
-                        value:
-                            (snapshot.data?.inMilliseconds ?? 0).clamp(
-                              0,
-                              maximum,
-                            ) /
-                            maximum,
-                        minHeight: 2,
-                      );
-                    },
-                  ),
-                  ListTile(
-                    minTileHeight: 72,
-                    leading: Artwork(
-                      itemId: track.id,
-                      size: 48,
-                      borderRadius: SpotifinRadii.small,
-                    ),
-                    title: Text(
-                      track.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    subtitle: Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'Previous',
-                          onPressed: playback.previous,
-                          icon: const Icon(Icons.skip_previous_rounded),
-                        ),
-                        SpotifinPlayButton(
-                          onPressed: playback.toggle,
-                          playing: playback.playing,
-                        ),
-                        IconButton(
-                          tooltip: 'Next',
-                          onPressed: playback.next,
-                          icon: const Icon(Icons.skip_next_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        void showPlayer() => _showNowPlaying(context, playback);
+        void showLyrics() => _showLyrics(context, track, playback);
+        return LayoutBuilder(
+          builder: (context, constraints) =>
+              constraints.maxWidth >= SpotifinBreakpoints.rail
+              ? DesktopPlayerBar(
+                  track: track,
+                  playback: playback,
+                  onOpenPlayer: showPlayer,
+                  onOpenLyrics: showLyrics,
+                )
+              : MobilePlayerBar(
+                  track: track,
+                  playback: playback,
+                  onOpenPlayer: showPlayer,
+                ),
         );
       },
     );
   }
+}
+
+void _showNowPlaying(BuildContext context, PlaybackService playback) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    constraints: const BoxConstraints(maxWidth: 720),
+    backgroundColor: SpotifinColors.surface,
+    builder: (_) => _NowPlaying(playback: playback),
+  );
+}
+
+void _showLyrics(BuildContext context, Track track, PlaybackService playback) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    constraints: const BoxConstraints(maxWidth: 720),
+    builder: (_) => _LyricsSheet(track: track, playback: playback),
+  );
 }
 
 class _NowPlaying extends ConsumerWidget {
@@ -249,8 +210,7 @@ class _NowPlaying extends ConsumerWidget {
                                 : Icons.repeat_rounded,
                           ),
                         ),
-                        if (AirPlayControl.isSupported)
-                          const AirPlayControl(),
+                        if (AirPlayControl.isSupported) const AirPlayControl(),
                       ],
                     ),
                     const SizedBox(height: 14),

@@ -50,56 +50,64 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     if (wide) {
       return Scaffold(
         backgroundColor: Colors.black,
-        body: Row(
+        body: Stack(
           children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: (index) => setState(() => _index = index),
-              extended: width >= SpotifinBreakpoints.extendedRail,
-              minWidth: 80,
-              minExtendedWidth: 220,
-              leading: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.graphic_eq_rounded,
-                      size: 34,
-                      color: SpotifinColors.accent,
-                    ),
-                    if (width >= SpotifinBreakpoints.extendedRail) ...[
-                      const SizedBox(width: 10),
-                      Text(
-                        'Spotifin',
-                        style: Theme.of(context).textTheme.titleLarge,
+            Positioned.fill(
+              child: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _index,
+                    onDestinationSelected: (index) =>
+                        setState(() => _index = index),
+                    extended: width >= SpotifinBreakpoints.extendedRail,
+                    minWidth: 80,
+                    minExtendedWidth: 220,
+                    leading: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 34,
+                            color: SpotifinColors.accent,
+                          ),
+                          if (width >= SpotifinBreakpoints.extendedRail) ...[
+                            const SizedBox(width: 10),
+                            Text(
+                              'Spotifin',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              destinations: _destinations
-                  .map(
-                    (item) => NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      selectedIcon: Icon(item.selectedIcon),
-                      label: Text(item.label),
                     ),
-                  )
-                  .toList(),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(SpotifinRadii.card),
-                  child: ColoredBox(
-                    color: SpotifinColors.background,
-                    child: content,
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationRailDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: Text(item.label),
+                          ),
+                        )
+                        .toList(),
                   ),
-                ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(SpotifinRadii.card),
+                        child: ColoredBox(
+                          color: SpotifinColors.background,
+                          child: _screens[_index],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
           ],
         ),
       );
