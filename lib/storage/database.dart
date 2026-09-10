@@ -92,7 +92,9 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(tracks, tracks.container);
       }
       if (from < 4) {
-        await customStatement('CREATE INDEX tracks_name ON tracks (name)');
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
+        );
       }
     },
   );

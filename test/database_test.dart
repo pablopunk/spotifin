@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Migrator, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/storage/database.dart';
@@ -52,5 +52,13 @@ void main() {
     final results = await database.searchTracks(['tiny', 'racer']).first;
 
     expect(results.map((track) => track.id), ['match']);
+  });
+
+  test('version 4 migration accepts an existing tracks index', () async {
+    await database.allTracks();
+
+    await database.migration.onUpgrade(Migrator(database), 3, 4);
+
+    expect(await database.allTracks(), isEmpty);
   });
 }
