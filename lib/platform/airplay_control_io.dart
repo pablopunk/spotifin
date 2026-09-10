@@ -12,5 +12,5 @@ class AirPlayControl extends StatelessWidget {
           height: 48,
           child: UiKitView(viewType: 'spotifin_airplay'),
         )
-      : const SizedBox(width: 48, height: 48);
+      : const SizedBox.shrink();
 }
