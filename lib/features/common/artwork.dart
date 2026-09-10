@@ -37,6 +37,7 @@ class Artwork extends ConsumerWidget {
         .round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
+      clipBehavior: Clip.hardEdge,
       child: Image.network(
         ref
             .read(jellyfinClientProvider)

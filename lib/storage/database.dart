@@ -102,7 +102,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<Track>> allTracks() => select(tracks).get();
 
-  Stream<List<Track>> searchTracks(List<String> words, {int limit = 60}) {
+  Stream<List<Track>> searchTracks(List<String> words, {int limit = 30}) {
     final query = select(tracks)
       ..where((track) {
         Expression<bool>? predicate;

@@ -25,7 +25,7 @@ class TrackTile extends ConsumerWidget {
     child: Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(SpotifinRadii.small),
-      clipBehavior: Clip.antiAlias,
+      clipBehavior: Clip.hardEdge,
       child: Row(
         children: [
           Expanded(
