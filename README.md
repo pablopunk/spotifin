@@ -21,9 +21,10 @@ details, and run:
 mise run dev
 ```
 
-Flutter opens Chrome automatically and serves the app on port 8080. The ignored
-`.env` credentials are compiled into this development build, so use HTTPS and
-do not expose it to untrusted networks.
+Flutter listens on all interfaces at port 8080 but opens Chrome at the secure
+`localhost` origin. The ignored `.env` credentials are compiled into this
+development build, so use HTTPS for remote access and do not expose it to
+untrusted networks.
 
 For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
 `mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.

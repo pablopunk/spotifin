@@ -3,4 +3,4 @@ flutter = { version = "3.47.3", platforms = { linux-x64 = { url = "https://stora
 
 [tasks.dev]
 description = "Run the local web app with development auto-login"
-run = "flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 --dart-define-from-file=.env"
+run = "flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 --web-launch-url http://localhost:8080 --dart-define-from-file=.env"
