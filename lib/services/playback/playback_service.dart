@@ -56,7 +56,7 @@ class PlaybackService extends ChangeNotifier {
   final Map<String, Track> _tracksById = {};
   bool _loadingSources = false;
   bool _smallStreaming = false;
-  bool _normalization = true;
+  bool _normalization = false;
   double _userVolume = 1;
   double _normalizationMultiplier = 1;
   bool _shuffle = false;
@@ -97,7 +97,7 @@ class PlaybackService extends ChangeNotifier {
   Future<void> configure(
     JellyfinSession session, {
     bool smallStreaming = false,
-    bool normalization = true,
+    bool normalization = false,
   }) async {
     _session = session;
     _smallStreaming = smallStreaming;

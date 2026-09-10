@@ -18,7 +18,7 @@ class AppState {
     this.error,
     this.smallStreaming = false,
     this.smallDownloads = false,
-    this.normalization = true,
+    this.normalization = false,
   });
 
   final AppStatus status;
@@ -58,7 +58,7 @@ class AppController extends Notifier<AppState> {
     final preferences = await SharedPreferences.getInstance();
     final smallStreaming = preferences.getBool('smallStreaming') ?? false;
     final smallDownloads = preferences.getBool('smallDownloads') ?? false;
-    final normalization = preferences.getBool('normalization') ?? true;
+    final normalization = preferences.getBool('normalization') ?? false;
     const developmentLogin = DevelopmentLogin.fromEnvironment();
     if (developmentLogin.canSignIn) {
       state = AppState(
