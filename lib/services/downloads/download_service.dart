@@ -73,4 +73,11 @@ class DownloadService extends ChangeNotifier {
     if (row?.localUri != null) await _store.remove(row!.localUri!);
     await _database.removeDownload(trackId);
   }
+
+  Future<void> clear() async {
+    final rows = await _database.select(_database.downloads).get();
+    for (final row in rows) {
+      if (row.localUri != null) await _store.remove(row.localUri!);
+    }
+  }
 }

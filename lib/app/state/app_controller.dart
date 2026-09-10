@@ -189,6 +189,7 @@ class AppController extends Notifier<AppState> {
       } catch (_) {}
     }
     await ref.read(playbackProvider).clear();
+    await ref.read(downloadProvider).clear();
     await ref.read(databaseProvider).clearAccountData();
     await ref.read(sessionStoreProvider).clear();
     state = state.copyWith(
