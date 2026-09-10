@@ -24,6 +24,8 @@ class JellyfinClient {
   static const _clientName = 'Spotifin';
   static const _version = '1.0.0';
 
+  void close() => _http.close();
+
   Future<JellyfinSession> authenticate({
     required String serverUrl,
     required String username,

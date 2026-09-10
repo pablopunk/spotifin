@@ -66,6 +66,28 @@ class DownloadService extends ChangeNotifier {
     return resolved;
   }
 
+  Future<Map<String, Uri>> resolveAll(Iterable<String> trackIds) async {
+    final wanted = trackIds.toSet();
+    if (wanted.isEmpty) return const {};
+    final rows = await (_database.select(
+      _database.downloads,
+    )..where((row) => row.status.equals('complete'))).get();
+    final matches = rows.where(
+      (row) => wanted.contains(row.trackId) && row.localUri != null,
+    );
+    final entries = await Future.wait(
+      matches.map((row) async {
+        final uri = await _store.resolve(row.localUri!);
+        if (uri == null) {
+          await _database.removeDownload(row.trackId);
+          return null;
+        }
+        return MapEntry(row.trackId, uri);
+      }),
+    );
+    return Map.fromEntries(entries.whereType<MapEntry<String, Uri>>());
+  }
+
   Future<void> remove(String trackId) async {
     final row = await (_database.select(
       _database.downloads,
@@ -79,5 +101,11 @@ class DownloadService extends ChangeNotifier {
     for (final row in rows) {
       if (row.localUri != null) await _store.remove(row.localUri!);
     }
+  }
+
+  @override
+  void dispose() {
+    _store.dispose();
+    super.dispose();
   }
 }

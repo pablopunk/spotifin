@@ -32,15 +32,23 @@ class MixGenerator {
         artistsByLabel.putIfAbsent(label, () => {}).add(track.artist);
       }
     }
-    final mixes = artistsByLabel.entries
-        .where((entry) => entry.value.isNotEmpty)
+    final labelsByArtist = <String, Set<String>>{};
+    for (final entry in artistsByLabel.entries) {
+      for (final artist in entry.value) {
+        labelsByArtist.putIfAbsent(artist, () => {}).add(entry.key);
+      }
+    }
+    final tracksByLabel = <String, List<Track>>{};
+    for (final track in catalog) {
+      for (final label in labelsByArtist[track.artist] ?? const <String>{}) {
+        tracksByLabel.putIfAbsent(label, () => []).add(track);
+      }
+    }
+    final mixes = tracksByLabel.entries
         .map((entry) {
-          final pool = catalog
-              .where((track) => entry.value.contains(track.artist))
-              .toList();
           return DailyMix(
             name: '${entry.key} mix',
-            tracks: _select(pool, day, entry.key),
+            tracks: _select(entry.value, day, entry.key),
           );
         })
         .where((mix) => mix.tracks.length >= 3)

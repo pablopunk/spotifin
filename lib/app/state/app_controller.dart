@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/jellyfin/session.dart';
+import '../../storage/database.dart';
 import '../providers.dart';
 
 enum AppStatus { starting, signedOut, ready }
@@ -123,12 +124,31 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(syncing: !silent, clearError: true);
     try {
       final client = ref.read(jellyfinClientProvider);
+      final database = ref.read(databaseProvider);
       await _flushPending();
+      var firstPage = true;
+      final bufferedTracks = <TracksCompanion>[];
       final tracks = await client.fetchTracks(
         session,
-        onPage: ref.read(databaseProvider).upsertTracks,
+        onPage: (page) async {
+          if (firstPage) {
+            firstPage = false;
+            await database.upsertTracks(page);
+            return;
+          }
+          bufferedTracks.addAll(page);
+          if (bufferedTracks.length >= 2000) {
+            await database.upsertTracks(bufferedTracks);
+            bufferedTracks.clear();
+          }
+        },
       );
-      await ref.read(databaseProvider).replaceTracks(tracks);
+      if (bufferedTracks.isNotEmpty) {
+        await database.upsertTracks(bufferedTracks);
+      }
+      await database.removeTracksExcept(
+        tracks.map((track) => track.id.value).toList(growable: false),
+      );
       final playlists = await client.fetchPlaylists(session);
       await ref.read(databaseProvider).replacePlaylists(playlists);
       final catalog = await ref.read(databaseProvider).allTracks();

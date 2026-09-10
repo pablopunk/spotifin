@@ -108,6 +108,7 @@ class _NowPlaying extends ConsumerWidget {
     builder: (context, _) {
       final track = playback.currentTrack;
       if (track == null) return const SizedBox.shrink();
+      final queue = playback.queue;
       return DraggableScrollableSheet(
         expand: false,
         initialChildSize: .92,
@@ -247,7 +248,7 @@ class _NowPlaying extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: playback.queue.isEmpty
+                    onPressed: queue.isEmpty
                         ? null
                         : () => _saveQueue(context, ref),
                     icon: const Icon(Icons.playlist_add_rounded),
@@ -262,10 +263,10 @@ class _NowPlaying extends ConsumerWidget {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               sliver: SliverReorderableList(
-                itemCount: playback.queue.length,
+                itemCount: queue.length,
                 onReorderItem: playback.reorder,
                 itemBuilder: (context, index) {
-                  final item = playback.queue[index];
+                  final item = queue[index];
                   return ReorderableDelayedDragStartListener(
                     key: ValueKey('$index-${item.id}'),
                     index: index,

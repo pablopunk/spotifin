@@ -5,6 +5,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'database.g.dart';
 
+@TableIndex(name: 'tracks_name', columns: {#name})
 class Tracks extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -77,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -90,6 +91,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await migrator.addColumn(tracks, tracks.container);
       }
+      if (from < 4) {
+        await customStatement('CREATE INDEX tracks_name ON tracks (name)');
+      }
     },
   );
 
@@ -97,6 +101,27 @@ class AppDatabase extends _$AppDatabase {
       (select(tracks)..orderBy([(row) => OrderingTerm.asc(row.name)])).watch();
 
   Future<List<Track>> allTracks() => select(tracks).get();
+
+  Stream<List<Track>> searchTracks(List<String> words, {int limit = 200}) {
+    final query = select(tracks)
+      ..where((track) {
+        Expression<bool>? predicate;
+        for (final word in words) {
+          final pattern = '%${_escapeLike(word)}%';
+          final matches =
+              track.name.like(pattern) |
+              track.artist.like(pattern) |
+              track.album.like(pattern);
+          predicate = predicate == null ? matches : predicate & matches;
+        }
+        return predicate ?? const Constant(false);
+      })
+      ..orderBy([(track) => OrderingTerm.asc(track.name)])
+      ..limit(limit);
+    return query.watch();
+  }
+
+  String _escapeLike(String value) => value.replaceAll(RegExp(r'[%_]'), '');
 
   Future<void> upsertTracks(List<TracksCompanion> rows) =>
       batch((batch) => batch.insertAllOnConflictUpdate(tracks, rows));
@@ -111,6 +136,14 @@ class AppDatabase extends _$AppDatabase {
         await batch((batch) => batch.insertAllOnConflictUpdate(tracks, rows));
         await (delete(tracks)..where((row) => row.id.isNotIn(ids))).go();
       });
+
+  Future<void> removeTracksExcept(List<String> ids) async {
+    if (ids.isEmpty) {
+      await delete(tracks).go();
+      return;
+    }
+    await (delete(tracks)..where((track) => track.id.isNotIn(ids))).go();
+  }
 
   Future<void> setFavorite(String id, bool value) =>
       (update(tracks)..where((row) => row.id.equals(id))).write(

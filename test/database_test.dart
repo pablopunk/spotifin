@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/storage/database.dart';
@@ -36,5 +37,20 @@ void main() {
     final playlist = await database.select(database.playlists).getSingle();
     expect(playlist.trackIds, '["song","song"]');
     expect(await database.pendingOperations(), hasLength(2));
+  });
+
+  test('search filters in sqlite and limits results', () async {
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'match',
+        name: 'Tiny Voices',
+        artist: const Value('Box Car Racer'),
+      ),
+      TracksCompanion.insert(id: 'other', name: 'Different Song'),
+    ]);
+
+    final results = await database.searchTracks(['tiny', 'racer']).first;
+
+    expect(results.map((track) => track.id), ['match']);
   });
 }

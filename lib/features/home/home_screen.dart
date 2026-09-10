@@ -101,10 +101,12 @@ class HomeScreen extends ConsumerWidget {
                 ...mixes
                     .take(3)
                     .map(
-                      (mix) => _HorizontalSection(
-                        title: mix.name,
-                        tracks: mix.tracks.take(12).toList(),
-                        contextTracks: mix.tracks,
+                      (mix) => SliverToBoxAdapter(
+                        child: _HorizontalSection(
+                          title: mix.name,
+                          tracks: mix.tracks.take(12).toList(),
+                          contextTracks: mix.tracks,
+                        ),
                       ),
                     ),
               ],

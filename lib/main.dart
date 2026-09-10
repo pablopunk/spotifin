@@ -6,6 +6,9 @@ import 'app/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 300
+    ..maximumSizeBytes = 64 << 20;
   await JustAudioBackground.init(
     androidNotificationChannelId: 'app.spotifin.audio',
     androidNotificationChannelName: 'Music playback',

@@ -17,9 +17,11 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
-final jellyfinClientProvider = Provider<JellyfinClient>(
-  (ref) => JellyfinClient(),
-);
+final jellyfinClientProvider = Provider<JellyfinClient>((ref) {
+  final client = JellyfinClient();
+  ref.onDispose(client.close);
+  return client;
+});
 
 final lyricsProvider = Provider<LyricsService>(
   (ref) => LyricsService(ref.watch(jellyfinClientProvider)),

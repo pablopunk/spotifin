@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,20 +16,36 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _query = '';
+  Timer? _debounce;
+  Stream<List<Track>> _results = const Stream.empty();
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _search(String value) {
+    _debounce?.cancel();
+    setState(() => _query = value.trim());
+    if (_query.isEmpty) {
+      setState(() => _results = const Stream.empty());
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      final words = _query.toLowerCase().split(RegExp(r'\s+'));
+      setState(() {
+        _results = ref.read(databaseProvider).searchTracks(words);
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) => StreamBuilder<List<Track>>(
-    stream: ref.watch(databaseProvider).watchTracks(),
+    stream: _results,
     builder: (context, snapshot) {
-      final all = snapshot.data ?? const [];
-      final words = _query.trim().toLowerCase().split(RegExp(r'\s+'));
-      final results = _query.trim().isEmpty
-          ? const <Track>[]
-          : all.where((track) {
-              final value = '${track.name} ${track.artist} ${track.album}'
-                  .toLowerCase();
-              return words.every(value.contains);
-            }).toList();
+      final results = snapshot.data ?? const [];
       return CustomScrollView(
         slivers: [
           const SliverAppBar.large(title: Text('Search')),
@@ -38,7 +56,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 autoFocus: false,
                 hintText: 'Songs, artists, and albums',
                 leading: const Icon(Icons.search_rounded),
-                onChanged: (value) => setState(() => _query = value),
+                onChanged: _search,
               ),
             ),
           ),

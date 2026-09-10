@@ -2009,6 +2009,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PlaylistsTable playlists = $PlaylistsTable(this);
   late final $DownloadsTable downloads = $DownloadsTable(this);
   late final $PendingWritesTable pendingWrites = $PendingWritesTable(this);
+  late final Index tracksName = Index(
+    'tracks_name',
+    'CREATE INDEX tracks_name ON tracks (name)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2018,6 +2022,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     playlists,
     downloads,
     pendingWrites,
+    tracksName,
   ];
 }
 

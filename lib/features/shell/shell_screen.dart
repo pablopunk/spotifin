@@ -18,7 +18,7 @@ class ShellScreen extends ConsumerStatefulWidget {
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
   int _index = 0;
-  static const _screens = [
+  static const _screens = <Widget>[
     HomeScreen(),
     SearchScreen(),
     LibraryScreen(),
@@ -40,9 +40,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final wide = MediaQuery.sizeOf(context).width >= 850;
     final content = Stack(
       children: [
-        Positioned.fill(
-          child: IndexedStack(index: _index, children: _screens),
-        ),
+        Positioned.fill(child: _screens[_index]),
         const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
       ],
     );

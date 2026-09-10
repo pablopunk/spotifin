@@ -4,6 +4,7 @@ import 'package:web/web.dart' as web;
 
 class DownloadStore {
   static const _cacheName = 'spotifin-audio-v1';
+  final Map<String, String> _objectUrls = {};
 
   Future<String> save(
     String accountId,
@@ -25,15 +26,28 @@ class DownloadStore {
   }
 
   Future<Uri?> resolve(String storedUri) async {
+    final existing = _objectUrls[storedUri];
+    if (existing != null) return Uri.parse(existing);
     final cache = await web.window.caches.open(_cacheName).toDart;
     final response = await cache.match(storedUri.toJS).toDart;
     if (response == null) return null;
     final blob = await response.blob().toDart;
-    return Uri.parse(web.URL.createObjectURL(blob));
+    final objectUrl = web.URL.createObjectURL(blob);
+    _objectUrls[storedUri] = objectUrl;
+    return Uri.parse(objectUrl);
   }
 
   Future<void> remove(String storedUri) async {
+    final objectUrl = _objectUrls.remove(storedUri);
+    if (objectUrl != null) web.URL.revokeObjectURL(objectUrl);
     final cache = await web.window.caches.open(_cacheName).toDart;
     await cache.delete(storedUri.toJS).toDart;
+  }
+
+  void dispose() {
+    for (final objectUrl in _objectUrls.values) {
+      web.URL.revokeObjectURL(objectUrl);
+    }
+    _objectUrls.clear();
   }
 }

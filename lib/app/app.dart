@@ -23,12 +23,14 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(appControllerProvider);
+    final status = ref.watch(
+      appControllerProvider.select((state) => state.status),
+    );
     return MaterialApp(
       title: 'Spotifin',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: switch (state.status) {
+      home: switch (status) {
         AppStatus.starting => const _StartupScreen(),
         AppStatus.signedOut => const LoginScreen(),
         AppStatus.ready => const ShellScreen(),

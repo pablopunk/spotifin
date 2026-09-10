@@ -19,15 +19,20 @@ class DownloadStore {
       '${directory.path}/$trackId.${safeExtension.isEmpty ? 'mp3' : safeExtension}',
     );
     final temporary = File('${target.path}.partial');
-    final request = http.Request('GET', source)..headers.addAll(headers);
-    final response = await http.Client().send(request);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw HttpException('Download failed (${response.statusCode}).');
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', source)..headers.addAll(headers);
+      final response = await client.send(request);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException('Download failed (${response.statusCode}).');
+      }
+      final sink = temporary.openWrite();
+      await response.stream.pipe(sink);
+      await temporary.rename(target.path);
+      return target.uri.toString();
+    } finally {
+      client.close();
     }
-    final sink = temporary.openWrite();
-    await response.stream.pipe(sink);
-    await temporary.rename(target.path);
-    return target.uri.toString();
   }
 
   Future<Uri?> resolve(String storedUri) async {
@@ -39,4 +44,6 @@ class DownloadStore {
     final file = File.fromUri(Uri.parse(storedUri));
     if (await file.exists()) await file.delete();
   }
+
+  void dispose() {}
 }

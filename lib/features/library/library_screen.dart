@@ -36,14 +36,13 @@ class LibraryScreen extends ConsumerWidget {
             children: [
               _TrackList(tracks: tracks),
               _GroupedList(
-                groups: groupBy(
-                  tracks.where((track) => track.album.isNotEmpty),
-                  (Track track) => track.album,
-                ),
+                tracks: tracks,
+                groupName: _albumName,
                 icon: Icons.album_rounded,
               ),
               _GroupedList(
-                groups: groupBy(tracks, (Track track) => track.artist),
+                tracks: tracks,
+                groupName: _artistName,
                 icon: Icons.person_rounded,
               ),
               _PlaylistsTab(tracks: tracks),
@@ -69,12 +68,21 @@ class _TrackList extends StatelessWidget {
 }
 
 class _GroupedList extends StatelessWidget {
-  const _GroupedList({required this.groups, required this.icon});
-  final Map<String, List<Track>> groups;
+  const _GroupedList({
+    required this.tracks,
+    required this.groupName,
+    required this.icon,
+  });
+  final List<Track> tracks;
+  final String Function(Track) groupName;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
+    final groups = groupBy(
+      tracks.where((track) => groupName(track).isNotEmpty),
+      groupName,
+    );
     final entries = groups.entries.sortedBy((entry) => entry.key.toLowerCase());
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 120),
@@ -104,6 +112,10 @@ class _GroupedList extends StatelessWidget {
     );
   }
 }
+
+String _albumName(Track track) => track.album;
+
+String _artistName(Track track) => track.artist;
 
 class _PlaylistsTab extends ConsumerWidget {
   const _PlaylistsTab({required this.tracks});

@@ -18,7 +18,9 @@ class Artwork extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(appControllerProvider).session;
+    final session = ref.watch(
+      appControllerProvider.select((state) => state.session),
+    );
     final fallback = Container(
       width: size,
       height: size,
@@ -31,15 +33,19 @@ class Artwork extends ConsumerWidget {
       ),
     );
     if (session == null) return fallback;
+    final physicalWidth = (size * MediaQuery.devicePixelRatioOf(context))
+        .round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: Image.network(
         ref
             .read(jellyfinClientProvider)
-            .imageUri(session, itemId, width: (size * 2).round())
+            .imageUri(session, itemId, width: physicalWidth)
             .toString(),
         width: size,
         height: size,
+        cacheWidth: physicalWidth,
+        filterQuality: FilterQuality.low,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => fallback,
       ),
