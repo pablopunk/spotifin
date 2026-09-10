@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
+import 'package:spotifin/services/jellyfin/session.dart';
 
 void main() {
   test('normalizes a server URL and authenticates', () async {
@@ -59,5 +60,24 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('identifies the exact media source in playback URLs', () {
+    final client = JellyfinClient();
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final uri = client.streamUri(session, 'track-id');
+
+    expect(uri.path, '/Audio/track-id/stream');
+    expect(uri.queryParameters['mediaSourceId'], 'track-id');
+    expect(uri.queryParameters['deviceId'], 'spotifin-server');
+    expect(uri.queryParameters['static'], 'true');
   });
 }

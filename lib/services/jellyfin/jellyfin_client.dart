@@ -234,6 +234,8 @@ class JellyfinClient {
   Uri streamUri(JellyfinSession session, String itemId, {bool small = false}) {
     final query = <String, String>{
       'api_key': session.accessToken,
+      'mediaSourceId': itemId,
+      'deviceId': 'spotifin-${session.serverId}',
       if (!small) 'static': 'true',
       if (small) ...{
         'audioCodec': 'aac',
