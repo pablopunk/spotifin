@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/services/mixes/mix_generator.dart';
@@ -21,39 +22,61 @@ void main() {
     });
   });
 
-  test('combines similar tags and ranks mixes by directly tagged songs', () {
+  test('combines tags with shared words and matching word stems', () {
     final tracks = [
-      _track('1', 'Artist A', ['punk'], 0),
-      _track('2', 'Artist B', ['pop punk'], 0),
-      _track('3', 'Artist C', ['punk rock'], 0),
-      _track('4', 'Artist D', ['punk'], 0),
-      _track('5', 'Artist E', ['r&b'], 0),
-      _track('6', 'Artist F', ['soul'], 0),
-      _track('7', 'Artist G', ['R&B/Soul'], 0),
+      _track('1', 'Artist A', ['rock'], 0),
+      _track('2', 'Artist B', ['hard rock'], 0),
+      _track('3', 'Artist C', ['indie rock'], 0),
+      _track('4', 'Artist D', ['rock'], 0),
+      _track('5', 'Artist E', ['electronic'], 0),
+      _track('6', 'Artist F', ['electronica'], 0),
+      _track('7', 'Artist G', ['electronic'], 0),
     ];
 
     final mixes = const MixGenerator().generate(tracks, DateTime(2026, 9, 10));
 
-    expect(mixes.map((mix) => mix.name), ['Punk mix', 'R&B/Soul mix']);
+    expect(mixes.map((mix) => mix.name), ['Rock mix', 'Electronic mix']);
     expect(mixes.first.tracks, hasLength(4));
     expect(mixes.last.tracks, hasLength(3));
   });
 
-  test('keeps only the four most common tag groups', () {
+  test('produces useful groups from the server tag distribution', () {
+    final counts = (jsonDecode(
+      File('test/fixtures/server_tag_counts.json').readAsStringSync(),
+    ) as Map<String, dynamic>).cast<String, int>();
+    var id = 0;
     final tracks = [
-      for (var group = 0; group < 5; group++)
-        for (var song = 0; song < 3 + group; song++)
-          _track('$group-$song', 'Artist $group-$song', ['genre $group'], 0),
+      for (final entry in counts.entries)
+        for (var song = 0; song < entry.value; song++)
+          _track('${id++}', 'Artist $id', [entry.key], 0),
+    ];
+
+    final mixes = const MixGenerator().generate(tracks, DateTime(2026, 9, 10));
+
+    expect(mixes.map((mix) => mix.name), [
+      'Rock mix',
+      'Alternative mix',
+      'Pop mix',
+      'Punk mix',
+    ]);
+  });
+
+  test('keeps only the four most common tag groups', () {
+    const labels = ['ambient', 'blues', 'country', 'dance', 'folk'];
+    final tracks = [
+      for (var group = 0; group < labels.length; group++)
+        for (var song = 0; song < group + 3; song++)
+          _track('$group-$song', 'Artist $group-$song', [labels[group]], 0),
     ];
 
     final mixes = const MixGenerator().generate(tracks, DateTime(2026));
 
     expect(mixes, hasLength(4));
     expect(mixes.map((mix) => mix.name), [
-      'Genre 4 mix',
-      'Genre 3 mix',
-      'Genre 2 mix',
-      'Genre 1 mix',
+      'Folk mix',
+      'Dance mix',
+      'Country mix',
+      'Blues mix',
     ]);
   });
 

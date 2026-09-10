@@ -12,45 +12,39 @@ class DailyMix {
 class MixGenerator {
   const MixGenerator();
 
-  static const _aliases = {
-    'hip hop': 'Hip-Hop',
-    'hip-hop': 'Hip-Hop',
-    'rap': 'Hip-Hop',
-    'r&b': 'R&B/Soul',
-    'r&b/soul': 'R&B/Soul',
-    'rhythm and blues': 'R&B/Soul',
-    'rnb': 'R&B/Soul',
-    'soul': 'R&B/Soul',
-    'electronic': 'Electronic',
-    'electronica': 'Electronic',
-    'rock': 'Rock',
-    'indie rock': 'Rock',
-    'pop rock': 'Rock',
-    'punk': 'Punk',
-    'pop punk': 'Punk',
-    'punk rock': 'Punk',
-  };
-
   List<DailyMix> generate(List<Track> catalog, DateTime day) {
     final tracksByLabel = <String, List<Track>>{};
     for (final track in catalog) {
       final labels = _labels(track)
-          .map(_group)
+          .map(_normalize)
           .where((label) => label.isNotEmpty);
       for (final label in labels.toSet()) {
         tracksByLabel.putIfAbsent(label, () => []).add(track);
       }
     }
-    final groups =
-        tracksByLabel.entries.where((entry) => entry.value.length >= 3).toList()
-          ..sort((a, b) {
-            final popularity = b.value.length.compareTo(a.value.length);
-            return popularity != 0 ? popularity : a.key.compareTo(b.key);
-          });
+    final labels = tracksByLabel.entries.toList()
+      ..sort((a, b) {
+        final popularity = b.value.length.compareTo(a.value.length);
+        return popularity != 0 ? popularity : a.key.compareTo(b.key);
+      });
+    final groups = <_TagGroup>[];
+    for (final label in labels) {
+      final matching = groups.indexWhere((group) => group.matches(label.key));
+      if (matching < 0) {
+        groups.add(_TagGroup(label.key, label.value));
+      } else {
+        groups[matching].add(label.value);
+      }
+    }
+    groups.removeWhere((group) => group.tracks.length < 3);
+    groups.sort((a, b) {
+      final popularity = b.tracks.length.compareTo(a.tracks.length);
+      return popularity != 0 ? popularity : a.label.compareTo(b.label);
+    });
     return groups.take(4).map((group) {
       return DailyMix(
-        name: '${group.key} mix',
-        tracks: _select(group.value, day, group.key),
+        name: '${_titleCase(group.label)} mix',
+        tracks: _select(group.tracks.values.toList(), day, group.label),
       );
     }).toList();
   }
@@ -63,10 +57,8 @@ class MixGenerator {
     }
   }
 
-  String _group(String value) {
-    final normalized = value.trim().toLowerCase();
-    return _aliases[normalized] ?? _titleCase(normalized);
-  }
+  String _normalize(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
   String _titleCase(String value) => value
       .split(' ')
@@ -97,6 +89,45 @@ class MixGenerator {
     }
     return result;
   }
+}
+
+class _TagGroup {
+  _TagGroup(this.label, List<Track> initial)
+    : _tokens = _tagTokens(label),
+      tracks = {for (final track in initial) track.id: track};
+
+  final String label;
+  final Set<String> _tokens;
+  final Map<String, Track> tracks;
+
+  bool matches(String candidate) {
+    final candidateTokens = _tagTokens(candidate);
+    if (_tokens.isEmpty || candidateTokens.isEmpty) return false;
+    var matches = 0;
+    for (final token in candidateTokens) {
+      if (_tokens.any((existing) => _tokensMatch(existing, token))) matches++;
+    }
+    return matches * 2 >= math.min(_tokens.length, candidateTokens.length);
+  }
+
+  void add(List<Track> additions) {
+    for (final track in additions) {
+      tracks[track.id] = track;
+    }
+  }
+}
+
+Set<String> _tagTokens(String label) => label
+    .split(RegExp(r'[^a-z0-9]+'))
+    .where((token) => token.length > 1)
+    .toSet();
+
+bool _tokensMatch(String left, String right) {
+  if (left == right) return true;
+  final shorter = left.length <= right.length ? left : right;
+  final longer = left.length <= right.length ? right : left;
+  if (shorter.length < 5 || longer.length - shorter.length > 2) return false;
+  return longer.startsWith(shorter.substring(0, shorter.length - 1));
 }
 
 class _SeededRandom implements math.Random {
