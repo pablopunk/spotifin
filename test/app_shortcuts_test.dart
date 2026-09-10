@@ -28,6 +28,45 @@ void main() {
     expect(second.hasPrimaryFocus, isTrue);
   });
 
+  testWidgets('Down traverses and scrolls beyond a lazy list viewport', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    final focusNodes = List.generate(20, (_) => FocusNode());
+    addTearDown(scrollController.dispose);
+    addTearDown(() {
+      for (final focusNode in focusNodes) {
+        focusNode.dispose();
+      }
+    });
+    await _pumpApp(
+      tester,
+      child: SizedBox(
+        height: 168,
+        child: ListView.builder(
+          controller: scrollController,
+          itemExtent: 56,
+          itemCount: focusNodes.length,
+          itemBuilder: (context, index) => ListTile(
+            focusNode: focusNodes[index],
+            title: Text('Row $index'),
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    focusNodes.first.requestFocus();
+    await tester.pump();
+    for (var index = 0; index < 10; index++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+
+    expect(focusNodes[10].hasPrimaryFocus, isTrue);
+    expect(scrollController.offset, greaterThan(0));
+  });
+
   testWidgets('Right moves focus horizontally', (tester) async {
     final first = FocusNode();
     final second = FocusNode();
