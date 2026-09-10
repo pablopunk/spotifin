@@ -157,6 +157,13 @@ class PlaybackService extends ChangeNotifier {
 
   Future<void> toggle() => _player.playing ? _player.pause() : _player.play();
   Future<void> next() => _player.seekToNext();
+
+  Future<void> playQueueIndex(int index) async {
+    if (index < 0 || index >= _queue.length) return;
+    await _player.seek(Duration.zero, index: index);
+    await _player.play();
+  }
+
   Future<void> previous() async {
     if (_player.position > const Duration(seconds: 4)) {
       await _player.seek(Duration.zero);

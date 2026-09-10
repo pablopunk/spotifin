@@ -38,6 +38,7 @@ class PlayerSidePanel extends ConsumerWidget {
                   children: [
                     if (panels.player)
                       Expanded(
+                        flex: panels.queue && panels.lyrics ? 2 : 1,
                         child: _PanelSection(
                           title: 'Now playing',
                           child: _PlayerPanel(track: track, playback: playback),
@@ -157,65 +158,85 @@ class _PlayerPanel extends StatelessWidget {
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
-    children: [
-      AspectRatio(
-        aspectRatio: 1,
-        child: Artwork(
-          itemId: track.albumId ?? track.id,
-          size: 420,
-          borderRadius: SpotifinRadii.card,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+    child: Column(
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = constraints.biggest.shortestSide;
+              return Align(
+                alignment: Alignment.bottomCenter,
+                child: Artwork(
+                  itemId: track.albumId ?? track.id,
+                  size: size,
+                  borderRadius: SpotifinRadii.card,
+                ),
+              );
+            },
+          ),
         ),
-      ),
-      const SizedBox(height: SpotifinSpacing.lg),
-      Text(
-        track.name,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.titleLarge,
-      ),
-      const SizedBox(height: SpotifinSpacing.xxs),
-      Text(track.artist, style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: SpotifinSpacing.md),
-      _PanelProgress(playback: playback),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _ActiveControl(
-            tooltip: 'Shuffle',
-            active: playback.shuffle,
-            onPressed: playback.toggleShuffle,
-            icon: Icons.shuffle_rounded,
+        const SizedBox(height: SpotifinSpacing.sm),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            track.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          IconButton(
-            tooltip: 'Previous',
-            iconSize: 32,
-            onPressed: playback.previous,
-            icon: const Icon(Icons.skip_previous_rounded),
+        ),
+        const SizedBox(height: SpotifinSpacing.xxs),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            track.artist,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-          SpotifinPlayButton(
-            onPressed: playback.toggle,
-            playing: playback.playing,
-            large: true,
-          ),
-          IconButton(
-            tooltip: 'Next',
-            iconSize: 32,
-            onPressed: playback.next,
-            icon: const Icon(Icons.skip_next_rounded),
-          ),
-          _ActiveControl(
-            tooltip: 'Repeat',
-            active: playback.loopMode != LoopMode.off,
-            onPressed: playback.cycleRepeat,
-            icon: playback.loopMode == LoopMode.one
-                ? Icons.repeat_one_rounded
-                : Icons.repeat_rounded,
-          ),
-        ],
-      ),
-    ],
+        ),
+        const SizedBox(height: SpotifinSpacing.xs),
+        _PanelProgress(playback: playback),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _ActiveControl(
+              tooltip: 'Shuffle',
+              active: playback.shuffle,
+              onPressed: playback.toggleShuffle,
+              icon: Icons.shuffle_rounded,
+            ),
+            IconButton(
+              tooltip: 'Previous',
+              iconSize: 32,
+              onPressed: playback.previous,
+              icon: const Icon(Icons.skip_previous_rounded),
+            ),
+            SpotifinPlayButton(
+              onPressed: playback.toggle,
+              playing: playback.playing,
+              large: true,
+            ),
+            IconButton(
+              tooltip: 'Next',
+              iconSize: 32,
+              onPressed: playback.next,
+              icon: const Icon(Icons.skip_next_rounded),
+            ),
+            _ActiveControl(
+              tooltip: 'Repeat',
+              active: playback.loopMode != LoopMode.off,
+              onPressed: playback.cycleRepeat,
+              icon: playback.loopMode == LoopMode.one
+                  ? Icons.repeat_one_rounded
+                  : Icons.repeat_rounded,
+            ),
+          ],
+        ),
+      ],
+    ),
   );
 }
 
@@ -296,41 +317,104 @@ class _QueuePanel extends StatelessWidget {
     onReorderItem: playback.reorder,
     itemBuilder: (context, index) {
       final track = playback.queue[index];
-      return ListTile(
+      return _QueueItem(
         key: ValueKey('$index-${track.id}'),
+        track: track,
+        index: index,
         selected: index == playback.currentIndex,
-        selectedColor: SpotifinColors.accent,
-        selectedTileColor: SpotifinColors.interactive,
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ReorderableDragStartListener(
-              index: index,
-              child: const Padding(
-                padding: EdgeInsets.only(right: 8),
-                child: Icon(Icons.drag_handle_rounded),
-              ),
-            ),
-            Artwork(
-              itemId: track.albumId ?? track.id,
-              size: 44,
-              borderRadius: SpotifinRadii.small,
-            ),
-          ],
-        ),
-        title: Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          track.artist,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: IconButton(
-          tooltip: 'Remove from queue',
-          onPressed: () => playback.removeAt(index),
-          icon: const Icon(Icons.close_rounded),
-        ),
+        playback: playback,
       );
     },
+  );
+}
+
+class _QueueItem extends StatefulWidget {
+  const _QueueItem({
+    required this.track,
+    required this.index,
+    required this.selected,
+    required this.playback,
+    super.key,
+  });
+
+  final Track track;
+  final int index;
+  final bool selected;
+  final PlaybackService playback;
+
+  @override
+  State<_QueueItem> createState() => _QueueItemState();
+}
+
+class _QueueItemState extends State<_QueueItem> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _hovered = true),
+    onExit: (_) => setState(() => _hovered = false),
+    child: ListTile(
+      selected: widget.selected,
+      selectedColor: SpotifinColors.accent,
+      selectedTileColor: SpotifinColors.interactive,
+      hoverColor: SpotifinColors.hover,
+      onTap: () => widget.playback.playQueueIndex(widget.index),
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ReorderableDragStartListener(
+            index: widget.index,
+            child: const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.drag_handle_rounded),
+            ),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(SpotifinRadii.small),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Artwork(
+                  itemId: widget.track.albumId ?? widget.track.id,
+                  size: 44,
+                  borderRadius: 0,
+                ),
+                AnimatedOpacity(
+                  opacity: _hovered ? 1 : 0,
+                  duration: const Duration(milliseconds: 120),
+                  child: const ColoredBox(
+                    color: Color(0x99000000),
+                    child: SizedBox.square(
+                      dimension: 44,
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      title: Text(
+        widget.track.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        widget.track.artist,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: IconButton(
+        tooltip: 'Remove from queue',
+        onPressed: () => widget.playback.removeAt(widget.index),
+        icon: const Icon(Icons.close_rounded),
+      ),
+    ),
   );
 }
 

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class PlayerPanelState {
   const PlayerPanelState({
     this.player = true,
-    this.queue = false,
+    this.queue = true,
     this.lyrics = false,
   });
 
