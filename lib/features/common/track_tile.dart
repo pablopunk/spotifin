@@ -40,6 +40,19 @@ class TrackTile extends ConsumerWidget {
               .toggleFavorite(track.id, !track.favorite);
         } else if (action == 'queue') {
           await ref.read(playbackProvider).addToQueue(track);
+        } else if (action == 'download') {
+          final session = ref.read(appControllerProvider).session;
+          if (session != null) {
+            await ref
+                .read(downloadProvider)
+                .download(
+                  session,
+                  track,
+                  small: ref.read(appControllerProvider).smallDownloads,
+                );
+          }
+        } else if (action == 'playlist') {
+          await _addToPlaylist(context, ref);
         }
       },
       itemBuilder: (_) => [
@@ -54,6 +67,14 @@ class TrackTile extends ConsumerWidget {
           ),
         ),
         const PopupMenuItem(
+          value: 'playlist',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.library_add_rounded),
+            title: Text('Add to playlist'),
+          ),
+        ),
+        const PopupMenuItem(
           value: 'queue',
           child: ListTile(
             contentPadding: EdgeInsets.zero,
@@ -61,7 +82,50 @@ class TrackTile extends ConsumerWidget {
             title: Text('Add to queue'),
           ),
         ),
+        const PopupMenuItem(
+          value: 'download',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.download_rounded),
+            title: Text('Download'),
+          ),
+        ),
       ],
     ),
   );
+
+  Future<void> _addToPlaylist(BuildContext context, WidgetRef ref) async {
+    final playlists = await ref
+        .read(databaseProvider)
+        .select(ref.read(databaseProvider).playlists)
+        .get();
+    if (!context.mounted) return;
+    if (playlists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Create a playlist from the current queue first.'),
+        ),
+      );
+      return;
+    }
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Add to playlist'),
+        children: playlists
+            .map(
+              (playlist) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, playlist.id),
+                child: Text(playlist.name),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (selected != null) {
+      await ref
+          .read(appControllerProvider.notifier)
+          .addToPlaylist(selected, track.id);
+    }
+  }
 }

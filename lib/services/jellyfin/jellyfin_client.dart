@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:http/http.dart' as http;
 
 import '../../storage/database.dart';
+import '../lyrics/lyric_line.dart';
 import 'session.dart';
 
 class JellyfinException implements Exception {
@@ -60,7 +61,10 @@ class JellyfinClient {
     return _decodeResponse(response);
   }
 
-  Future<List<TracksCompanion>> fetchTracks(JellyfinSession session) async {
+  Future<List<TracksCompanion>> fetchTracks(
+    JellyfinSession session, {
+    Future<void> Function(List<TracksCompanion> page)? onPage,
+  }) async {
     final items = <TracksCompanion>[];
     var startIndex = 0;
     const pageSize = 500;
@@ -72,14 +76,15 @@ class JellyfinClient {
         'Limit': '$pageSize',
         'SortBy': 'SortName',
         'SortOrder': 'Ascending',
-        'Fields':
-            'Genres,Tags,DateCreated,UserData,AlbumId,ArtistItems,ImageTags',
+        'Fields': 'Genres,Tags,DateCreated,UserData,AlbumId,ArtistItems,ImageTags,NormalizationGain',
         'EnableUserData': 'true',
       });
       final body = await _getJson(session, uri);
       final page = (body['Items'] as List<dynamic>? ?? const [])
           .cast<Map<String, dynamic>>();
-      items.addAll(page.map(_trackFromJson));
+      final rows = page.map(_trackFromJson).toList();
+      items.addAll(rows);
+      await onPage?.call(rows);
       startIndex += page.length;
       final total = body['TotalRecordCount'] as int? ?? startIndex;
       if (page.isEmpty || startIndex >= total) break;
@@ -133,6 +138,95 @@ class JellyfinClient {
         ? await _http.post(uri, headers: _headers(session))
         : await _http.delete(uri, headers: _headers(session));
     _ensureSuccess(response);
+  }
+
+  Future<void> addToPlaylist(
+    JellyfinSession session,
+    String playlistId,
+    List<String> trackIds,
+  ) async {
+    final response = await _http.post(
+      _uri(session, '/Playlists/$playlistId/Items', {
+        'ids': trackIds.join(','),
+        'userId': session.userId,
+      }),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<void> createPlaylist(
+    JellyfinSession session,
+    String name,
+    List<String> trackIds,
+  ) async {
+    final response = await _http.post(
+      _uri(session, '/Playlists', {
+        'name': name,
+        'ids': trackIds.join(','),
+        'userId': session.userId,
+        'mediaType': 'Audio',
+      }),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<void> logout(JellyfinSession session) async {
+    final response = await _http.post(
+      _uri(session, '/Sessions/Logout'),
+      headers: _headers(session),
+    );
+    if (response.statusCode == 401) return;
+    _ensureSuccess(response);
+  }
+
+  Future<void> reportPlayback(
+    JellyfinSession session,
+    String endpoint,
+    String itemId,
+    Duration position, {
+    required String playSessionId,
+    bool paused = false,
+  }) async {
+    final response = await _http.post(
+      _uri(session, endpoint),
+      headers: {..._headers(session), 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'ItemId': itemId,
+        'PositionTicks': position.inMicroseconds * 10,
+        'IsPaused': paused,
+        'CanSeek': true,
+        'PlayMethod': 'DirectStream',
+        'PlaySessionId': playSessionId,
+      }),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<List<LyricLine>> fetchLyrics(
+    JellyfinSession session,
+    String itemId,
+  ) async {
+    final response = await _http.get(
+      _uri(session, '/Audio/$itemId/Lyrics'),
+      headers: _headers(session),
+    );
+    if (response.statusCode == 404 || response.statusCode == 204) {
+      return const [];
+    }
+    final body = _decodeResponse(response);
+    return (body['Lyrics'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map((line) {
+          final ticks = line['Start'] as int?;
+          return LyricLine(
+            line['Text'] as String? ?? '',
+            ticks == null ? null : Duration(microseconds: ticks ~/ 10),
+          );
+        })
+        .where((line) => line.text.isNotEmpty)
+        .toList();
   }
 
   Uri streamUri(JellyfinSession session, String itemId, {bool small = false}) {
@@ -235,6 +329,10 @@ class JellyfinClient {
       imageTag: Value(_primaryImageTag(json)),
       favorite: Value(userData['IsFavorite'] as bool? ?? false),
       playCount: Value(userData['PlayCount'] as int? ?? 0),
+      normalizationGain: Value((json['NormalizationGain'] as num?)?.toDouble()),
+      albumNormalizationGain: Value(
+        (json['AlbumNormalizationGain'] as num?)?.toDouble(),
+      ),
       lastPlayed: Value(
         DateTime.tryParse(userData['LastPlayedDate'] as String? ?? ''),
       ),

@@ -1,4 +1,5 @@
 import Flutter
+import AVKit
 import UIKit
 
 @main
@@ -12,5 +13,39 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    engineBridge.pluginRegistry.registrar(forPlugin: "SpotifinAirPlay")?.register(
+      AirPlayViewFactory(),
+      withId: "spotifin_airplay"
+    )
+  }
+}
+
+private final class AirPlayViewFactory: NSObject, FlutterPlatformViewFactory {
+  func createArgsCodec() -> (any FlutterMessageCodec & NSObjectProtocol)? {
+    FlutterStandardMessageCodec.sharedInstance()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> any FlutterPlatformView {
+    AirPlayPlatformView(frame: frame)
+  }
+}
+
+private final class AirPlayPlatformView: NSObject, FlutterPlatformView {
+  private let routePicker: AVRoutePickerView
+
+  init(frame: CGRect) {
+    routePicker = AVRoutePickerView(frame: frame)
+    routePicker.prioritizesVideoDevices = false
+    routePicker.tintColor = .white
+    routePicker.activeTintColor = .systemGreen
+    super.init()
+  }
+
+  func view() -> UIView {
+    routePicker
   }
 }

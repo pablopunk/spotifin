@@ -16,6 +16,8 @@ class Tracks extends Table {
   TextColumn get imageTag => text().nullable()();
   BoolColumn get favorite => boolean().withDefault(const Constant(false))();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
+  RealColumn get normalizationGain => real().nullable()();
+  RealColumn get albumNormalizationGain => real().nullable()();
   DateTimeColumn get lastPlayed => dateTime().nullable()();
   DateTimeColumn get dateCreated => dateTime().nullable()();
 
@@ -58,15 +60,38 @@ class PendingWrites extends Table {
 
 @DriftDatabase(tables: [Tracks, Playlists, Downloads, PendingWrites])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'spotifin'));
+  AppDatabase()
+    : super(
+        driftDatabase(
+          name: 'spotifin',
+          web: DriftWebOptions(
+            sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+            driftWorker: Uri.parse('drift_worker.js'),
+          ),
+        ),
+      );
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (migrator) => migrator.createAll(),
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(tracks, tracks.normalizationGain);
+        await migrator.addColumn(tracks, tracks.albumNormalizationGain);
+      }
+    },
+  );
 
   Stream<List<Track>> watchTracks() =>
       (select(tracks)..orderBy([(row) => OrderingTerm.asc(row.name)])).watch();
 
   Future<List<Track>> allTracks() => select(tracks).get();
+
+  Future<void> upsertTracks(List<TracksCompanion> rows) =>
+      batch((batch) => batch.insertAllOnConflictUpdate(tracks, rows));
 
   Future<void> replaceTracks(List<TracksCompanion> rows) =>
       transaction(() async {

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/jellyfin/session.dart';
 import '../providers.dart';
@@ -11,12 +12,18 @@ class AppState {
     this.session,
     this.syncing = false,
     this.error,
+    this.smallStreaming = false,
+    this.smallDownloads = false,
+    this.normalization = true,
   });
 
   final AppStatus status;
   final JellyfinSession? session;
   final bool syncing;
   final String? error;
+  final bool smallStreaming;
+  final bool smallDownloads;
+  final bool normalization;
 
   AppState copyWith({
     AppStatus? status,
@@ -25,11 +32,17 @@ class AppState {
     String? error,
     bool clearError = false,
     bool clearSession = false,
+    bool? smallStreaming,
+    bool? smallDownloads,
+    bool? normalization,
   }) => AppState(
     status: status ?? this.status,
     session: clearSession ? null : session ?? this.session,
     syncing: syncing ?? this.syncing,
     error: clearError ? null : error ?? this.error,
+    smallStreaming: smallStreaming ?? this.smallStreaming,
+    smallDownloads: smallDownloads ?? this.smallDownloads,
+    normalization: normalization ?? this.normalization,
   );
 }
 
@@ -38,13 +51,34 @@ class AppController extends Notifier<AppState> {
   AppState build() => const AppState();
 
   Future<void> initialize() async {
+    final preferences = await SharedPreferences.getInstance();
+    final smallStreaming = preferences.getBool('smallStreaming') ?? false;
+    final smallDownloads = preferences.getBool('smallDownloads') ?? false;
+    final normalization = preferences.getBool('normalization') ?? true;
     final session = await ref.read(sessionStoreProvider).load();
     if (session == null) {
-      state = const AppState(status: AppStatus.signedOut);
+      state = AppState(
+        status: AppStatus.signedOut,
+        smallStreaming: smallStreaming,
+        smallDownloads: smallDownloads,
+        normalization: normalization,
+      );
       return;
     }
-    state = AppState(status: AppStatus.ready, session: session);
-    await ref.read(playbackProvider).configure(session);
+    state = AppState(
+      status: AppStatus.ready,
+      session: session,
+      smallStreaming: smallStreaming,
+      smallDownloads: smallDownloads,
+      normalization: normalization,
+    );
+    await ref
+        .read(playbackProvider)
+        .configure(
+          session,
+          smallStreaming: smallStreaming,
+          normalization: normalization,
+        );
     final cached = await ref.read(databaseProvider).allTracks();
     if (cached.isNotEmpty) await ref.read(playbackProvider).restore(cached);
     await refresh(silent: cached.isNotEmpty);
@@ -61,8 +95,14 @@ class AppController extends Notifier<AppState> {
             password: password,
           );
       await ref.read(sessionStoreProvider).save(session);
-      await ref.read(playbackProvider).configure(session);
-      state = AppState(
+      await ref
+          .read(playbackProvider)
+          .configure(
+            session,
+            smallStreaming: state.smallStreaming,
+            normalization: state.normalization,
+          );
+      state = state.copyWith(
         status: AppStatus.ready,
         session: session,
         syncing: true,
@@ -81,11 +121,17 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(syncing: !silent, clearError: true);
     try {
       final client = ref.read(jellyfinClientProvider);
-      final tracks = await client.fetchTracks(session);
+      final tracks = await client.fetchTracks(
+        session,
+        onPage: ref.read(databaseProvider).upsertTracks,
+      );
       await ref.read(databaseProvider).replaceTracks(tracks);
       final playlists = await client.fetchPlaylists(session);
       await ref.read(databaseProvider).replacePlaylists(playlists);
       final catalog = await ref.read(databaseProvider).allTracks();
+      await ref
+          .read(carPlayProvider)
+          .configure(catalog, ref.read(playbackProvider));
       if (ref.read(playbackProvider).queue.isEmpty) {
         await ref.read(playbackProvider).restore(catalog);
       }
@@ -109,12 +155,95 @@ class AppController extends Notifier<AppState> {
     }
   }
 
+  Future<void> addToPlaylist(String playlistId, String trackId) async {
+    final session = state.session;
+    if (session == null) return;
+    try {
+      await ref.read(jellyfinClientProvider).addToPlaylist(
+        session,
+        playlistId,
+        [trackId],
+      );
+      final playlists = await ref
+          .read(jellyfinClientProvider)
+          .fetchPlaylists(session);
+      await ref.read(databaseProvider).replacePlaylists(playlists);
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
+  Future<void> createPlaylist(String name, List<String> trackIds) async {
+    final session = state.session;
+    if (session == null || name.trim().isEmpty || trackIds.isEmpty) return;
+    try {
+      await ref
+          .read(jellyfinClientProvider)
+          .createPlaylist(session, name.trim(), trackIds);
+      final playlists = await ref
+          .read(jellyfinClientProvider)
+          .fetchPlaylists(session);
+      await ref.read(databaseProvider).replacePlaylists(playlists);
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    }
+  }
+
   Future<void> signOut() async {
+    final session = state.session;
+    if (session != null) {
+      try {
+        await ref.read(jellyfinClientProvider).logout(session);
+      } catch (_) {}
+    }
     await ref.read(playbackProvider).clear();
     await ref.read(databaseProvider).clearAccountData();
     await ref.read(sessionStoreProvider).clear();
-    state = const AppState(status: AppStatus.signedOut);
+    state = state.copyWith(
+      status: AppStatus.signedOut,
+      clearSession: true,
+      syncing: false,
+      clearError: true,
+    );
   }
 
   void clearError() => state = state.copyWith(clearError: true);
+
+  Future<void> setSmallStreaming(bool value) async {
+    state = state.copyWith(smallStreaming: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('smallStreaming', value);
+    final session = state.session;
+    if (session != null) {
+      await ref
+          .read(playbackProvider)
+          .configure(
+            session,
+            smallStreaming: value,
+            normalization: state.normalization,
+          );
+    }
+  }
+
+  Future<void> setSmallDownloads(bool value) async {
+    state = state.copyWith(smallDownloads: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('smallDownloads', value);
+  }
+
+  Future<void> setNormalization(bool value) async {
+    state = state.copyWith(normalization: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('normalization', value);
+    final session = state.session;
+    if (session != null) {
+      await ref
+          .read(playbackProvider)
+          .configure(
+            session,
+            smallStreaming: state.smallStreaming,
+            normalization: value,
+          );
+    }
+  }
 }

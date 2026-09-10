@@ -1,17 +1,38 @@
-# spotifin
+# Spotifin
 
-A new Flutter project.
+Spotifin is a free, open-source, Spotify-style music player that connects
+directly to an existing Jellyfin server.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+Install the pinned toolchain with [mise](https://mise.jdx.dev/), then run:
 
-A few resources to get you started if this is your first Flutter project:
+```sh
+mise install
+mise exec -- flutter pub get
+mise exec -- dart run build_runner build
+mise exec -- flutter run -d chrome
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
+`mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Checks
+
+```sh
+mise exec -- flutter analyze
+mise exec -- flutter test
+mise exec -- flutter build web --release
+mise exec -- flutter build ios --release --no-codesign
+```
+
+The iOS build needs the matching iOS platform component in Xcode and the
+CarPlay audio entitlement before distribution.
+
+## Deploy
+
+- Vercel uses `vercel.json` and `scripts/build-web.sh` for the static web app.
+- Codemagic uses `codemagic.yaml` for signed TestFlight builds after its App
+  Store Connect integration and signing profile are configured.
+
+Product and engineering decisions are in [`docs/`](docs/).

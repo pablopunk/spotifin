@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
+import '../../services/mixes/mix_generator.dart';
 import '../common/artwork.dart';
 import '../common/track_tile.dart';
 
@@ -33,6 +34,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             );
           final favorites = tracks.where((track) => track.favorite).toList();
+          final mixes = const MixGenerator().generate(tracks, DateTime.now());
           return RefreshIndicator(
             onRefresh: ref.read(appControllerProvider.notifier).refresh,
             child: CustomScrollView(
@@ -96,6 +98,15 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: 120),
                   ],
                 ),
+                ...mixes
+                    .take(3)
+                    .map(
+                      (mix) => _HorizontalSection(
+                        title: mix.name,
+                        tracks: mix.tracks.take(12).toList(),
+                        contextTracks: mix.tracks,
+                      ),
+                    ),
               ],
             ),
           );

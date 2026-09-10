@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bash scripts/build-web.sh",
+  "outputDirectory": "build/web",
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(flutter_service_worker.js|index.html|manifest.json)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "source": "/(.*\\.(js|wasm|png|woff2|otf|ttf))",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ],
+  "rewrites": [{ "source": "/((?!.*\\.).*)", "destination": "/index.html" }]
+}

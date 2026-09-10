@@ -47,6 +47,9 @@ dependencies:
   audio_session: ^0.2.4
   path_provider: ^2.1.6
   collection: ^1.19.1
+  web: ^1.1.1
+  just_audio_background: ^0.0.1-beta.17
+  flutter_carplay: ^1.6.5
 
 dev_dependencies:
   flutter_test:

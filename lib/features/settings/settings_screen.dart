@@ -21,21 +21,37 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(session?.serverUrl ?? ''),
           ),
           const Divider(),
-          const SwitchListTile(
-            value: true,
-            onChanged: null,
-            title: Text('Volume normalization'),
-            subtitle: Text('Use Jellyfin gain data when available'),
+          SwitchListTile(
+            value: state.normalization,
+            onChanged: ref
+                .read(appControllerProvider.notifier)
+                .setNormalization,
+            title: const Text('Volume normalization'),
+            subtitle: const Text('Use Jellyfin gain data when available'),
           ),
-          const ListTile(
-            leading: Icon(Icons.high_quality_rounded),
-            title: Text('Streaming quality'),
-            subtitle: Text('Full quality'),
+          ListTile(
+            leading: const Icon(Icons.high_quality_rounded),
+            title: const Text('Streaming quality'),
+            subtitle: Text(
+              state.smallStreaming ? 'Small file' : 'Full quality',
+            ),
+            onTap: () => _chooseQuality(
+              context,
+              state.smallStreaming,
+              ref.read(appControllerProvider.notifier).setSmallStreaming,
+            ),
           ),
-          const ListTile(
-            leading: Icon(Icons.download_rounded),
-            title: Text('Download quality'),
-            subtitle: Text('Full quality'),
+          ListTile(
+            leading: const Icon(Icons.download_rounded),
+            title: const Text('Download quality'),
+            subtitle: Text(
+              state.smallDownloads ? 'Small file' : 'Full quality',
+            ),
+            onTap: () => _chooseQuality(
+              context,
+              state.smallDownloads,
+              ref.read(appControllerProvider.notifier).setSmallDownloads,
+            ),
           ),
           const Divider(),
           ListTile(
@@ -87,5 +103,40 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(appControllerProvider.notifier).signOut();
     }
+  }
+
+  Future<void> _chooseQuality(
+    BuildContext context,
+    bool current,
+    Future<void> Function(bool) save,
+  ) async {
+    final selected = await showDialog<bool>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Choose quality'),
+        children: [
+          RadioGroup<bool>(
+            groupValue: current,
+            onChanged: (value) => Navigator.pop(context, value),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<bool>(
+                  value: false,
+                  title: Text('Full quality'),
+                  subtitle: Text('Prefer the original audio'),
+                ),
+                RadioListTile<bool>(
+                  value: true,
+                  title: Text('Small file'),
+                  subtitle: Text('AAC at about 128 kbps'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (selected != null) await save(selected);
   }
 }

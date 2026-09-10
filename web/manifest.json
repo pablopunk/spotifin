@@ -1,12 +1,12 @@
 {
-    "name": "spotifin",
-    "short_name": "spotifin",
+    "name": "Spotifin",
+    "short_name": "Spotifin",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0D0F12",
+    "theme_color": "#8BE28B",
+    "description": "A simple Jellyfin music player.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

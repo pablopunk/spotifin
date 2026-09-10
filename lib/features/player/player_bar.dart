@@ -4,7 +4,10 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../platform/airplay_control.dart';
 import '../../services/playback/playback_service.dart';
+import '../../services/lyrics/lyric_line.dart';
+import '../../storage/database.dart';
 import '../common/artwork.dart';
 
 class PlayerBar extends ConsumerWidget {
@@ -95,12 +98,12 @@ class PlayerBar extends ConsumerWidget {
   }
 }
 
-class _NowPlaying extends StatelessWidget {
+class _NowPlaying extends ConsumerWidget {
   const _NowPlaying({required this.playback});
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context, WidgetRef ref) => ListenableBuilder(
     listenable: playback,
     builder: (context, _) {
       final track = playback.currentTrack;
@@ -210,7 +213,26 @@ class _NowPlaying extends StatelessWidget {
                         : Icons.repeat_rounded,
                   ),
                 ),
+                const AirPlayControl(),
               ],
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => _LyricsSheet(track: track, playback: playback),
+              ),
+              icon: const Icon(Icons.lyrics_outlined),
+              label: const Text('Lyrics'),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: playback.queue.isEmpty
+                  ? null
+                  : () => _saveQueue(context, ref),
+              icon: const Icon(Icons.playlist_add_rounded),
+              label: const Text('Save queue as playlist'),
             ),
             const SizedBox(height: 30),
             Text('Queue', style: Theme.of(context).textTheme.titleLarge),
@@ -254,5 +276,104 @@ class _NowPlaying extends StatelessWidget {
     final minutes = value.inMinutes;
     final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+
+  Future<void> _saveQueue(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController(text: 'New playlist');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save queue'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name != null && name.trim().isNotEmpty) {
+      await ref
+          .read(appControllerProvider.notifier)
+          .createPlaylist(
+            name,
+            playback.queue.map((track) => track.id).toList(),
+          );
+    }
+  }
+}
+
+class _LyricsSheet extends ConsumerWidget {
+  const _LyricsSheet({required this.track, required this.playback});
+  final Track track;
+  final PlaybackService playback;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(appControllerProvider).session;
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .82,
+        child: session == null
+            ? const Center(child: Text('Lyrics are unavailable offline.'))
+            : FutureBuilder<List<LyricLine>>(
+                future: ref.read(lyricsProvider).find(session, track),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final lines = snapshot.data ?? const [];
+                  if (lines.isEmpty) {
+                    return const Center(child: Text('No lyrics found'));
+                  }
+                  return StreamBuilder<Duration>(
+                    stream: playback.player.positionStream,
+                    builder: (context, positionSnapshot) {
+                      final position = positionSnapshot.data ?? Duration.zero;
+                      final active = _activeLine(lines, position);
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
+                        itemCount: lines.length,
+                        itemBuilder: (context, index) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            lines[index].text,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: index == active
+                                      ? SpotifinColors.accent
+                                      : Colors.white54,
+                                  fontWeight: index == active
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  int _activeLine(List<LyricLine> lines, Duration position) {
+    var result = -1;
+    for (var index = 0; index < lines.length; index++) {
+      final start = lines[index].start;
+      if (start != null && start <= position) result = index;
+    }
+    return result;
   }
 }

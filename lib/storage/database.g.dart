@@ -129,6 +129,29 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _normalizationGainMeta = const VerificationMeta(
+    'normalizationGain',
+  );
+  @override
+  late final GeneratedColumn<double> normalizationGain =
+      GeneratedColumn<double>(
+        'normalization_gain',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _albumNormalizationGainMeta =
+      const VerificationMeta('albumNormalizationGain');
+  @override
+  late final GeneratedColumn<double> albumNormalizationGain =
+      GeneratedColumn<double>(
+        'album_normalization_gain',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _lastPlayedMeta = const VerificationMeta(
     'lastPlayed',
   );
@@ -164,6 +187,8 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     imageTag,
     favorite,
     playCount,
+    normalizationGain,
+    albumNormalizationGain,
     lastPlayed,
     dateCreated,
   ];
@@ -249,6 +274,24 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta),
       );
     }
+    if (data.containsKey('normalization_gain')) {
+      context.handle(
+        _normalizationGainMeta,
+        normalizationGain.isAcceptableOrUnknown(
+          data['normalization_gain']!,
+          _normalizationGainMeta,
+        ),
+      );
+    }
+    if (data.containsKey('album_normalization_gain')) {
+      context.handle(
+        _albumNormalizationGainMeta,
+        albumNormalizationGain.isAcceptableOrUnknown(
+          data['album_normalization_gain']!,
+          _albumNormalizationGainMeta,
+        ),
+      );
+    }
     if (data.containsKey('last_played')) {
       context.handle(
         _lastPlayedMeta,
@@ -317,6 +360,14 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.int,
         data['${effectivePrefix}play_count'],
       )!,
+      normalizationGain: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}normalization_gain'],
+      ),
+      albumNormalizationGain: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}album_normalization_gain'],
+      ),
       lastPlayed: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_played'],
@@ -346,6 +397,8 @@ class Track extends DataClass implements Insertable<Track> {
   final String? imageTag;
   final bool favorite;
   final int playCount;
+  final double? normalizationGain;
+  final double? albumNormalizationGain;
   final DateTime? lastPlayed;
   final DateTime? dateCreated;
   const Track({
@@ -360,6 +413,8 @@ class Track extends DataClass implements Insertable<Track> {
     this.imageTag,
     required this.favorite,
     required this.playCount,
+    this.normalizationGain,
+    this.albumNormalizationGain,
     this.lastPlayed,
     this.dateCreated,
   });
@@ -381,6 +436,14 @@ class Track extends DataClass implements Insertable<Track> {
     }
     map['favorite'] = Variable<bool>(favorite);
     map['play_count'] = Variable<int>(playCount);
+    if (!nullToAbsent || normalizationGain != null) {
+      map['normalization_gain'] = Variable<double>(normalizationGain);
+    }
+    if (!nullToAbsent || albumNormalizationGain != null) {
+      map['album_normalization_gain'] = Variable<double>(
+        albumNormalizationGain,
+      );
+    }
     if (!nullToAbsent || lastPlayed != null) {
       map['last_played'] = Variable<DateTime>(lastPlayed);
     }
@@ -407,6 +470,12 @@ class Track extends DataClass implements Insertable<Track> {
           : Value(imageTag),
       favorite: Value(favorite),
       playCount: Value(playCount),
+      normalizationGain: normalizationGain == null && nullToAbsent
+          ? const Value.absent()
+          : Value(normalizationGain),
+      albumNormalizationGain: albumNormalizationGain == null && nullToAbsent
+          ? const Value.absent()
+          : Value(albumNormalizationGain),
       lastPlayed: lastPlayed == null && nullToAbsent
           ? const Value.absent()
           : Value(lastPlayed),
@@ -433,6 +502,12 @@ class Track extends DataClass implements Insertable<Track> {
       imageTag: serializer.fromJson<String?>(json['imageTag']),
       favorite: serializer.fromJson<bool>(json['favorite']),
       playCount: serializer.fromJson<int>(json['playCount']),
+      normalizationGain: serializer.fromJson<double?>(
+        json['normalizationGain'],
+      ),
+      albumNormalizationGain: serializer.fromJson<double?>(
+        json['albumNormalizationGain'],
+      ),
       lastPlayed: serializer.fromJson<DateTime?>(json['lastPlayed']),
       dateCreated: serializer.fromJson<DateTime?>(json['dateCreated']),
     );
@@ -452,6 +527,10 @@ class Track extends DataClass implements Insertable<Track> {
       'imageTag': serializer.toJson<String?>(imageTag),
       'favorite': serializer.toJson<bool>(favorite),
       'playCount': serializer.toJson<int>(playCount),
+      'normalizationGain': serializer.toJson<double?>(normalizationGain),
+      'albumNormalizationGain': serializer.toJson<double?>(
+        albumNormalizationGain,
+      ),
       'lastPlayed': serializer.toJson<DateTime?>(lastPlayed),
       'dateCreated': serializer.toJson<DateTime?>(dateCreated),
     };
@@ -469,6 +548,8 @@ class Track extends DataClass implements Insertable<Track> {
     Value<String?> imageTag = const Value.absent(),
     bool? favorite,
     int? playCount,
+    Value<double?> normalizationGain = const Value.absent(),
+    Value<double?> albumNormalizationGain = const Value.absent(),
     Value<DateTime?> lastPlayed = const Value.absent(),
     Value<DateTime?> dateCreated = const Value.absent(),
   }) => Track(
@@ -483,6 +564,12 @@ class Track extends DataClass implements Insertable<Track> {
     imageTag: imageTag.present ? imageTag.value : this.imageTag,
     favorite: favorite ?? this.favorite,
     playCount: playCount ?? this.playCount,
+    normalizationGain: normalizationGain.present
+        ? normalizationGain.value
+        : this.normalizationGain,
+    albumNormalizationGain: albumNormalizationGain.present
+        ? albumNormalizationGain.value
+        : this.albumNormalizationGain,
     lastPlayed: lastPlayed.present ? lastPlayed.value : this.lastPlayed,
     dateCreated: dateCreated.present ? dateCreated.value : this.dateCreated,
   );
@@ -501,6 +588,12 @@ class Track extends DataClass implements Insertable<Track> {
       imageTag: data.imageTag.present ? data.imageTag.value : this.imageTag,
       favorite: data.favorite.present ? data.favorite.value : this.favorite,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
+      normalizationGain: data.normalizationGain.present
+          ? data.normalizationGain.value
+          : this.normalizationGain,
+      albumNormalizationGain: data.albumNormalizationGain.present
+          ? data.albumNormalizationGain.value
+          : this.albumNormalizationGain,
       lastPlayed: data.lastPlayed.present
           ? data.lastPlayed.value
           : this.lastPlayed,
@@ -524,6 +617,8 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('imageTag: $imageTag, ')
           ..write('favorite: $favorite, ')
           ..write('playCount: $playCount, ')
+          ..write('normalizationGain: $normalizationGain, ')
+          ..write('albumNormalizationGain: $albumNormalizationGain, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('dateCreated: $dateCreated')
           ..write(')'))
@@ -543,6 +638,8 @@ class Track extends DataClass implements Insertable<Track> {
     imageTag,
     favorite,
     playCount,
+    normalizationGain,
+    albumNormalizationGain,
     lastPlayed,
     dateCreated,
   );
@@ -561,6 +658,8 @@ class Track extends DataClass implements Insertable<Track> {
           other.imageTag == this.imageTag &&
           other.favorite == this.favorite &&
           other.playCount == this.playCount &&
+          other.normalizationGain == this.normalizationGain &&
+          other.albumNormalizationGain == this.albumNormalizationGain &&
           other.lastPlayed == this.lastPlayed &&
           other.dateCreated == this.dateCreated);
 }
@@ -577,6 +676,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<String?> imageTag;
   final Value<bool> favorite;
   final Value<int> playCount;
+  final Value<double?> normalizationGain;
+  final Value<double?> albumNormalizationGain;
   final Value<DateTime?> lastPlayed;
   final Value<DateTime?> dateCreated;
   final Value<int> rowid;
@@ -592,6 +693,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.imageTag = const Value.absent(),
     this.favorite = const Value.absent(),
     this.playCount = const Value.absent(),
+    this.normalizationGain = const Value.absent(),
+    this.albumNormalizationGain = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.dateCreated = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -608,6 +711,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.imageTag = const Value.absent(),
     this.favorite = const Value.absent(),
     this.playCount = const Value.absent(),
+    this.normalizationGain = const Value.absent(),
+    this.albumNormalizationGain = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.dateCreated = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -625,6 +730,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<String>? imageTag,
     Expression<bool>? favorite,
     Expression<int>? playCount,
+    Expression<double>? normalizationGain,
+    Expression<double>? albumNormalizationGain,
     Expression<DateTime>? lastPlayed,
     Expression<DateTime>? dateCreated,
     Expression<int>? rowid,
@@ -641,6 +748,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (imageTag != null) 'image_tag': imageTag,
       if (favorite != null) 'favorite': favorite,
       if (playCount != null) 'play_count': playCount,
+      if (normalizationGain != null) 'normalization_gain': normalizationGain,
+      if (albumNormalizationGain != null)
+        'album_normalization_gain': albumNormalizationGain,
       if (lastPlayed != null) 'last_played': lastPlayed,
       if (dateCreated != null) 'date_created': dateCreated,
       if (rowid != null) 'rowid': rowid,
@@ -659,6 +769,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<String?>? imageTag,
     Value<bool>? favorite,
     Value<int>? playCount,
+    Value<double?>? normalizationGain,
+    Value<double?>? albumNormalizationGain,
     Value<DateTime?>? lastPlayed,
     Value<DateTime?>? dateCreated,
     Value<int>? rowid,
@@ -675,6 +787,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
       imageTag: imageTag ?? this.imageTag,
       favorite: favorite ?? this.favorite,
       playCount: playCount ?? this.playCount,
+      normalizationGain: normalizationGain ?? this.normalizationGain,
+      albumNormalizationGain:
+          albumNormalizationGain ?? this.albumNormalizationGain,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       dateCreated: dateCreated ?? this.dateCreated,
       rowid: rowid ?? this.rowid,
@@ -717,6 +832,14 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
     }
+    if (normalizationGain.present) {
+      map['normalization_gain'] = Variable<double>(normalizationGain.value);
+    }
+    if (albumNormalizationGain.present) {
+      map['album_normalization_gain'] = Variable<double>(
+        albumNormalizationGain.value,
+      );
+    }
     if (lastPlayed.present) {
       map['last_played'] = Variable<DateTime>(lastPlayed.value);
     }
@@ -743,6 +866,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('imageTag: $imageTag, ')
           ..write('favorite: $favorite, ')
           ..write('playCount: $playCount, ')
+          ..write('normalizationGain: $normalizationGain, ')
+          ..write('albumNormalizationGain: $albumNormalizationGain, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('dateCreated: $dateCreated, ')
           ..write('rowid: $rowid')
@@ -1862,6 +1987,8 @@ typedef $$TracksTableCreateCompanionBuilder = TracksCompanion Function({
   Value<String?> imageTag,
   Value<bool> favorite,
   Value<int> playCount,
+  Value<double?> normalizationGain,
+  Value<double?> albumNormalizationGain,
   Value<DateTime?> lastPlayed,
   Value<DateTime?> dateCreated,
   Value<int> rowid,
@@ -1878,6 +2005,8 @@ typedef $$TracksTableUpdateCompanionBuilder = TracksCompanion Function({
   Value<String?> imageTag,
   Value<bool> favorite,
   Value<int> playCount,
+  Value<double?> normalizationGain,
+  Value<double?> albumNormalizationGain,
   Value<DateTime?> lastPlayed,
   Value<DateTime?> dateCreated,
   Value<int> rowid,
@@ -1944,6 +2073,16 @@ class $$TracksTableFilterComposer
 
   ColumnFilters<int> get playCount => $composableBuilder(
     column: $table.playCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get normalizationGain => $composableBuilder(
+    column: $table.normalizationGain,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get albumNormalizationGain => $composableBuilder(
+    column: $table.albumNormalizationGain,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2022,6 +2161,16 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get normalizationGain => $composableBuilder(
+    column: $table.normalizationGain,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get albumNormalizationGain => $composableBuilder(
+    column: $table.albumNormalizationGain,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get lastPlayed => $composableBuilder(
     column: $table.lastPlayed,
     builder: (column) => ColumnOrderings(column),
@@ -2077,6 +2226,16 @@ class $$TracksTableAnnotationComposer
   GeneratedColumn<int> get playCount =>
       $composableBuilder(column: $table.playCount, builder: (column) => column);
 
+  GeneratedColumn<double> get normalizationGain => $composableBuilder(
+    column: $table.normalizationGain,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get albumNormalizationGain => $composableBuilder(
+    column: $table.albumNormalizationGain,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get lastPlayed => $composableBuilder(
     column: $table.lastPlayed,
     builder: (column) => column,
@@ -2127,6 +2286,8 @@ class $$TracksTableTableManager
                 Value<String?> imageTag = const Value.absent(),
                 Value<bool> favorite = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
+                Value<double?> normalizationGain = const Value.absent(),
+                Value<double?> albumNormalizationGain = const Value.absent(),
                 Value<DateTime?> lastPlayed = const Value.absent(),
                 Value<DateTime?> dateCreated = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2142,6 +2303,8 @@ class $$TracksTableTableManager
                 imageTag: imageTag,
                 favorite: favorite,
                 playCount: playCount,
+                normalizationGain: normalizationGain,
+                albumNormalizationGain: albumNormalizationGain,
                 lastPlayed: lastPlayed,
                 dateCreated: dateCreated,
                 rowid: rowid,
@@ -2159,6 +2322,8 @@ class $$TracksTableTableManager
                 Value<String?> imageTag = const Value.absent(),
                 Value<bool> favorite = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
+                Value<double?> normalizationGain = const Value.absent(),
+                Value<double?> albumNormalizationGain = const Value.absent(),
                 Value<DateTime?> lastPlayed = const Value.absent(),
                 Value<DateTime?> dateCreated = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2174,6 +2339,8 @@ class $$TracksTableTableManager
                 imageTag: imageTag,
                 favorite: favorite,
                 playCount: playCount,
+                normalizationGain: normalizationGain,
+                albumNormalizationGain: albumNormalizationGain,
                 lastPlayed: lastPlayed,
                 dateCreated: dateCreated,
                 rowid: rowid,
