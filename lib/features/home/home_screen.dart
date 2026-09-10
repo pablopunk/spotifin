@@ -449,12 +449,14 @@ class _HorizontalSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
           child: Row(
             children: [
-              Expanded(
+              Flexible(
                 child: Text(
                   title,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
+              if (action != null) const SizedBox(width: SpotifinSpacing.xs),
               ?action,
             ],
           ),
