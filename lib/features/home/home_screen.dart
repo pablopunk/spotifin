@@ -71,6 +71,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return _cachedCatalog = _HomeCatalog.fromTracks(tracks);
   }
 
+  Future<void> _saveMix(DailyMix mix) async {
+    var playlistName = mix.name;
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save mix as playlist'),
+        content: TextFormField(
+          initialValue: playlistName,
+          autofocus: true,
+          onChanged: (value) => playlistName = value,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, playlistName),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await ref
+        .read(appControllerProvider.notifier)
+        .createPlaylist(name, mix.tracks.map((track) => track.id).toList());
+  }
+
   @override
   Widget build(BuildContext context) => StreamBuilder<List<Track>>(
     stream: ref.watch(databaseProvider).watchTracks(),
@@ -166,6 +196,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         title: mix.name,
                         tracks: mix.tracks.take(12).toList(),
                         contextTracks: mix.tracks,
+                        action: IconButton(
+                          tooltip: 'Save ${mix.name} as playlist',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _saveMix(mix),
+                          icon: const Icon(Icons.playlist_add_rounded),
+                        ),
                       ),
                     ),
                   ),
@@ -396,10 +432,12 @@ class _HorizontalSection extends StatelessWidget {
     required this.title,
     required this.tracks,
     required this.contextTracks,
+    this.action,
   });
   final String title;
   final List<Track> tracks;
   final List<Track> contextTracks;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -409,7 +447,17 @@ class _HorizontalSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
-          child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              ?action,
+            ],
+          ),
         ),
         const SizedBox(height: SpotifinSpacing.sm),
         SizedBox(

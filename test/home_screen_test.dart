@@ -35,6 +35,17 @@ void main() {
     expect(find.text('Rock mix'), findsOneWidget);
     expect(find.text('Good listening'), findsNothing);
     expect(find.byType(SearchBar), findsOneWidget);
+    expect(find.byTooltip('Save Rock mix as playlist'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Save Rock mix as playlist'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save mix as playlist'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(find.byType(TextFormField)).initialValue,
+      'Rock mix',
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(SearchBar), 'Track 1');
     await tester.pump(const Duration(milliseconds: 50));
