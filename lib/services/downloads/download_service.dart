@@ -27,8 +27,13 @@ class DownloadService extends ChangeNotifier {
       DownloadsCompanion.insert(trackId: track.id, status: 'downloading'),
     );
     try {
-      final source = _client.streamUri(session, track.id, small: small);
-      final localUri = await _store.save(session.serverId, track.id, source);
+      final source = _client.downloadUri(session, track.id, small: small);
+      final localUri = await _store.save(
+        session.serverId,
+        track.id,
+        source,
+        _client.downloadHeaders(session),
+      );
       await _database.putDownload(
         DownloadsCompanion.insert(
           trackId: track.id,

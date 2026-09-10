@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
@@ -71,6 +73,8 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
+  AppDatabase.forTesting(super.executor);
+
   @override
   int get schemaVersion => 2;
 
@@ -109,6 +113,27 @@ class AppDatabase extends _$AppDatabase {
         TracksCompanion(favorite: Value(value)),
       );
 
+  Future<void> saveFavoriteEdit(String trackId, bool favorite) =>
+      transaction(() async {
+        await (update(tracks)..where((row) => row.id.equals(trackId))).write(
+          TracksCompanion(favorite: Value(favorite)),
+        );
+        await (delete(pendingWrites)..where(
+              (row) =>
+                  row.kind.equals('favorite') & row.targetId.equals(trackId),
+            ))
+            .go();
+        await into(pendingWrites).insert(
+          PendingWritesCompanion.insert(
+            id: 'favorite-$trackId-${DateTime.now().microsecondsSinceEpoch}',
+            kind: 'favorite',
+            targetId: trackId,
+            payload: Value(jsonEncode({'favorite': favorite})),
+            createdAt: DateTime.now(),
+          ),
+        );
+      });
+
   Stream<List<Playlist>> watchPlaylists() => (select(
     playlists,
   )..orderBy([(row) => OrderingTerm.asc(row.name)])).watch();
@@ -118,6 +143,40 @@ class AppDatabase extends _$AppDatabase {
         await delete(playlists).go();
         await batch((batch) => batch.insertAll(playlists, rows));
       });
+
+  Future<void> savePlaylistAddition(String playlistId, String trackId) =>
+      transaction(() async {
+        final playlist = await (select(
+          playlists,
+        )..where((row) => row.id.equals(playlistId))).getSingle();
+        final ids =
+            (jsonDecode(playlist.trackIds) as List<dynamic>).cast<String>()
+              ..add(trackId);
+        await (update(playlists)..where((row) => row.id.equals(playlistId)))
+            .write(PlaylistsCompanion(trackIds: Value(jsonEncode(ids))));
+        await into(pendingWrites).insert(
+          PendingWritesCompanion.insert(
+            id: 'playlist-$playlistId-${DateTime.now().microsecondsSinceEpoch}',
+            kind: 'playlistAdd',
+            targetId: playlistId,
+            payload: Value(jsonEncode({'trackId': trackId})),
+            createdAt: DateTime.now(),
+          ),
+        );
+      });
+
+  Future<List<PendingWrite>> pendingOperations() => (select(
+    pendingWrites,
+  )..orderBy([(row) => OrderingTerm.asc(row.createdAt)])).get();
+
+  Future<void> completePending(String id) =>
+      (delete(pendingWrites)..where((row) => row.id.equals(id))).go();
+
+  Future<void> incrementPendingAttempts(String id) => customUpdate(
+    'UPDATE pending_writes SET attempts = attempts + 1 WHERE id = ?',
+    variables: [Variable(id)],
+    updates: {pendingWrites},
+  );
 
   Stream<List<Download>> watchDownloads() => select(downloads).watch();
 

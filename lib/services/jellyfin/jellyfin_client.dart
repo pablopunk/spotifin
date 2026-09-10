@@ -242,6 +242,17 @@ class JellyfinClient {
     return _uri(session, '/Audio/$itemId/stream', query);
   }
 
+  Uri downloadUri(
+    JellyfinSession session,
+    String itemId, {
+    bool small = false,
+  }) => small
+      ? streamUri(session, itemId, small: true)
+      : _uri(session, '/Items/$itemId/Download');
+
+  Map<String, String> downloadHeaders(JellyfinSession session) =>
+      _headers(session);
+
   Uri imageUri(JellyfinSession session, String itemId, {int width = 500}) =>
       _uri(session, '/Items/$itemId/Images/Primary', {
         'maxWidth': '$width',

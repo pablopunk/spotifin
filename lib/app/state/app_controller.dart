@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -121,6 +123,7 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(syncing: !silent, clearError: true);
     try {
       final client = ref.read(jellyfinClientProvider);
+      await _flushPending();
       final tracks = await client.fetchTracks(
         session,
         onPage: ref.read(databaseProvider).upsertTracks,
@@ -144,32 +147,21 @@ class AppController extends Notifier<AppState> {
   Future<void> toggleFavorite(String trackId, bool favorite) async {
     final session = state.session;
     if (session == null) return;
-    await ref.read(databaseProvider).setFavorite(trackId, favorite);
-    try {
-      await ref
-          .read(jellyfinClientProvider)
-          .setFavorite(session, trackId, favorite);
-    } catch (error) {
-      await ref.read(databaseProvider).setFavorite(trackId, !favorite);
-      state = state.copyWith(error: error.toString());
-    }
+    await ref.read(databaseProvider).saveFavoriteEdit(trackId, favorite);
+    await _flushPending();
   }
 
   Future<void> addToPlaylist(String playlistId, String trackId) async {
     final session = state.session;
     if (session == null) return;
-    try {
-      await ref.read(jellyfinClientProvider).addToPlaylist(
-        session,
-        playlistId,
-        [trackId],
-      );
-      final playlists = await ref
-          .read(jellyfinClientProvider)
-          .fetchPlaylists(session);
-      await ref.read(databaseProvider).replacePlaylists(playlists);
-    } catch (error) {
-      state = state.copyWith(error: error.toString());
+    await ref.read(databaseProvider).savePlaylistAddition(playlistId, trackId);
+    if (await _flushPending()) {
+      try {
+        final playlists = await ref
+            .read(jellyfinClientProvider)
+            .fetchPlaylists(session);
+        await ref.read(databaseProvider).replacePlaylists(playlists);
+      } catch (_) {}
     }
   }
 
@@ -245,5 +237,34 @@ class AppController extends Notifier<AppState> {
             normalization: value,
           );
     }
+  }
+
+  Future<bool> _flushPending() async {
+    final session = state.session;
+    if (session == null) return false;
+    final database = ref.read(databaseProvider);
+    final client = ref.read(jellyfinClientProvider);
+    final operations = await database.pendingOperations();
+    for (final operation in operations) {
+      try {
+        final payload = jsonDecode(operation.payload) as Map<String, dynamic>;
+        if (operation.kind == 'favorite') {
+          await client.setFavorite(
+            session,
+            operation.targetId,
+            payload['favorite'] as bool,
+          );
+        } else if (operation.kind == 'playlistAdd') {
+          await client.addToPlaylist(session, operation.targetId, [
+            payload['trackId'] as String,
+          ]);
+        }
+        await database.completePending(operation.id);
+      } catch (_) {
+        await database.incrementPendingAttempts(operation.id);
+        return false;
+      }
+    }
+    return true;
   }
 }

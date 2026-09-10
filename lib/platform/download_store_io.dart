@@ -4,13 +4,19 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 class DownloadStore {
-  Future<String> save(String accountId, String trackId, Uri source) async {
+  Future<String> save(
+    String accountId,
+    String trackId,
+    Uri source,
+    Map<String, String> headers,
+  ) async {
     final root = await getApplicationDocumentsDirectory();
     final directory = Directory('${root.path}/downloads/$accountId');
     await directory.create(recursive: true);
     final target = File('${directory.path}/$trackId.audio');
     final temporary = File('${target.path}.partial');
-    final response = await http.Client().send(http.Request('GET', source));
+    final request = http.Request('GET', source)..headers.addAll(headers);
+    final response = await http.Client().send(request);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Download failed (${response.statusCode}).');
     }

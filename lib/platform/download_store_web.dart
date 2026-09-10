@@ -5,8 +5,17 @@ import 'package:web/web.dart' as web;
 class DownloadStore {
   static const _cacheName = 'spotifin-audio-v1';
 
-  Future<String> save(String accountId, String trackId, Uri source) async {
-    final response = await web.window.fetch(source.toString().toJS).toDart;
+  Future<String> save(
+    String accountId,
+    String trackId,
+    Uri source,
+    Map<String, String> requestHeaders,
+  ) async {
+    final headers = web.Headers();
+    requestHeaders.forEach((name, value) => headers.append(name, value));
+    final response = await web.window
+        .fetch(source.toString().toJS, web.RequestInit(headers: headers))
+        .toDart;
     if (!response.ok) throw Exception('Download failed (${response.status}).');
     final key = '/.spotifin/audio/$accountId/$trackId';
     final cache = await web.window.caches.open(_cacheName).toDart;
