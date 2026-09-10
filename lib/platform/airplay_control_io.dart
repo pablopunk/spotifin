@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 class AirPlayControl extends StatelessWidget {
   const AirPlayControl({super.key});
 
+  static bool get isSupported => Platform.isIOS;
+
   @override
   Widget build(BuildContext context) => Platform.isIOS
       ? const SizedBox(

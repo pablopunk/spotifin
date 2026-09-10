@@ -249,7 +249,8 @@ class _NowPlaying extends ConsumerWidget {
                                 : Icons.repeat_rounded,
                           ),
                         ),
-                        const AirPlayControl(),
+                        if (AirPlayControl.isSupported)
+                          const AirPlayControl(),
                       ],
                     ),
                     const SizedBox(height: 14),
