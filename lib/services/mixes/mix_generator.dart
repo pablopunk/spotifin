@@ -16,51 +16,49 @@ class MixGenerator {
     'hip hop': 'Hip-Hop',
     'hip-hop': 'Hip-Hop',
     'rap': 'Hip-Hop',
-    'r&b': 'R&B',
-    'rhythm and blues': 'R&B',
+    'r&b': 'R&B/Soul',
+    'r&b/soul': 'R&B/Soul',
+    'rhythm and blues': 'R&B/Soul',
+    'rnb': 'R&B/Soul',
+    'soul': 'R&B/Soul',
     'electronic': 'Electronic',
     'electronica': 'Electronic',
     'rock': 'Rock',
     'indie rock': 'Rock',
+    'pop rock': 'Rock',
+    'punk': 'Punk',
+    'pop punk': 'Punk',
+    'punk rock': 'Punk',
   };
 
   List<DailyMix> generate(List<Track> catalog, DateTime day) {
-    final artistsByLabel = <String, Set<String>>{};
-    for (final track in catalog) {
-      for (final raw in _labels(track)) {
-        final label = _group(raw);
-        artistsByLabel.putIfAbsent(label, () => {}).add(track.artist);
-      }
-    }
-    final labelsByArtist = <String, Set<String>>{};
-    for (final entry in artistsByLabel.entries) {
-      for (final artist in entry.value) {
-        labelsByArtist.putIfAbsent(artist, () => {}).add(entry.key);
-      }
-    }
     final tracksByLabel = <String, List<Track>>{};
     for (final track in catalog) {
-      for (final label in labelsByArtist[track.artist] ?? const <String>{}) {
+      final labels = _labels(track)
+          .map(_group)
+          .where((label) => label.isNotEmpty);
+      for (final label in labels.toSet()) {
         tracksByLabel.putIfAbsent(label, () => []).add(track);
       }
     }
-    final mixes = tracksByLabel.entries
-        .map((entry) {
-          return DailyMix(
-            name: '${entry.key} mix',
-            tracks: _select(entry.value, day, entry.key),
-          );
-        })
-        .where((mix) => mix.tracks.length >= 3)
-        .toList();
-    mixes.sort((a, b) => b.tracks.length.compareTo(a.tracks.length));
-    return mixes.take(6).toList();
+    final groups =
+        tracksByLabel.entries.where((entry) => entry.value.length >= 3).toList()
+          ..sort((a, b) {
+            final popularity = b.value.length.compareTo(a.value.length);
+            return popularity != 0 ? popularity : a.key.compareTo(b.key);
+          });
+    return groups.take(4).map((group) {
+      return DailyMix(
+        name: '${group.key} mix',
+        tracks: _select(group.value, day, group.key),
+      );
+    }).toList();
   }
 
   List<String> _labels(Track track) {
     try {
       return (jsonDecode(track.labels) as List<dynamic>).cast<String>();
-    } on FormatException {
+    } on Object {
       return const [];
     }
   }

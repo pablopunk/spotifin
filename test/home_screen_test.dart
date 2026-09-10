@@ -18,7 +18,7 @@ void main() {
           id: 'track-$index',
           name: 'Track $index',
           artist: const Value('Artist'),
-          labels: Value(index == 0 ? '["rock"]' : '[]'),
+          labels: const Value('["rock"]'),
         ),
     ]);
 
