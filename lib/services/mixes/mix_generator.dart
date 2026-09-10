@@ -12,7 +12,7 @@ class DailyMix {
 class MixGenerator {
   const MixGenerator();
 
-  List<DailyMix> generate(List<Track> catalog, DateTime day) {
+  List<DailyMix> generate(List<Track> catalog, DateTime day, {int? seed}) {
     final tracksByLabel = <String, List<Track>>{};
     for (final track in catalog) {
       final labels = _labels(track)
@@ -41,12 +41,46 @@ class MixGenerator {
       final popularity = b.tracks.length.compareTo(a.tracks.length);
       return popularity != 0 ? popularity : a.label.compareTo(b.label);
     });
-    return groups.take(4).map((group) {
+    if (groups.isEmpty) return const [];
+    final minimumSize = math.max(3, (groups.first.tracks.length / 50).ceil());
+    final random = _SeededRandom(
+      _seedFor(day, seed ?? math.Random().nextInt(1 << 31)),
+    );
+    final selectedGroups = _weightedSample(
+      groups.where((group) => group.tracks.length >= minimumSize).toList(),
+      random,
+    )..sort((a, b) => b.tracks.length.compareTo(a.tracks.length));
+    return selectedGroups.map((group) {
       return DailyMix(
         name: '${_titleCase(group.label)} mix',
-        tracks: _select(group.tracks.values.toList(), day, group.label),
+        tracks: _select(group.tracks.values.toList(), random, group.label),
       );
     }).toList();
+  }
+
+  List<_TagGroup> _weightedSample(
+    List<_TagGroup> candidates,
+    math.Random random,
+  ) {
+    final remaining = [...candidates];
+    final selected = <_TagGroup>[];
+    while (selected.length < 4 && remaining.isNotEmpty) {
+      final totalWeight = remaining.fold<double>(
+        0,
+        (total, group) => total + math.sqrt(group.tracks.length),
+      );
+      var target = random.nextDouble() * totalWeight;
+      var selectedIndex = remaining.length - 1;
+      for (var index = 0; index < remaining.length; index++) {
+        target -= math.sqrt(remaining[index].tracks.length);
+        if (target < 0) {
+          selectedIndex = index;
+          break;
+        }
+      }
+      selected.add(remaining.removeAt(selectedIndex));
+    }
+    return selected;
   }
 
   List<String> _labels(Track track) {
@@ -66,7 +100,7 @@ class MixGenerator {
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
 
-  List<Track> _select(List<Track> pool, DateTime day, String label) {
+  List<Track> _select(List<Track> pool, math.Random random, String label) {
     final unique = {for (final track in pool) track.id: track}.values.toList();
     unique.sort((a, b) {
       final plays = b.playCount.compareTo(a.playCount);
@@ -76,7 +110,7 @@ class MixGenerator {
     final midpoint = (unique.length / 2).ceil();
     final frequent = unique.take(midpoint).toList();
     final lessPlayed = unique.skip(midpoint).toList();
-    final seed = day.year * 10000 + day.month * 100 + day.day + label.hashCode;
+    final seed = random.nextInt(1 << 31) ^ label.hashCode;
     frequent.shuffle(_SeededRandom(seed));
     lessPlayed.shuffle(_SeededRandom(seed ^ 0x5f3759df));
     final result = <Track>[];
@@ -90,6 +124,9 @@ class MixGenerator {
     return result;
   }
 }
+
+int _seedFor(DateTime day, int variation) =>
+    (day.year * 10000 + day.month * 100 + day.day) ^ variation;
 
 class _TagGroup {
   _TagGroup(this.label, List<Track> initial)

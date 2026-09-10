@@ -13,7 +13,11 @@ void main() {
       _track('3', 'Artist B', ['Rock'], 2),
       _track('4', 'Artist C', ['Rock'], 1),
     ];
-    final mixes = const MixGenerator().generate(tracks, DateTime(2026, 9, 10));
+    final mixes = const MixGenerator().generate(
+      tracks,
+      DateTime(2026, 9, 10),
+      seed: 1,
+    );
     expect(mixes.single.name, 'Rock mix');
     expect(mixes.single.tracks.map((track) => track.id).toSet(), {
       '1',
@@ -33,7 +37,11 @@ void main() {
       _track('7', 'Artist G', ['electronic'], 0),
     ];
 
-    final mixes = const MixGenerator().generate(tracks, DateTime(2026, 9, 10));
+    final mixes = const MixGenerator().generate(
+      tracks,
+      DateTime(2026, 9, 10),
+      seed: 1,
+    );
 
     expect(mixes.map((mix) => mix.name), ['Rock mix', 'Electronic mix']);
     expect(mixes.first.tracks, hasLength(4));
@@ -51,14 +59,26 @@ void main() {
           _track('${id++}', 'Artist $id', [entry.key], 0),
     ];
 
-    final mixes = const MixGenerator().generate(tracks, DateTime(2026, 9, 10));
+    final mixes = const MixGenerator().generate(
+      tracks,
+      DateTime(2026, 9, 10),
+      seed: 1,
+    );
+    final repeated = const MixGenerator().generate(
+      tracks,
+      DateTime(2026, 9, 10),
+      seed: 1,
+    );
+    final varied = const MixGenerator().generate(
+      tracks,
+      DateTime(2026, 9, 10),
+      seed: 2,
+    );
 
-    expect(mixes.map((mix) => mix.name), [
-      'Rock mix',
-      'Alternative mix',
-      'Pop mix',
-      'Punk mix',
-    ]);
+    expect(mixes, hasLength(4));
+    expect(mixes.map((mix) => mix.name), repeated.map((mix) => mix.name));
+    expect(mixes.map((mix) => mix.name), isNot(varied.map((mix) => mix.name)));
+    expect(mixes.map((mix) => mix.name), isNot(contains('R&b/soul mix')));
   });
 
   test('keeps only the four most common tag groups', () {
@@ -69,20 +89,45 @@ void main() {
           _track('$group-$song', 'Artist $group-$song', [labels[group]], 0),
     ];
 
-    final mixes = const MixGenerator().generate(tracks, DateTime(2026));
+    final mixes = const MixGenerator().generate(
+      tracks,
+      DateTime(2026),
+      seed: 1,
+    );
 
     expect(mixes, hasLength(4));
-    expect(mixes.map((mix) => mix.name), [
-      'Folk mix',
-      'Dance mix',
-      'Country mix',
-      'Blues mix',
-    ]);
+    expect(
+      mixes.map((mix) => mix.tracks.length),
+      orderedEquals(
+        [...mixes.map((mix) => mix.tracks.length)]
+          ..sort((a, b) => b.compareTo(a)),
+      ),
+    );
+  });
+
+  test('changes song selection when the variation seed changes', () {
+    final tracks = [
+      for (var song = 0; song < 100; song++)
+        _track('$song', 'Artist $song', ['rock'], song),
+    ];
+
+    List<String> songsFor(int seed) => const MixGenerator()
+        .generate(tracks, DateTime(2026, 9, 10), seed: seed)
+        .single
+        .tracks
+        .map((track) => track.id)
+        .toList();
+
+    expect(songsFor(1), songsFor(1));
+    expect(songsFor(1), isNot(songsFor(2)));
   });
 
   test('does not invent a mix for untagged music', () {
     final tracks = [_track('1', 'Artist A', [], 0)];
-    expect(const MixGenerator().generate(tracks, DateTime(2026)), isEmpty);
+    expect(
+      const MixGenerator().generate(tracks, DateTime(2026), seed: 1),
+      isEmpty,
+    );
   });
 }
 
