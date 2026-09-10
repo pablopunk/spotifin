@@ -59,22 +59,22 @@ class AppController extends Notifier<AppState> {
     final smallStreaming = preferences.getBool('smallStreaming') ?? false;
     final smallDownloads = preferences.getBool('smallDownloads') ?? false;
     final normalization = preferences.getBool('normalization') ?? true;
+    const developmentLogin = DevelopmentLogin.fromEnvironment();
+    if (developmentLogin.canSignIn) {
+      state = AppState(
+        smallStreaming: smallStreaming,
+        smallDownloads: smallDownloads,
+        normalization: normalization,
+      );
+      await signIn(
+        developmentLogin.server,
+        developmentLogin.username,
+        developmentLogin.password,
+      );
+      return;
+    }
     final session = await ref.read(sessionStoreProvider).load();
     if (session == null) {
-      const developmentLogin = DevelopmentLogin.fromEnvironment();
-      if (developmentLogin.canSignIn) {
-        state = AppState(
-          smallStreaming: smallStreaming,
-          smallDownloads: smallDownloads,
-          normalization: normalization,
-        );
-        await signIn(
-          developmentLogin.server,
-          developmentLogin.username,
-          developmentLogin.password,
-        );
-        return;
-      }
       state = AppState(
         status: AppStatus.signedOut,
         smallStreaming: smallStreaming,

@@ -61,4 +61,12 @@ void main() {
 
     expect(await database.allTracks(), isEmpty);
   });
+
+  test('creation accepts existing tables and tracks index', () async {
+    await database.allTracks();
+
+    await database.migration.onCreate(Migrator(database));
+
+    expect(await database.allTracks(), isEmpty);
+  });
 }

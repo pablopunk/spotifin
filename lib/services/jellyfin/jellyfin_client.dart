@@ -41,7 +41,7 @@ class JellyfinClient {
       },
       body: jsonEncode({'Username': username.trim(), 'Pw': password}),
     );
-    final body = _decodeResponse(response);
+    final body = _decodeResponse(response, signingIn: true);
     final user = body['User'] as Map<String, dynamic>?;
     final token = body['AccessToken'] as String?;
     if (user == null || token == null) {
@@ -300,8 +300,11 @@ class JellyfinClient {
     return result.replaceFirst(RegExp(r'/+$'), '');
   }
 
-  Map<String, dynamic> _decodeResponse(http.Response response) {
-    _ensureSuccess(response);
+  Map<String, dynamic> _decodeResponse(
+    http.Response response, {
+    bool signingIn = false,
+  }) {
+    _ensureSuccess(response, signingIn: signingIn);
     try {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } on FormatException {
@@ -309,10 +312,13 @@ class JellyfinClient {
     }
   }
 
-  void _ensureSuccess(http.Response response) {
+  void _ensureSuccess(http.Response response, {bool signingIn = false}) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
     final message = switch (response.statusCode) {
-      401 => 'The username or password is incorrect.',
+      401 =>
+        signingIn
+            ? 'The username or password is incorrect.'
+            : 'The Jellyfin session expired. Sign in again.',
       403 => 'This account cannot perform that action.',
       404 => 'The requested Jellyfin item no longer exists.',
       _ => 'Jellyfin request failed (${response.statusCode}).',

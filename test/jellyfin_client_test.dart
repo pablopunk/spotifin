@@ -62,6 +62,31 @@ void main() {
     );
   });
 
+  test('reports an expired authenticated session accurately', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient((_) async => http.Response('', 401)),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'expired',
+    );
+
+    expect(
+      () => client.fetchTracks(session),
+      throwsA(
+        isA<JellyfinException>().having(
+          (error) => error.message,
+          'message',
+          'The Jellyfin session expired. Sign in again.',
+        ),
+      ),
+    );
+  });
+
   test('identifies the exact media source in playback URLs', () {
     final client = JellyfinClient();
     addTearDown(client.close);
