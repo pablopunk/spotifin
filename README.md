@@ -14,16 +14,15 @@ mise exec -- dart run build_runner build
 mise exec -- flutter run -d chrome
 ```
 
-For a persistent local browser profile and optional development auto-login,
-copy `.env.example` to `.env`, enter your Jellyfin details, and run:
+For development auto-login, copy `.env.example` to `.env`, enter your Jellyfin
+details, and run:
 
 ```sh
 mise run dev
 ```
 
-Then open `http://127.0.0.1:8080` in your normal browser. The ignored `.env`
-credentials are compiled into this development build, so do not use it for
-deployment.
+Flutter opens Chrome automatically. The ignored `.env` credentials are compiled
+into this development build, so do not use it for deployment.
 
 For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
 `mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.
