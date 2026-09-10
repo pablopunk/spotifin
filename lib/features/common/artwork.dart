@@ -35,21 +35,23 @@ class Artwork extends ConsumerWidget {
     if (session == null) return fallback;
     final physicalWidth = (size * MediaQuery.devicePixelRatioOf(context))
         .round();
+    final image = Image.network(
+      ref
+          .read(jellyfinClientProvider)
+          .imageUri(session, itemId, width: physicalWidth)
+          .toString(),
+      width: size,
+      height: size,
+      cacheWidth: physicalWidth,
+      filterQuality: FilterQuality.low,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+    if (size <= 56 || borderRadius == 0) return image;
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       clipBehavior: Clip.hardEdge,
-      child: Image.network(
-        ref
-            .read(jellyfinClientProvider)
-            .imageUri(session, itemId, width: physicalWidth)
-            .toString(),
-        width: size,
-        height: size,
-        cacheWidth: physicalWidth,
-        filterQuality: FilterQuality.low,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => fallback,
-      ),
+      child: image,
     );
   }
 }
