@@ -318,7 +318,7 @@ class JellyfinClient {
       401 =>
         signingIn
             ? 'The username or password is incorrect.'
-            : 'The Jellyfin session expired. Sign in again.',
+            : 'Jellyfin did not authorize this request.',
       403 => 'This account cannot perform that action.',
       404 => 'The requested Jellyfin item no longer exists.',
       _ => 'Jellyfin request failed (${response.statusCode}).',

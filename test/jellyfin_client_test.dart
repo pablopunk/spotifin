@@ -62,7 +62,7 @@ void main() {
     );
   });
 
-  test('reports an expired authenticated session accurately', () async {
+  test('reports a rejected authenticated request accurately', () async {
     final client = JellyfinClient(
       httpClient: MockClient((_) async => http.Response('', 401)),
     );
@@ -81,7 +81,7 @@ void main() {
         isA<JellyfinException>().having(
           (error) => error.message,
           'message',
-          'The Jellyfin session expired. Sign in again.',
+          'Jellyfin did not authorize this request.',
         ),
       ),
     );

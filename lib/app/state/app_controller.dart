@@ -175,7 +175,9 @@ class AppController extends Notifier<AppState> {
       }
       state = state.copyWith(syncing: false, clearError: true);
     } catch (error) {
-      state = state.copyWith(syncing: false, error: error.toString());
+      state = silent
+          ? state.copyWith(syncing: false, clearError: true)
+          : state.copyWith(syncing: false, error: error.toString());
     }
   }
 
