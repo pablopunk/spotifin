@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -461,6 +462,10 @@ class _LyricsPanel extends ConsumerStatefulWidget {
 
 class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
   late Future<List<LyricLine>> _lyrics;
+  final ScrollController _scrollController = ScrollController();
+  List<GlobalKey> _lineKeys = const [];
+  var _activeIndex = -1;
+  var _followingLyrics = true;
 
   @override
   void initState() {
@@ -471,7 +476,18 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
   @override
   void didUpdateWidget(covariant _LyricsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.track.id != widget.track.id) _lyrics = _load();
+    if (oldWidget.track.id != widget.track.id) {
+      _lyrics = _load();
+      _lineKeys = const [];
+      _activeIndex = -1;
+      _followingLyrics = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<List<LyricLine>> _load() {
@@ -501,6 +517,9 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
           title: 'No lyrics found',
         );
       }
+      if (_lineKeys.length != lines.length) {
+        _lineKeys = List.generate(lines.length, (_) => GlobalKey());
+      }
       return StreamBuilder<Duration>(
         stream: widget.playback.player.positionStream,
         builder: (context, positionSnapshot) {
@@ -508,34 +527,86 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
             lines,
             positionSnapshot.data ?? Duration.zero,
           );
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 112),
-            itemCount: lines.length,
-            itemBuilder: (context, index) {
-              final line = lines[index];
-              return InkWell(
-                onTap: line.start == null
-                    ? null
-                    : () => widget.playback.seek(line.start!),
-                borderRadius: BorderRadius.circular(SpotifinRadii.small),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    line.text,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: index == active
-                          ? SpotifinColors.text
-                          : SpotifinColors.textMuted,
+          _followActiveLine(active, lines.length);
+          return NotificationListener<UserScrollNotification>(
+            onNotification: (notification) {
+              if (notification.direction != ScrollDirection.idle) {
+                _followingLyrics = false;
+              }
+              return false;
+            },
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 112),
+              itemCount: lines.length,
+              itemBuilder: (context, index) {
+                final line = lines[index];
+                return InkWell(
+                  key: _lineKeys[index],
+                  onTap: line.start == null
+                      ? null
+                      : () {
+                          _followingLyrics = true;
+                          _activeIndex = -1;
+                          widget.playback.seek(line.start!);
+                        },
+                  borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      line.text,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: index == active
+                            ? SpotifinColors.text
+                            : SpotifinColors.textMuted,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       );
     },
   );
+
+  void _followActiveLine(int index, int lineCount) {
+    if (index < 0 || index == _activeIndex) return;
+    _activeIndex = index;
+    if (!_followingLyrics) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || index != _activeIndex) return;
+      final lineContext = _lineKeys[index].currentContext;
+      if (lineContext != null) {
+        _centerLine(lineContext);
+        return;
+      }
+      if (!_scrollController.hasClients || lineCount < 2) return;
+      final approximateOffset =
+          _scrollController.position.maxScrollExtent * index / (lineCount - 1);
+      _scrollController
+          .animateTo(
+            approximateOffset,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          )
+          .then((_) {
+            if (!mounted || index != _activeIndex) return;
+            final context = _lineKeys[index].currentContext;
+            if (context != null && context.mounted) _centerLine(context);
+          });
+    });
+  }
+
+  void _centerLine(BuildContext lineContext) {
+    Scrollable.ensureVisible(
+      lineContext,
+      alignment: 0.5,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
+  }
 }
 
 int _activeLine(List<LyricLine> lines, Duration position) {
