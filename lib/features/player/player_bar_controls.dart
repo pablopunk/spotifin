@@ -356,6 +356,7 @@ class _DesktopUtilities extends StatelessWidget {
         onPressed: onOpenQueue,
         icon: const Icon(Icons.queue_music_rounded, size: 20),
       ),
+      const SizedBox(width: SpotifinSpacing.sm),
       if (AirPlayControl.isSupported) const AirPlayControl(),
       const Icon(Icons.volume_up_rounded, size: 20),
       SizedBox(
