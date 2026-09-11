@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../app/theme.dart';
 import '../../platform/airplay_control.dart';
@@ -16,6 +17,7 @@ class DesktopPlayerBar extends StatelessWidget {
     required this.onOpenPlayer,
     required this.onOpenQueue,
     required this.onOpenLyrics,
+    required this.glass,
     super.key,
   });
 
@@ -24,13 +26,11 @@ class DesktopPlayerBar extends StatelessWidget {
   final VoidCallback onOpenPlayer;
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
+  final bool glass;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.black,
-    elevation: 20,
-    shadowColor: Colors.black,
-    child: SafeArea(
+  Widget build(BuildContext context) {
+    final content = SafeArea(
       top: false,
       child: SizedBox(
         height: 88,
@@ -59,8 +59,23 @@ class DesktopPlayerBar extends StatelessWidget {
           ),
         ),
       ),
-    ),
-  );
+    );
+    if (!glass) {
+      return Material(
+        color: Colors.black,
+        elevation: 20,
+        shadowColor: Colors.black,
+        child: content,
+      );
+    }
+    return GlassContainer(
+      useOwnLayer: true,
+      quality: GlassQuality.premium,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+      clipBehavior: Clip.antiAlias,
+      child: content,
+    );
+  }
 }
 
 class MobilePlayerBar extends StatelessWidget {
@@ -68,70 +83,87 @@ class MobilePlayerBar extends StatelessWidget {
     required this.track,
     required this.playback,
     required this.onOpenPlayer,
+    required this.glass,
     super.key,
   });
 
   final Track track;
   final PlaybackService playback;
   final VoidCallback onOpenPlayer;
+  final bool glass;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: SpotifinColors.surface,
-    elevation: 16,
-    shadowColor: Colors.black,
-    child: InkWell(
-      onTap: onOpenPlayer,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _MobileProgress(playback: playback),
-            ListTile(
-              minTileHeight: 72,
-              leading: Artwork(
-                itemId: track.albumId ?? track.id,
-                size: 48,
-                borderRadius: SpotifinRadii.small,
+  Widget build(BuildContext context) {
+    final content = Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onOpenPlayer,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MobileProgress(playback: playback),
+              ListTile(
+                minTileHeight: 72,
+                leading: Artwork(
+                  itemId: track.albumId ?? track.id,
+                  size: 48,
+                  borderRadius: SpotifinRadii.small,
+                ),
+                title: Text(
+                  track.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  track.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Previous',
+                      onPressed: playback.previous,
+                      icon: const Icon(Icons.skip_previous_rounded),
+                    ),
+                    SpotifinPlayButton(
+                      onPressed: playback.toggle,
+                      playing: playback.playing,
+                    ),
+                    IconButton(
+                      tooltip: 'Next',
+                      onPressed: playback.next,
+                      icon: const Icon(Icons.skip_next_rounded),
+                    ),
+                  ],
+                ),
               ),
-              title: Text(
-                track.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              subtitle: Text(
-                track.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Previous',
-                    onPressed: playback.previous,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  SpotifinPlayButton(
-                    onPressed: playback.toggle,
-                    playing: playback.playing,
-                  ),
-                  IconButton(
-                    tooltip: 'Next',
-                    onPressed: playback.next,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+    if (!glass) {
+      return Material(
+        color: SpotifinColors.surface,
+        elevation: 16,
+        shadowColor: Colors.black,
+        child: content,
+      );
+    }
+    return GlassContainer(
+      useOwnLayer: true,
+      quality: GlassQuality.premium,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+      clipBehavior: Clip.antiAlias,
+      child: content,
+    );
+  }
 }
 
 class _TrackSummary extends StatelessWidget {

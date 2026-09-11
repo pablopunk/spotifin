@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
+import '../common/glass.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
@@ -101,11 +103,13 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         ? _playerPanelWidth.clamp(_minimumPlayerPanelWidth, width * 0.5)
         : 0.0;
     final selectedIndex = widget.controller.selectedIndex;
+    final glassEffects = ref.watch(glassEffectsProvider);
     _visitedDestinations.add(selectedIndex);
     final content = Stack(
       children: [
         Positioned.fill(child: _buildDestinationStack(selectedIndex)),
-        const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
+        if (!glassEffects)
+          const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
       ],
     );
     if (wide) {
@@ -181,6 +185,36 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         ),
       );
     }
+    if (glassEffects) {
+      final hasTrack = _playback.currentTrack != null;
+      return GlassScaffold(
+        background: const _ShellBackdrop(),
+        backgroundColor: SpotifinColors.background,
+        topEdgeFade: false,
+        bottomBar: GlassTabBar.bottom(
+          selectedIndex: selectedIndex,
+          onTabSelected: widget.controller.selectDestination,
+          selectedIconColor: SpotifinColors.text,
+          unselectedIconColor: SpotifinColors.textMuted,
+          selectedLabelColor: SpotifinColors.text,
+          unselectedLabelColor: SpotifinColors.textMuted,
+          interactionGlowColor: SpotifinColors.accent,
+          bottomAccessory: const PlayerBar(),
+          bottomAccessoryEnabled: hasTrack,
+          bottomAccessoryHeight: 74,
+          tabs: _destinations
+              .map(
+                (item) => GlassTab(
+                  icon: Icon(item.icon),
+                  activeIcon: Icon(item.selectedIcon),
+                  label: item.label,
+                ),
+              )
+              .toList(),
+        ),
+        body: content,
+      );
+    }
     return Scaffold(
       body: content,
       bottomNavigationBar: NavigationBar(
@@ -213,6 +247,22 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     key: _navigatorKeys[index],
     onGenerateRoute: (_) =>
         MaterialPageRoute<void>(builder: (_) => _screens[index]),
+  );
+}
+
+class _ShellBackdrop extends StatelessWidget {
+  const _ShellBackdrop();
+
+  @override
+  Widget build(BuildContext context) => const DecoratedBox(
+    decoration: BoxDecoration(
+      color: SpotifinColors.background,
+      gradient: RadialGradient(
+        center: Alignment.topRight,
+        radius: 1.4,
+        colors: [Color(0x1F33BFFF), Color(0x1239F4D1), Colors.transparent],
+      ),
+    ),
   );
 }
 

@@ -10,6 +10,7 @@ import '../../services/lyrics/lyric_line.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/glass.dart';
 import 'player_bar_controls.dart';
 
 class PlayerBar extends ConsumerWidget {
@@ -25,6 +26,7 @@ class PlayerBar extends ConsumerWidget {
         if (track == null) return const SizedBox.shrink();
         final useSidePanel =
             MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.playerPanel;
+        final glassEffects = ref.watch(glassEffectsProvider);
         void showPlayer() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).togglePlayer()
             : _showNowPlaying(context, playback);
@@ -44,11 +46,13 @@ class PlayerBar extends ConsumerWidget {
                   onOpenPlayer: showPlayer,
                   onOpenQueue: showQueue,
                   onOpenLyrics: showLyrics,
+                  glass: glassEffects,
                 )
               : MobilePlayerBar(
                   track: track,
                   playback: playback,
                   onOpenPlayer: showPlayer,
+                  glass: glassEffects,
                 ),
         );
       },
