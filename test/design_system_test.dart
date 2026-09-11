@@ -40,4 +40,22 @@ void main() {
     expect(find.text('Collection'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('tabs start without the Material 3 leading offset', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DefaultTabController(
+          length: 2,
+          child: Scaffold(appBar: SpotifinTabBar(labels: ['Songs', 'Albums'])),
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<TabBar>(find.byType(TabBar)).tabAlignment,
+      TabAlignment.start,
+    );
+  });
 }

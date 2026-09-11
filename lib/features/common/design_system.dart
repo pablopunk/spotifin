@@ -56,6 +56,7 @@ class SpotifinTabBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) => TabBar(
     isScrollable: true,
+    tabAlignment: TabAlignment.start,
     onTap: onTap,
     tabs: labels.map((label) => Tab(text: label)).toList(),
   );
