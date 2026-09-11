@@ -193,7 +193,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     if (glassEffects) {
       final hasTrack = _playback.currentTrack != null;
       return GlassScaffold(
-        background: const _ShellBackdrop(),
         backgroundColor: SpotifinColors.background,
         topEdgeFade: false,
         bottomBar: GlassTabBar.bottom(
@@ -252,22 +251,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     key: _navigatorKeys[index],
     onGenerateRoute: (_) =>
         MaterialPageRoute<void>(builder: (_) => _screens[index]),
-  );
-}
-
-class _ShellBackdrop extends StatelessWidget {
-  const _ShellBackdrop();
-
-  @override
-  Widget build(BuildContext context) => const DecoratedBox(
-    decoration: BoxDecoration(
-      color: SpotifinColors.background,
-      gradient: RadialGradient(
-        center: Alignment.topRight,
-        radius: 1.4,
-        colors: [Color(0x1F33BFFF), Color(0x1239F4D1), Colors.transparent],
-      ),
-    ),
   );
 }
 
