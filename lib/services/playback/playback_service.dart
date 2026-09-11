@@ -20,9 +20,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   PlaybackService(this._client, this._downloads) {
     _subscriptions.add(
       _player.playerStateStream.listen((playerState) {
-        _reportProgress();
         if (playerState.processingState == ProcessingState.completed) {
-          _reportStop();
+          unawaited(_finishCompletedQueue());
+        } else {
+          unawaited(_reportProgress());
         }
         notifyListeners();
       }),
@@ -57,6 +58,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   final StreamController<double> _volumeController =
       StreamController<double>.broadcast();
   final List<StreamSubscription<Object?>> _subscriptions = [];
+  Future<void> _reportQueue = Future.value();
   JellyfinSession? _session;
   List<Track> _queue = [];
   List<String> _playlistItemIds = [];
@@ -444,21 +446,25 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     await _reportStop();
     _reportedTrackId = track.id;
     _reportedPlaylistItemId = playlistItemId;
-    _playSessionId = '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
+    final playSessionId =
+        '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
+    _playSessionId = playSessionId;
     _lastReportedSecond = -1;
     try {
-      await _client.reportPlayback(
-        session,
-        '/Sessions/Playing',
-        track.id,
-        _player.position,
-        playSessionId: _playSessionId!,
-        paused: !_player.playing,
-        playlistItemId: playlistItemId,
-        queue: _reportedQueue,
-        volume: (_userVolume * 100).round(),
-        repeatMode: _reportedRepeatMode,
-        shuffle: _shuffle,
+      await _serializeReport(
+        () => _client.reportPlayback(
+          session,
+          '/Sessions/Playing',
+          track.id,
+          _player.position,
+          playSessionId: playSessionId,
+          paused: !_player.playing,
+          playlistItemId: playlistItemId,
+          queue: _reportedQueue,
+          volume: (_userVolume * 100).round(),
+          repeatMode: _reportedRepeatMode,
+          shuffle: _shuffle,
+        ),
       );
     } catch (_) {}
   }
@@ -530,7 +536,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> _updateOutputVolume() =>
       _player.setVolume(_userVolume * _normalizationMultiplier);
 
-  Future<void> _reportProgress({bool force = false}) async {
+  Future<void> _reportProgress({bool force = false}) =>
+      _serializeReport(() => _reportProgressNow(force: force));
+
+  Future<void> _reportProgressNow({required bool force}) async {
     final session = _session;
     final trackId = _reportedTrackId;
     final playSessionId = _playSessionId;
@@ -575,7 +584,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   String _newPlaylistItemId() => _queueItemIdentity.next();
 
-  Future<void> _reportStop() async {
+  Future<void> _reportStop() => _serializeReport(_reportStopNow);
+
+  Future<void> _reportStopNow() async {
     final session = _session;
     final trackId = _reportedTrackId;
     final playSessionId = _playSessionId;
@@ -592,6 +603,19 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         playSessionId: playSessionId,
       );
     } catch (_) {}
+  }
+
+  Future<void> _finishCompletedQueue() async {
+    await _reportStop();
+    if (_playSessionId != null) return;
+    await _player.stop();
+    notifyListeners();
+  }
+
+  Future<void> _serializeReport(Future<void> Function() report) {
+    final result = _reportQueue.then((_) => report());
+    _reportQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
   }
 
   @override
