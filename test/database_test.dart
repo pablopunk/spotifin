@@ -54,6 +54,26 @@ void main() {
     expect(results.map((track) => track.id), ['match']);
   });
 
+  test('orders library tracks by date added with newest first', () async {
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'old',
+        name: 'Old song',
+        dateCreated: Value(DateTime(2025)),
+      ),
+      TracksCompanion.insert(id: 'unknown', name: 'Unknown date'),
+      TracksCompanion.insert(
+        id: 'new',
+        name: 'New song',
+        dateCreated: Value(DateTime(2026)),
+      ),
+    ]);
+
+    final tracks = await database.watchTracksByDateAdded().first;
+
+    expect(tracks.map((track) => track.id), ['new', 'old', 'unknown']);
+  });
+
   test('version 4 migration accepts an existing tracks index', () async {
     await database.allTracks();
 

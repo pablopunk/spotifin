@@ -110,6 +110,13 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Track>> watchTracks() =>
       (select(tracks)..orderBy([(row) => OrderingTerm.asc(row.name)])).watch();
 
+  Stream<List<Track>> watchTracksByDateAdded() =>
+      (select(tracks)..orderBy([
+            (row) => OrderingTerm.desc(row.dateCreated),
+            (row) => OrderingTerm.asc(row.name),
+          ]))
+          .watch();
+
   Future<List<Track>> allTracks() => select(tracks).get();
 
   Stream<List<Track>> searchTracks(List<String> words, {int limit = 30}) {

@@ -28,7 +28,7 @@ class LibraryScreen extends ConsumerWidget {
           ),
         ),
         body: StreamBuilder<List<Track>>(
-          stream: ref.watch(databaseProvider).watchTracks(),
+          stream: ref.watch(databaseProvider).watchTracksByDateAdded(),
           builder: (context, trackSnapshot) {
             final tracks = trackSnapshot.data ?? const [];
             return TabBarView(
