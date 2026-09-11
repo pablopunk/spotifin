@@ -270,7 +270,7 @@ ThemeData buildTheme() {
       activeTrackColor: SpotifinColors.text,
       inactiveTrackColor: SpotifinColors.border,
       thumbColor: SpotifinColors.text,
-      overlayColor: Color(0x331ED760),
+      overlayColor: Color(0x3339F4D1),
       trackHeight: 4,
     ),
     dividerTheme: const DividerThemeData(

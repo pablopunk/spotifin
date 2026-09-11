@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/login_screen.dart';
+import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
 import 'app_shortcuts.dart';
@@ -89,11 +90,7 @@ class _StartupScreen extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.graphic_eq_rounded,
-            size: 72,
-            color: SpotifinColors.accent,
-          ),
+          SpotifinLogo(size: 72),
           SizedBox(height: 24),
           CircularProgressIndicator(),
         ],

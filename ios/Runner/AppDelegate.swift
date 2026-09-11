@@ -41,7 +41,12 @@ private final class AirPlayPlatformView: NSObject, FlutterPlatformView {
     routePicker = AVRoutePickerView(frame: frame)
     routePicker.prioritizesVideoDevices = false
     routePicker.tintColor = .white
-    routePicker.activeTintColor = .systemGreen
+    routePicker.activeTintColor = UIColor(
+      red: 57 / 255,
+      green: 244 / 255,
+      blue: 209 / 255,
+      alpha: 1
+    )
     super.init()
   }
 

@@ -14,6 +14,7 @@ void main() {
     expect(theme.textTheme.headlineSmall?.fontWeight, FontWeight.w700);
     expect(theme.textTheme.bodySmall?.color, SpotifinColors.textMuted);
     expect(theme.textTheme.bodyMedium?.fontFamily, 'Manrope');
+    expect(theme.sliderTheme.overlayColor, const Color(0x3339F4D1));
   });
 
   testWidgets('shared components fit a narrow mobile viewport', (tester) async {
