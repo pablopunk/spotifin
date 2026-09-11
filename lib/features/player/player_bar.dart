@@ -221,21 +221,32 @@ class _NowPlaying extends ConsumerWidget {
                                 : Icons.repeat_rounded,
                           ),
                         ),
-                        if (AirPlayControl.isSupported) const AirPlayControl(),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: () => showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        constraints: const BoxConstraints(maxWidth: 720),
-                        builder: (_) =>
-                            _LyricsSheet(track: track, playback: playback),
-                      ),
-                      icon: const Icon(Icons.lyrics_outlined),
-                      label: const Text('Lyrics'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              constraints: const BoxConstraints(maxWidth: 720),
+                              builder: (_) => _LyricsSheet(
+                                track: track,
+                                playback: playback,
+                              ),
+                            ),
+                            icon: const Icon(Icons.lyrics_outlined),
+                            label: const Text('Lyrics'),
+                          ),
+                        ),
+                        if (AirPlayControl.isSupported) ...[
+                          const SizedBox(width: SpotifinSpacing.sm),
+                          const AirPlayControl(),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 30),
                     Text(
@@ -247,7 +258,9 @@ class _NowPlaying extends ConsumerWidget {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpotifinSpacing.sm,
+                ),
                 sliver: SliverReorderableList(
                   itemCount: queue.length,
                   onReorderItem: playback.reorder,
@@ -257,6 +270,8 @@ class _NowPlaying extends ConsumerWidget {
                       key: ValueKey('$index-${item.id}'),
                       index: index,
                       child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        horizontalTitleGap: SpotifinSpacing.sm,
                         selected: index == playback.currentIndex,
                         selectedTileColor: SpotifinColors.interactive,
                         selectedColor: SpotifinColors.accent,
@@ -277,6 +292,11 @@ class _NowPlaying extends ConsumerWidget {
                         ),
                         trailing: IconButton(
                           tooltip: 'Remove from queue',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 40,
+                            height: 40,
+                          ),
                           onPressed: () => playback.removeAt(index),
                           icon: const Icon(Icons.close_rounded),
                         ),
