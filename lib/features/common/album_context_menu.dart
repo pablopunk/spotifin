@@ -86,11 +86,9 @@ class AlbumContextMenu extends ConsumerWidget {
   Future<void> _download(WidgetRef ref) async {
     final app = ref.read(appControllerProvider);
     if (app.session == null) return;
-    for (final track in tracks) {
-      await ref
-          .read(downloadProvider)
-          .download(app.session!, track, small: app.smallDownloads);
-    }
+    await ref
+        .read(downloadProvider)
+        .downloadAll(app.session!, tracks, small: app.smallDownloads);
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {

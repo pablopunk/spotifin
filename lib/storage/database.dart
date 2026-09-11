@@ -144,6 +144,13 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<Track>> allTracks() => select(tracks).get();
 
+  Future<List<Track>> allTracksByDateAdded() =>
+      (select(tracks)..orderBy([
+            (row) => OrderingTerm.desc(row.dateCreated),
+            (row) => OrderingTerm.asc(row.name),
+          ]))
+          .get();
+
   Stream<List<Track>> searchTracks(List<String> words, {int limit = 30}) {
     final query = select(tracks)
       ..where((track) {
@@ -275,11 +282,25 @@ class AppDatabase extends _$AppDatabase {
 
   Stream<List<Download>> watchDownloads() => select(downloads).watch();
 
+  Future<List<Download>> allDownloads() => select(downloads).get();
+
   Future<void> putDownload(DownloadsCompanion row) =>
       into(downloads).insertOnConflictUpdate(row);
 
+  Future<void> queueDownloads(Iterable<String> trackIds) => batch(
+    (batch) => batch.insertAllOnConflictUpdate(
+      downloads,
+      trackIds.map(
+        (trackId) =>
+            DownloadsCompanion.insert(trackId: trackId, status: 'queued'),
+      ),
+    ),
+  );
+
   Future<void> removeDownload(String trackId) =>
       (delete(downloads)..where((row) => row.trackId.equals(trackId))).go();
+
+  Future<void> clearDownloads() => delete(downloads).go();
 
   Stream<List<DowntifyImport>> watchDowntifyImports(
     String serverId,

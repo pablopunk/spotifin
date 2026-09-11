@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/album_context_menu.dart';
+import '../common/collection_download_button.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
 import '../common/track_tile.dart';
@@ -62,9 +63,24 @@ class _TrackList extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.builder(
     padding: EdgeInsets.only(bottom: SpotifinChromeInsets.bottomOf(context)),
-    itemCount: tracks.length,
-    itemBuilder: (context, index) =>
-        TrackTile(track: tracks[index], contextTracks: tracks),
+    itemCount: tracks.length + 1,
+    itemBuilder: (context, index) {
+      if (index == 0) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SpotifinSpacing.md,
+            SpotifinSpacing.md,
+            SpotifinSpacing.md,
+            SpotifinSpacing.sm,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: CollectionDownloadButton(tracks: tracks),
+          ),
+        );
+      }
+      return TrackTile(track: tracks[index - 1], contextTracks: tracks);
+    },
   );
 }
 
@@ -308,6 +324,8 @@ class CollectionScreen extends ConsumerWidget {
                                         .read(playbackProvider)
                                         .replaceQueue(tracks),
                             ),
+                            const SizedBox(width: SpotifinSpacing.sm),
+                            CollectionDownloadButton(tracks: tracks),
                           ],
                         ),
                       ],

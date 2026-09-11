@@ -22,6 +22,7 @@ class TrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final downloadStatus = ref.watch(downloadStatusesProvider).value?[track.id];
     final tile = Padding(
       padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.sm),
       child: Material(
@@ -57,7 +58,12 @@ class TrackTile extends ConsumerWidget {
                     ref.read(playbackProvider).playTrack(track, contextTracks),
               ),
             ),
-            TrackMenuButton(track: track, contextTracks: contextTracks),
+            _DownloadIndicator(status: downloadStatus),
+            TrackMenuButton(
+              track: track,
+              contextTracks: contextTracks,
+              downloadStatus: downloadStatus,
+            ),
           ],
         ),
       ),
@@ -70,7 +76,44 @@ class TrackTile extends ConsumerWidget {
   }
 }
 
-enum _TrackAction { favorite, playlist, queue, download, delete }
+enum _TrackAction {
+  favorite,
+  playlist,
+  queue,
+  download,
+  removeDownload,
+  delete,
+}
+
+class _DownloadIndicator extends StatelessWidget {
+  const _DownloadIndicator({required this.status});
+
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == 'complete') {
+      return const Tooltip(
+        message: 'Downloaded',
+        child: Icon(
+          Icons.download_for_offline_rounded,
+          size: 19,
+          color: SpotifinColors.accent,
+        ),
+      );
+    }
+    if (status == 'queued' || status == 'downloading') {
+      return const Padding(
+        padding: EdgeInsets.all(3),
+        child: SizedBox.square(
+          dimension: 13,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
 
 class TrackContextMenu extends ConsumerWidget {
   const TrackContextMenu({
@@ -102,11 +145,13 @@ class TrackMenuButton extends ConsumerWidget {
   const TrackMenuButton({
     required this.track,
     required this.contextTracks,
+    required this.downloadStatus,
     super.key,
   });
 
   final Track track;
   final List<Track> contextTracks;
+  final String? downloadStatus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
@@ -116,11 +161,14 @@ class TrackMenuButton extends ConsumerWidget {
         tooltip: 'More options',
         onSelected: (action) =>
             _handleTrackAction(context, ref, track, contextTracks, action),
-        itemBuilder: (_) => _trackMenuItems(track),
+        itemBuilder: (_) => _trackMenuItems(track, downloadStatus),
       );
 }
 
-List<PopupMenuEntry<_TrackAction>> _trackMenuItems(Track track) => [
+List<PopupMenuEntry<_TrackAction>> _trackMenuItems(
+  Track track,
+  String? downloadStatus,
+) => [
   PopupMenuItem(
     height: 40,
     value: _TrackAction.favorite,
@@ -145,10 +193,17 @@ List<PopupMenuEntry<_TrackAction>> _trackMenuItems(Track track) => [
       label: 'Add to queue',
     ),
   ),
-  const PopupMenuItem(
+  PopupMenuItem(
     height: 40,
-    value: _TrackAction.download,
-    child: SpotifinMenuLabel(icon: Icons.download_rounded, label: 'Download'),
+    value: downloadStatus == 'complete'
+        ? _TrackAction.removeDownload
+        : _TrackAction.download,
+    child: SpotifinMenuLabel(
+      icon: downloadStatus == 'complete'
+          ? Icons.download_done_rounded
+          : Icons.download_rounded,
+      label: downloadStatus == 'complete' ? 'Remove download' : 'Download',
+    ),
   ),
   const PopupMenuDivider(height: 9),
   const PopupMenuItem(
@@ -174,7 +229,10 @@ Future<void> _showTrackMenu(
     color: SpotifinColors.raised,
     constraints: spotifinMenuConstraints,
     position: spotifinMenuPosition(context, globalPosition),
-    items: _trackMenuItems(track),
+    items: _trackMenuItems(
+      track,
+      ref.read(downloadStatusesProvider).value?[track.id],
+    ),
   );
   if (action != null && context.mounted) {
     await _handleTrackAction(context, ref, track, contextTracks, action);
@@ -201,11 +259,41 @@ Future<void> _handleTrackAction(
           .read(downloadProvider)
           .download(app.session!, track, small: app.smallDownloads);
     }
+  } else if (action == _TrackAction.removeDownload) {
+    await _removeDownload(context, ref, track);
   } else if (action == _TrackAction.playlist) {
     await _addToPlaylist(context, ref, track);
   } else if (action == _TrackAction.delete) {
     await _deleteTrack(context, ref, track);
   }
+}
+
+Future<void> _removeDownload(
+  BuildContext context,
+  WidgetRef ref,
+  Track track,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Remove download?'),
+      content: Text(
+        '“${track.name}” will be removed from this device. It will stay in '
+        'your Jellyfin library.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) await ref.read(downloadProvider).remove(track.id);
 }
 
 Future<void> _addToPlaylist(

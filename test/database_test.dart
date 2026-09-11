@@ -96,6 +96,28 @@ void main() {
     final tracks = await database.watchTracksByDateAdded().first;
 
     expect(tracks.map((track) => track.id), ['new', 'old', 'unknown']);
+    expect((await database.allTracksByDateAdded()).map((track) => track.id), [
+      'new',
+      'old',
+      'unknown',
+    ]);
+  });
+
+  test('queues and clears large download sets in one operation', () async {
+    await database.queueDownloads(['new', 'old', 'unknown']);
+
+    expect(
+      (await database.allDownloads()).map((download) => download.trackId),
+      containsAll(['new', 'old', 'unknown']),
+    );
+    expect(
+      (await database.allDownloads()).map((download) => download.status),
+      everyElement('queued'),
+    );
+
+    await database.clearDownloads();
+
+    expect(await database.allDownloads(), isEmpty);
   });
 
   test('version 4 migration accepts an existing tracks index', () async {

@@ -65,6 +65,13 @@ final downloadProvider = Provider<DownloadService>((ref) {
   return service;
 });
 
+final downloadStatusesProvider = StreamProvider<Map<String, String>>((ref) {
+  return ref
+      .watch(databaseProvider)
+      .watchDownloads()
+      .map((rows) => {for (final row in rows) row.trackId: row.status});
+});
+
 final playbackProvider = Provider<PlaybackService>((ref) {
   final service = PlaybackService(
     ref.watch(jellyfinClientProvider),

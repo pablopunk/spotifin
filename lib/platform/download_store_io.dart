@@ -21,6 +21,7 @@ class DownloadStore {
     final temporary = File('${target.path}.partial');
     final client = http.Client();
     try {
+      if (await temporary.exists()) await temporary.delete();
       final request = http.Request('GET', source)..headers.addAll(headers);
       final response = await client.send(request);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -28,10 +29,12 @@ class DownloadStore {
       }
       final sink = temporary.openWrite();
       await response.stream.pipe(sink);
+      if (await target.exists()) await target.delete();
       await temporary.rename(target.path);
       return target.uri.toString();
     } finally {
       client.close();
+      if (await temporary.exists()) await temporary.delete();
     }
   }
 

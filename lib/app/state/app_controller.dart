@@ -122,7 +122,12 @@ class AppController extends Notifier<AppState> {
           normalization: normalization,
         );
     final cached = await ref.read(databaseProvider).allTracks();
-    if (cached.isNotEmpty) await ref.read(playbackProvider).restore(cached);
+    if (cached.isNotEmpty) {
+      await ref.read(playbackProvider).restore(cached);
+      await ref
+          .read(downloadProvider)
+          .resume(session, await _tracksByRecency(), small: smallDownloads);
+    }
     state = state.copyWith(status: AppStatus.ready);
     await refresh(silent: cached.isNotEmpty);
   }
@@ -206,6 +211,13 @@ class AppController extends Notifier<AppState> {
       if (ref.read(playbackProvider).queue.isEmpty) {
         await ref.read(playbackProvider).restore(catalog);
       }
+      await ref
+          .read(downloadProvider)
+          .resume(
+            session,
+            await _tracksByRecency(),
+            small: state.smallDownloads,
+          );
       state = state.copyWith(syncing: false, clearError: true);
     } catch (error) {
       if (error is JellyfinException && error.statusCode == 401) {
@@ -217,6 +229,9 @@ class AppController extends Notifier<AppState> {
           : state.copyWith(syncing: false, error: error.toString());
     }
   }
+
+  Future<List<Track>> _tracksByRecency() =>
+      ref.read(databaseProvider).allTracksByDateAdded();
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
     final session = state.session;
