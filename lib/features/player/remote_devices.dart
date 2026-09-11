@@ -266,7 +266,7 @@ class _RemoteDeviceCard extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: pending
                         ? null
-                        : () => _run(context, service.takeOver(session)),
+                        : () => _playHere(context, service, session),
                     icon: const Icon(Icons.move_to_inbox_rounded),
                     label: const Text('Play here'),
                   ),
@@ -343,12 +343,24 @@ String _nextRepeatMode(String current) => switch (current) {
   _ => 'RepeatNone',
 };
 
-Future<void> _run(BuildContext context, Future<void> action) async {
+Future<void> _playHere(
+  BuildContext context,
+  RemoteSessionService service,
+  RemoteSession session,
+) async {
+  final succeeded = await _run(context, service.takeOver(session));
+  if (succeeded && context.mounted) Navigator.of(context).pop();
+}
+
+Future<bool> _run(BuildContext context, Future<void> action) async {
   try {
     await action;
+    return true;
   } catch (error) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(error.toString())));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+    return false;
   }
 }
