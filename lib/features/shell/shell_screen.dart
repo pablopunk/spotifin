@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -6,6 +7,7 @@ import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
 import '../../services/playback/playback_service.dart';
+import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
@@ -34,6 +36,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   static const _minimumPlayerPanelWidth = 320.0;
 
   late final PlaybackService _playback;
+  late final RemoteSessionService _remoteSessions;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
   final _navigatorKeys = List.generate(
     _destinations.length,
@@ -51,11 +54,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   void initState() {
     super.initState();
     _playback = ref.read(playbackProvider)..addListener(_refreshPlaybackLayout);
+    _remoteSessions = ref.read(remoteSessionProvider)
+      ..addListener(_refreshPlaybackLayout);
   }
 
   @override
   void dispose() {
     _playback.removeListener(_refreshPlaybackLayout);
+    _remoteSessions.removeListener(_refreshPlaybackLayout);
     super.dispose();
   }
 
@@ -206,6 +212,54 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
           ],
         ),
+      );
+    }
+    if (glassEffects &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      final showAccessory =
+          hasLocalTrack || _remoteSessions.sessions.isNotEmpty;
+      return GlassScaffold(
+        backgroundColor: SpotifinColors.background,
+        settings: SpotifinGlass.settings(glassOpacity),
+        topEdgeFade: false,
+        bottomBar: GlassTabBar.bottom(
+          settings: SpotifinGlass.settings(glassOpacity),
+          indicatorSettings: SpotifinGlass.settings(glassOpacity),
+          selectedIndex: selectedIndex,
+          onTabSelected: widget.controller.selectDestination,
+          selectedIconColor: SpotifinColors.text,
+          unselectedIconColor: SpotifinColors.textMuted,
+          selectedLabelColor: SpotifinColors.text,
+          unselectedLabelColor: SpotifinColors.textMuted,
+          interactionGlowColor: SpotifinColors.accent,
+          bottomAccessorySpacing: 0,
+          bottomAccessory: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: hasLocalTrack
+                ? const PlayerBar()
+                : const GlassContainer(
+                    useOwnLayer: true,
+                    quality: GlassQuality.premium,
+                    shape: LiquidRoundedSuperellipse(borderRadius: 16),
+                    clipBehavior: Clip.antiAlias,
+                    child: RemoteNowPlayingBar(),
+                  ),
+          ),
+          bottomAccessoryEnabled: showAccessory,
+          bottomAccessoryHeight: 74,
+          verticalPadding: 12,
+          tabs: _destinations
+              .map(
+                (item) => GlassTab(
+                  icon: Icon(item.icon),
+                  activeIcon: Icon(item.selectedIcon),
+                  label: item.label,
+                ),
+              )
+              .toList(),
+        ),
+        body: content,
       );
     }
     if (glassEffects) {
