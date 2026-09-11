@@ -29,11 +29,13 @@ void main() {
       serverUrl: 'example.com/jellyfin/',
       username: 'Pablo',
       password: 'secret',
+      deviceId: 'spotifin-device',
     );
 
     expect(session.serverUrl, 'https://example.com/jellyfin');
     expect(session.accessToken, 'token');
     expect(requests.last.headers['Authorization'], contains('MediaBrowser'));
+    expect(requests.last.headers['Authorization'], contains('spotifin-device'));
   });
 
   test('reports an authentication failure without exposing a body', () async {
@@ -51,6 +53,7 @@ void main() {
         serverUrl: 'https://example.com',
         username: 'Pablo',
         password: 'secret',
+        deviceId: 'spotifin-device',
       ),
       throwsA(
         isA<JellyfinException>().having(
@@ -70,6 +73,7 @@ void main() {
     const session = JellyfinSession(
       serverUrl: 'https://example.com',
       serverId: 'server',
+      deviceId: 'spotifin-device',
       userId: 'user',
       userName: 'Pablo',
       accessToken: 'expired',
@@ -99,6 +103,7 @@ void main() {
     const session = JellyfinSession(
       serverUrl: 'https://example.com',
       serverId: 'server',
+      deviceId: 'spotifin-device',
       userId: 'user',
       userName: 'Pablo',
       accessToken: 'token',
@@ -109,12 +114,45 @@ void main() {
     expect(request.headers['X-Emby-Token'], 'token');
   });
 
+  test('refreshes saved identity from the authenticated user', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'Id': 'current-user',
+            'Name': 'Current name',
+            'ServerId': 'current-server',
+          }),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'old-server',
+      deviceId: 'spotifin-device',
+      userId: 'old-user',
+      userName: 'Old name',
+      accessToken: 'token',
+    );
+
+    final refreshed = await client.refreshSession(session);
+
+    expect(refreshed.serverId, 'current-server');
+    expect(refreshed.deviceId, 'spotifin-device');
+    expect(refreshed.userId, 'current-user');
+    expect(refreshed.userName, 'Current name');
+    expect(refreshed.accessToken, 'token');
+  });
+
   test('identifies the exact media source in playback URLs', () {
     final client = JellyfinClient();
     addTearDown(client.close);
     const session = JellyfinSession(
       serverUrl: 'https://example.com',
       serverId: 'server',
+      deviceId: 'spotifin-device',
       userId: 'user',
       userName: 'Pablo',
       accessToken: 'token',
@@ -124,7 +162,7 @@ void main() {
 
     expect(uri.path, '/Audio/track-id/stream');
     expect(uri.queryParameters['mediaSourceId'], 'track-id');
-    expect(uri.queryParameters['deviceId'], 'spotifin-server');
+    expect(uri.queryParameters['deviceId'], 'spotifin-device');
     expect(uri.queryParameters['static'], 'true');
   });
 
@@ -134,6 +172,7 @@ void main() {
     const session = JellyfinSession(
       serverUrl: 'https://example.com',
       serverId: 'server',
+      deviceId: 'spotifin-device',
       userId: 'user',
       userName: 'Pablo',
       accessToken: 'token',
@@ -157,6 +196,7 @@ void main() {
     const session = JellyfinSession(
       serverUrl: 'https://example.com',
       serverId: 'server',
+      deviceId: 'spotifin-device',
       userId: 'user',
       userName: 'Pablo',
       accessToken: 'token',

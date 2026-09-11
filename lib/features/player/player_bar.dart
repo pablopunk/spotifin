@@ -384,6 +384,13 @@ class _LyricsSheet extends ConsumerWidget {
                     if (snapshot.connectionState != ConnectionState.done) {
                       return const Center(child: CircularProgressIndicator());
                     }
+                    if (snapshot.hasError) {
+                      return SpotifinEmptyState(
+                        icon: Icons.sync_problem_rounded,
+                        title: 'Could not load lyrics',
+                        message: snapshot.error.toString(),
+                      );
+                    }
                     final lines = snapshot.data ?? const [];
                     if (lines.isEmpty) {
                       return const Center(child: Text('No lyrics found'));

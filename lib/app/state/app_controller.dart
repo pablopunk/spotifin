@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/jellyfin/jellyfin_client.dart';
 import '../../services/jellyfin/session.dart';
 import '../../storage/database.dart';
 import '../providers.dart';
@@ -85,8 +86,8 @@ class AppController extends Notifier<AppState> {
       );
       return;
     }
-    final session = await ref.read(sessionStoreProvider).load();
-    if (session == null) {
+    final savedSession = await ref.read(sessionStoreProvider).load();
+    if (savedSession == null) {
       state = AppState(
         status: AppStatus.signedOut,
         smallStreaming: smallStreaming,
@@ -95,6 +96,14 @@ class AppController extends Notifier<AppState> {
         glassEffects: glassEffects,
         glassOpacity: glassOpacity,
       );
+      return;
+    }
+    late final JellyfinSession session;
+    try {
+      session = await _refreshSessionIdentity(savedSession);
+    } on JellyfinException catch (error) {
+      if (error.statusCode != 401) rethrow;
+      await _expireSession();
       return;
     }
     state = AppState(
@@ -127,6 +136,7 @@ class AppController extends Notifier<AppState> {
             serverUrl: server,
             username: username,
             password: password,
+            deviceId: await ref.read(sessionStoreProvider).getDeviceId(),
           );
       await ref.read(sessionStoreProvider).save(session);
       await ref
@@ -155,12 +165,14 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> refresh({bool silent = false}) async {
-    final session = state.session;
-    if (session == null || state.syncing && silent) return;
+    final savedSession = state.session;
+    if (savedSession == null || state.syncing && silent) return;
     state = state.copyWith(syncing: !silent, clearError: true);
     try {
       final client = ref.read(jellyfinClientProvider);
       final database = ref.read(databaseProvider);
+      final session = await _refreshSessionIdentity(savedSession);
+      state = state.copyWith(session: session);
       await _flushPending();
       var firstPage = true;
       final bufferedTracks = <TracksCompanion>[];
@@ -196,6 +208,10 @@ class AppController extends Notifier<AppState> {
       }
       state = state.copyWith(syncing: false, clearError: true);
     } catch (error) {
+      if (error is JellyfinException && error.statusCode == 401) {
+        await _expireSession();
+        return;
+      }
       state = silent
           ? state.copyWith(syncing: false, clearError: true)
           : state.copyWith(syncing: false, error: error.toString());
@@ -275,6 +291,34 @@ class AppController extends Notifier<AppState> {
   }
 
   void clearError() => state = state.copyWith(clearError: true);
+
+  Future<JellyfinSession> _refreshSessionIdentity(
+    JellyfinSession session,
+  ) async {
+    try {
+      final refreshed = await ref
+          .read(jellyfinClientProvider)
+          .refreshSession(session);
+      await ref.read(sessionStoreProvider).save(refreshed);
+      return refreshed;
+    } on JellyfinException catch (error) {
+      if (error.statusCode == 401) rethrow;
+      return session;
+    } catch (_) {
+      return session;
+    }
+  }
+
+  Future<void> _expireSession() async {
+    await ref.read(playbackProvider).clear();
+    await ref.read(sessionStoreProvider).clear();
+    state = state.copyWith(
+      status: AppStatus.signedOut,
+      clearSession: true,
+      syncing: false,
+      error: 'Your Jellyfin session is no longer valid. Sign in again.',
+    );
+  }
 
   Future<void> setSmallStreaming(bool value) async {
     state = state.copyWith(smallStreaming: value);

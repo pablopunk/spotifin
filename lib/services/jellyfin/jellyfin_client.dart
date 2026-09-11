@@ -30,6 +30,7 @@ class JellyfinClient {
     required String serverUrl,
     required String username,
     required String password,
+    required String deviceId,
   }) async {
     final baseUrl = _normalizeServerUrl(serverUrl);
     final publicInfo = await _getPublicInfo(baseUrl);
@@ -37,7 +38,7 @@ class JellyfinClient {
       Uri.parse('$baseUrl/Users/AuthenticateByName'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': _authorization('spotifin-login'),
+        'Authorization': _authorization(deviceId),
       },
       body: jsonEncode({'Username': username.trim(), 'Pw': password}),
     );
@@ -52,9 +53,22 @@ class JellyfinClient {
     return JellyfinSession(
       serverUrl: baseUrl,
       serverId: (publicInfo['Id'] as String?) ?? '',
+      deviceId: deviceId,
       userId: user['Id'] as String,
       userName: user['Name'] as String? ?? username.trim(),
       accessToken: token,
+    );
+  }
+
+  Future<JellyfinSession> refreshSession(JellyfinSession session) async {
+    final user = await _getJson(session, _uri(session, '/Users/Me'));
+    return JellyfinSession(
+      serverUrl: session.serverUrl,
+      serverId: user['ServerId'] as String? ?? session.serverId,
+      deviceId: session.deviceId,
+      userId: user['Id'] as String? ?? session.userId,
+      userName: user['Name'] as String? ?? session.userName,
+      accessToken: session.accessToken,
     );
   }
 
@@ -248,7 +262,7 @@ class JellyfinClient {
     final query = <String, String>{
       'api_key': session.accessToken,
       'mediaSourceId': itemId,
-      'deviceId': 'spotifin-${session.serverId}',
+      'deviceId': session.deviceId,
       if (!small) 'static': 'true',
       if (small) ...{
         'audioCodec': 'aac',
@@ -286,12 +300,16 @@ class JellyfinClient {
   }
 
   Map<String, String> _headers(JellyfinSession session) => {
-    'Accept': 'application/json',
-    'X-Emby-Token': session.accessToken,
+    ..._tokenHeaders(session),
     'Authorization': _authorization(
-      session.serverId,
+      session.deviceId,
       token: session.accessToken,
     ),
+  };
+
+  Map<String, String> _tokenHeaders(JellyfinSession session) => {
+    'Accept': 'application/json',
+    'X-Emby-Token': session.accessToken,
   };
 
   String _authorization(String deviceId, {String? token}) {
