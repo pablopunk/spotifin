@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/features/common/design_system.dart';
+import 'package:spotifin/features/common/playlist_artwork.dart';
 import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/home/home_screen.dart';
 import 'package:spotifin/storage/database.dart';
@@ -38,6 +39,20 @@ void main() {
     expect(find.text('Good listening'), findsNothing);
     expect(find.byType(SearchBar), findsOneWidget);
     expect(find.byTooltip('Save Rock mix as playlist'), findsOneWidget);
+    expect(find.text('Playlists'), findsNothing);
+
+    await database.replacePlaylists([
+      PlaylistsCompanion.insert(
+        id: 'playlist',
+        name: 'Road trip',
+        trackIds: const Value('["track-0","track-1","track-2"]'),
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Playlists'), findsOneWidget);
+    expect(find.text('Road trip'), findsOneWidget);
+    expect(find.byType(PlaylistArtwork), findsOneWidget);
 
     await _secondaryTap(tester, find.byType(TrackContextMenu).first);
     await tester.pumpAndSettle();

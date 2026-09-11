@@ -17,6 +17,7 @@ import '../common/design_system.dart';
 import '../common/track_tile.dart';
 import '../downtify/external_track_tile.dart';
 import '../library/library_screen.dart';
+import 'playlists_section.dart';
 
 enum _SearchFilter { all, songs, artists, albums, downtify }
 
@@ -212,6 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     contextTracks: catalog.added,
                   ),
                 ),
+                SliverToBoxAdapter(child: PlaylistsSection(tracks: tracks)),
                 if (catalog.favorites.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _HorizontalSection(
