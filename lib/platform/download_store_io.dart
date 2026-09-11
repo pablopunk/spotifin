@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'download_store_exception.dart';
+
 class DownloadStore {
   Future<String> save(
     String accountId,
@@ -25,10 +27,13 @@ class DownloadStore {
       final request = http.Request('GET', source)..headers.addAll(headers);
       final response = await client.send(request);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException('Download failed (${response.statusCode}).');
+        throw DownloadStoreException(
+          'Download failed (${response.statusCode}).',
+          statusCode: response.statusCode,
+        );
       }
       final sink = temporary.openWrite();
-      await response.stream.pipe(sink);
+      await response.stream.timeout(const Duration(seconds: 30)).pipe(sink);
       if (await target.exists()) await target.delete();
       await temporary.rename(target.path);
       return target.uri.toString();

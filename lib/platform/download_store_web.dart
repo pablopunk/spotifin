@@ -2,6 +2,8 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+import 'download_store_exception.dart';
+
 class DownloadStore {
   static const _cacheName = 'spotifin-audio-v1';
   final Map<String, String> _objectUrls = {};
@@ -18,7 +20,12 @@ class DownloadStore {
     final response = await web.window
         .fetch(source.toString().toJS, web.RequestInit(headers: headers))
         .toDart;
-    if (!response.ok) throw Exception('Download failed (${response.status}).');
+    if (!response.ok) {
+      throw DownloadStoreException(
+        'Download failed (${response.status}).',
+        statusCode: response.status,
+      );
+    }
     final key = '/.spotifin/audio/$accountId/$trackId';
     final cache = await web.window.caches.open(_cacheName).toDart;
     await cache.put(key.toJS, response).toDart;

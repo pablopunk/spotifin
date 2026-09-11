@@ -202,6 +202,9 @@ class AppController extends Notifier<AppState> {
       await database.removeTracksExcept(
         tracks.map((track) => track.id.value).toList(growable: false),
       );
+      await ref
+          .read(downloadProvider)
+          .reconcile(tracks.map((track) => track.id.value));
       final playlists = await client.fetchPlaylists(session);
       await ref.read(databaseProvider).replacePlaylists(playlists);
       final catalog = await ref.read(databaseProvider).allTracks();
@@ -350,6 +353,7 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> _expireSession() async {
+    await ref.read(downloadProvider).suspend();
     await ref.read(playbackProvider).clear();
     await ref.read(sessionStoreProvider).clear();
     state = state.copyWith(

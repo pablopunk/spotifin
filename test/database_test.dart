@@ -104,15 +104,28 @@ void main() {
   });
 
   test('queues and clears large download sets in one operation', () async {
+    await database.putDownload(
+      DownloadsCompanion.insert(
+        trackId: 'old',
+        status: 'failed',
+        error: const Value('offline'),
+      ),
+    );
     await database.queueDownloads(['new', 'old', 'unknown']);
 
+    final queued = await database.allDownloads();
     expect(
-      (await database.allDownloads()).map((download) => download.trackId),
+      queued.map((download) => download.trackId),
       containsAll(['new', 'old', 'unknown']),
     );
+    expect(queued.map((download) => download.status), everyElement('queued'));
+    expect(queued.map((download) => download.error), everyElement(isNull));
+
+    await database.failQueuedDownloads('Paused');
+
     expect(
       (await database.allDownloads()).map((download) => download.status),
-      everyElement('queued'),
+      everyElement('failed'),
     );
 
     await database.clearDownloads();

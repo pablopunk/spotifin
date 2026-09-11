@@ -139,6 +139,7 @@ class AppDatabase extends _$AppDatabase {
       (select(tracks)..orderBy([
             (row) => OrderingTerm.desc(row.dateCreated),
             (row) => OrderingTerm.asc(row.name),
+            (row) => OrderingTerm.asc(row.id),
           ]))
           .watch();
 
@@ -148,6 +149,7 @@ class AppDatabase extends _$AppDatabase {
       (select(tracks)..orderBy([
             (row) => OrderingTerm.desc(row.dateCreated),
             (row) => OrderingTerm.asc(row.name),
+            (row) => OrderingTerm.asc(row.id),
           ]))
           .get();
 
@@ -287,15 +289,27 @@ class AppDatabase extends _$AppDatabase {
   Future<void> putDownload(DownloadsCompanion row) =>
       into(downloads).insertOnConflictUpdate(row);
 
-  Future<void> queueDownloads(Iterable<String> trackIds) => batch(
-    (batch) => batch.insertAllOnConflictUpdate(
-      downloads,
-      trackIds.map(
-        (trackId) =>
-            DownloadsCompanion.insert(trackId: trackId, status: 'queued'),
-      ),
-    ),
-  );
+  Future<void> queueDownloads(Iterable<String> trackIds) async {
+    final rows = trackIds
+        .map(
+          (trackId) => DownloadsCompanion.insert(
+            trackId: trackId,
+            status: 'queued',
+            error: const Value(null),
+          ),
+        )
+        .toList(growable: false);
+    if (rows.isEmpty) return;
+    await batch((batch) => batch.insertAllOnConflictUpdate(downloads, rows));
+  }
+
+  Future<void> failQueuedDownloads(String message) =>
+      (update(downloads)..where((row) => row.status.equals('queued'))).write(
+        DownloadsCompanion(
+          status: const Value('failed'),
+          error: Value(message),
+        ),
+      );
 
   Future<void> removeDownload(String trackId) =>
       (delete(downloads)..where((row) => row.trackId.equals(trackId))).go();

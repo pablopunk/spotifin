@@ -24,7 +24,16 @@ class DownloadService extends ChangeNotifier {
   final Queue<_DownloadTask> _queue = Queue();
   int _workers = 0;
   int _generation = 0;
+  int _consecutiveFailures = 0;
   bool _disposed = false;
+  bool _clearing = false;
+  bool _pausing = false;
+  bool _suspending = false;
+  bool _paused = false;
+  Completer<void>? _idleCompleter;
+  Future<void>? _clearFuture;
+  Future<void>? _suspendFuture;
+  JellyfinSession? _latestSession;
 
   bool isActive(String trackId) => _active.contains(trackId);
 
@@ -39,9 +48,22 @@ class DownloadService extends ChangeNotifier {
     Iterable<Track> tracks, {
     bool small = false,
   }) async {
+    if (_clearing || _pausing || _suspending || _disposed) return;
+    _latestSession = session;
+    _paused = false;
+    _consecutiveFailures = 0;
+    await _enqueue(session, tracks, small: small);
+  }
+
+  Future<void> _enqueue(
+    JellyfinSession session,
+    Iterable<Track> tracks, {
+    required bool small,
+  }) async {
     final existing = {
       for (final row in await _database.allDownloads()) row.trackId: row,
     };
+    if (_clearing || _pausing || _suspending || _disposed) return;
     final generation = _generation;
     final tasks = <_DownloadTask>[];
     for (final track in tracks) {
@@ -53,9 +75,19 @@ class DownloadService extends ChangeNotifier {
       _cancelled.remove(track.id);
       tasks.add(_DownloadTask(session, track, small, generation));
     }
-    if (tasks.isEmpty) return;
+    if (tasks.isEmpty) {
+      _startWorkers();
+      return;
+    }
     await _database.queueDownloads(tasks.map((task) => task.track.id));
-    _queue.addAll(tasks);
+    final cancelled = tasks
+        .where((task) => _isCancelled(task) || _clearing || _disposed)
+        .toList(growable: false);
+    for (final task in cancelled) {
+      _pending.remove(task.track.id);
+      await _database.removeDownload(task.track.id);
+    }
+    _queue.addAll(tasks.where((task) => !cancelled.contains(task)));
     _startWorkers();
   }
 
@@ -64,21 +96,26 @@ class DownloadService extends ChangeNotifier {
     Iterable<Track> orderedTracks, {
     bool small = false,
   }) async {
+    if (_clearing || _pausing || _suspending || _disposed) return;
+    _latestSession = session;
     final downloads = {
       for (final row in await _database.allDownloads()) row.trackId: row,
     };
-    await downloadAll(
+    await _enqueue(
       session,
       orderedTracks.where((track) {
         final status = downloads[track.id]?.status;
-        return status != null && status != 'complete';
+        return status == 'queued' || status == 'downloading';
       }),
       small: small,
     );
   }
 
   void _startWorkers() {
-    while (_workers < _parallelDownloads && _queue.isNotEmpty) {
+    while (!_paused &&
+        !_clearing &&
+        _workers < _parallelDownloads &&
+        _queue.isNotEmpty) {
       _workers++;
       unawaited(_work());
     }
@@ -86,81 +123,175 @@ class DownloadService extends ChangeNotifier {
 
   Future<void> _work() async {
     try {
-      while (_queue.isNotEmpty) {
+      while (!_paused && !_clearing && _queue.isNotEmpty) {
         final task = _queue.removeFirst();
         _pending.remove(task.track.id);
         if (task.generation != _generation) continue;
-        await _run(task);
+        try {
+          await _run(task);
+        } catch (error) {
+          try {
+            await _recordFailure(task, error);
+          } catch (_) {}
+          try {
+            await _pauseAfterRepeatedFailures();
+          } catch (_) {}
+        }
       }
     } finally {
       _workers--;
+      if (_active.isEmpty && !(_idleCompleter?.isCompleted ?? true)) {
+        _idleCompleter?.complete();
+      }
       _startWorkers();
     }
   }
 
   Future<void> _run(_DownloadTask task) async {
-    if (!_active.add(task.track.id)) return;
+    if (_isCancelled(task) || !_active.add(task.track.id)) return;
     _notifyChanged();
     try {
       await _database.putDownload(
         DownloadsCompanion.insert(
           trackId: task.track.id,
           status: 'downloading',
+          error: const Value(null),
         ),
       );
-      if (_isCancelled(task)) return;
+      if (_isCancelled(task)) {
+        await _database.removeDownload(task.track.id);
+        return;
+      }
       Object? lastError;
+      String? localUri;
       for (var attempt = 1; attempt <= _maximumAttempts; attempt++) {
         if (_isCancelled(task)) return;
         try {
-          final localUri = await _save(task);
-          if (_isCancelled(task)) {
-            await _store.remove(localUri);
-            return;
-          }
-          await _database.putDownload(
-            DownloadsCompanion.insert(
-              trackId: task.track.id,
-              status: 'complete',
-              localUri: Value(localUri),
-            ),
-          );
-          return;
+          localUri = await _save(task);
+          break;
         } catch (error) {
           lastError = error;
+          if (_isPermanentTrackFailure(error)) break;
           if (!_isCancelled(task) && attempt < _maximumAttempts) {
             await Future<void>.delayed(Duration(seconds: attempt));
           }
         }
       }
-      if (!_isCancelled(task)) {
-        await _database.putDownload(
-          DownloadsCompanion.insert(
-            trackId: task.track.id,
-            status: 'failed',
-            error: Value(lastError.toString()),
-          ),
-        );
+      if (_isCancelled(task)) {
+        if (localUri != null) await _store.remove(localUri);
+        return;
       }
+      if (localUri == null) {
+        await _recordFailure(
+          task,
+          lastError,
+          affectsQueue: !_isPermanentTrackFailure(lastError),
+        );
+        if (lastError is DownloadStoreException &&
+            lastError.statusCode == 401) {
+          await _pauseAfterRepeatedFailures();
+        }
+        return;
+      }
+      await _finishDownload(task, localUri);
     } finally {
       _active.remove(task.track.id);
       _notifyChanged();
     }
   }
 
+  Future<void> _finishDownload(_DownloadTask task, String localUri) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= _maximumAttempts; attempt++) {
+      try {
+        await _database.putDownload(
+          DownloadsCompanion.insert(
+            trackId: task.track.id,
+            status: 'complete',
+            localUri: Value(localUri),
+            error: const Value(null),
+          ),
+        );
+        if (_isCancelled(task)) {
+          await _store.remove(localUri);
+          await _database.removeDownload(task.track.id);
+          return;
+        }
+        _consecutiveFailures = 0;
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < _maximumAttempts) {
+          await Future<void>.delayed(Duration(seconds: attempt));
+        }
+      }
+    }
+    await _store.remove(localUri);
+    throw lastError!;
+  }
+
+  Future<void> _recordFailure(
+    _DownloadTask task,
+    Object? error, {
+    bool affectsQueue = true,
+  }) async {
+    await _database.putDownload(
+      DownloadsCompanion.insert(
+        trackId: task.track.id,
+        status: 'failed',
+        error: Value(error.toString()),
+      ),
+    );
+    if (affectsQueue) _consecutiveFailures++;
+    if (affectsQueue && _consecutiveFailures >= _parallelDownloads) {
+      await _pauseAfterRepeatedFailures();
+    }
+  }
+
+  bool _isPermanentTrackFailure(Object? error) =>
+      error is DownloadStoreException &&
+      !error.isRetryable &&
+      error.statusCode != 401;
+
   Future<String> _save(_DownloadTask task) => _store.save(
-    task.session.serverId,
+    _sessionFor(task).serverId,
     task.track.id,
-    _client.downloadUri(task.session, task.track.id, small: task.small),
-    _client.downloadHeaders(task.session),
+    _client.downloadUri(_sessionFor(task), task.track.id, small: task.small),
+    _client.downloadHeaders(_sessionFor(task)),
     task.small ? 'm4a' : task.track.container,
   );
+
+  JellyfinSession _sessionFor(_DownloadTask task) {
+    final latest = _latestSession;
+    return latest?.serverId == task.session.serverId &&
+            latest?.userId == task.session.userId
+        ? latest!
+        : task.session;
+  }
 
   bool _isCancelled(_DownloadTask task) =>
       task.generation != _generation || _cancelled.contains(task.track.id);
 
   void _notifyChanged() {
     if (!_disposed) notifyListeners();
+  }
+
+  Future<void> _pauseAfterRepeatedFailures() async {
+    if (_paused || _pausing) return;
+    _pausing = true;
+    _paused = true;
+    for (final task in _queue) {
+      _pending.remove(task.track.id);
+    }
+    _queue.clear();
+    try {
+      await _database.failQueuedDownloads(
+        'Download queue paused after repeated errors. Try again when the '
+        'connection is available.',
+      );
+    } finally {
+      _pausing = false;
+    }
   }
 
   Future<Uri?> resolve(String trackId) async {
@@ -206,22 +337,96 @@ class DownloadService extends ChangeNotifier {
     await _database.removeDownload(trackId);
   }
 
-  Future<void> clear() async {
-    _generation++;
-    _pending.clear();
-    _cancelled.clear();
-    _queue.clear();
-    final rows = await _database.select(_database.downloads).get();
-    for (var start = 0; start < rows.length; start += 8) {
-      final end = start + 8 < rows.length ? start + 8 : rows.length;
-      await Future.wait(
-        rows
-            .sublist(start, end)
-            .where((row) => row.localUri != null)
-            .map((row) => _removeFile(row.localUri!)),
-      );
+  Future<void> reconcile(Iterable<String> trackIds) async {
+    final valid = trackIds.toSet();
+    final orphaned = (await _database.allDownloads()).where(
+      (download) => !valid.contains(download.trackId),
+    );
+    for (final download in orphaned) {
+      _cancelled.add(download.trackId);
+      _pending.remove(download.trackId);
+      _queue.removeWhere((task) => task.track.id == download.trackId);
+      if (download.localUri != null) await _removeFile(download.localUri!);
+      await _database.removeDownload(download.trackId);
     }
-    await _database.clearDownloads();
+  }
+
+  Future<void> suspend() {
+    final current = _suspendFuture;
+    if (current != null) return current;
+    final clearing = _clearFuture;
+    if (clearing != null) {
+      return clearing.then((_) {
+        _latestSession = null;
+      });
+    }
+    return _suspendFuture = _suspend();
+  }
+
+  Future<void> _suspend() async {
+    _suspending = true;
+    try {
+      final incomplete = (await _database.allDownloads())
+          .where((download) => download.status != 'complete')
+          .map((download) => download.trackId)
+          .toSet();
+      _generation++;
+      _pending.clear();
+      _queue.clear();
+      _latestSession = null;
+      await _waitForActiveDownloads();
+      final current = {
+        for (final download in await _database.allDownloads())
+          download.trackId: download.status,
+      };
+      await _database.queueDownloads(
+        incomplete.where((trackId) => current[trackId] != 'complete'),
+      );
+    } finally {
+      _suspending = false;
+      _suspendFuture = null;
+    }
+  }
+
+  Future<void> clear() {
+    final current = _clearFuture;
+    if (current != null) return current;
+    final suspending = _suspendFuture;
+    if (suspending != null) return suspending.then((_) => clear());
+    return _clearFuture = _clear();
+  }
+
+  Future<void> _clear() async {
+    _clearing = true;
+    try {
+      _generation++;
+      _pending.clear();
+      _cancelled.clear();
+      _queue.clear();
+      await _waitForActiveDownloads();
+      final rows = await _database.select(_database.downloads).get();
+      for (var start = 0; start < rows.length; start += 8) {
+        final end = start + 8 < rows.length ? start + 8 : rows.length;
+        await Future.wait(
+          rows
+              .sublist(start, end)
+              .where((row) => row.localUri != null)
+              .map((row) => _removeFile(row.localUri!)),
+        );
+      }
+      await _database.clearDownloads();
+    } finally {
+      _clearing = false;
+      _clearFuture = null;
+      _notifyChanged();
+    }
+  }
+
+  Future<void> _waitForActiveDownloads() async {
+    if (_active.isEmpty) return;
+    _idleCompleter = Completer<void>();
+    await _idleCompleter!.future;
+    _idleCompleter = null;
   }
 
   Future<void> _removeFile(String localUri) async {
