@@ -216,6 +216,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         bottomBar: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: GlassContainer(
+            height: 140,
             useOwnLayer: true,
             quality: GlassQuality.premium,
             settings: SpotifinGlass.settings(glassOpacity),
