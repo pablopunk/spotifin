@@ -30,7 +30,7 @@ class LyricsService {
     });
     final response = await _http.get(
       uri,
-      headers: {'User-Agent': 'Spotifin/1.0'},
+      headers: {'Lrclib-Client': 'Spotifin/1.0'},
     );
     if (response.statusCode == 404) return const [];
     if (response.statusCode < 200 || response.statusCode >= 300) {
