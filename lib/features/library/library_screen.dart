@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
+import '../common/album_context_menu.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
 import '../common/track_tile.dart';
@@ -95,7 +96,7 @@ class _GroupedList extends StatelessWidget {
       itemBuilder: (context, index) {
         final entry = entries[index];
         final first = entry.value.first;
-        return SpotifinCollectionCard(
+        final card = SpotifinCollectionCard(
           artwork: LayoutBuilder(
             builder: (context, constraints) => Artwork(
               itemId: first.albumId ?? first.id,
@@ -117,6 +118,13 @@ class _GroupedList extends StatelessWidget {
             ),
           ),
         );
+        return icon == Icons.album_rounded
+            ? AlbumContextMenu(
+                title: entry.key,
+                tracks: entry.value,
+                child: card,
+              )
+            : card;
       },
     );
   }

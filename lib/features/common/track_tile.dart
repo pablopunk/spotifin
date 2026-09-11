@@ -59,83 +59,112 @@ class TrackTile extends ConsumerWidget {
             PopupMenuButton<String>(
               color: SpotifinColors.raised,
               tooltip: 'More options',
-              onSelected: (action) async {
-                if (action == 'favorite') {
-                  await ref
-                      .read(appControllerProvider.notifier)
-                      .toggleFavorite(track.id, !track.favorite);
-                } else if (action == 'queue') {
-                  await ref.read(playbackProvider).addToQueue(track);
-                } else if (action == 'download') {
-                  final session = ref.read(appControllerProvider).session;
-                  if (session != null) {
-                    await ref
-                        .read(downloadProvider)
-                        .download(
-                          session,
-                          track,
-                          small: ref.read(appControllerProvider).smallDownloads,
-                        );
-                  }
-                } else if (action == 'playlist') {
-                  await _addToPlaylist(context, ref);
-                } else if (action == 'delete') {
-                  await _deleteTrack(context, ref);
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'favorite',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      track.favorite ? Icons.favorite : Icons.favorite_border,
-                    ),
-                    title: Text(
-                      track.favorite ? 'Remove favorite' : 'Favorite',
-                    ),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'playlist',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.library_add_rounded),
-                    title: Text('Add to playlist'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'queue',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.playlist_add_rounded),
-                    title: Text('Add to queue'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'download',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.download_rounded),
-                    title: Text('Download'),
-                  ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.delete_forever_rounded),
-                    title: Text('Delete permanently'),
-                  ),
-                ),
-              ],
+              onSelected: (action) => _handleAction(context, ref, action),
+              itemBuilder: (_) => _menuItems(),
             ),
           ],
         ),
       ),
     );
-    return DraggableTrack(track: track, child: tile);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapDown: (details) =>
+          _showContextMenu(context, ref, details.globalPosition),
+      child: DraggableTrack(track: track, child: tile),
+    );
+  }
+
+  List<PopupMenuEntry<String>> _menuItems() => [
+    PopupMenuItem(
+      value: 'favorite',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(track.favorite ? Icons.favorite : Icons.favorite_border),
+        title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: 'playlist',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.library_add_rounded),
+        title: Text('Add to playlist'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: 'queue',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.playlist_add_rounded),
+        title: Text('Add to queue'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: 'download',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.download_rounded),
+        title: Text('Download'),
+      ),
+    ),
+    const PopupMenuDivider(),
+    const PopupMenuItem(
+      value: 'delete',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.delete_forever_rounded),
+        title: Text('Delete permanently'),
+      ),
+    ),
+  ];
+
+  Future<void> _showContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Offset globalPosition,
+  ) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = overlay.globalToLocal(globalPosition);
+    final action = await showMenu<String>(
+      context: context,
+      color: SpotifinColors.raised,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        overlay.size.width - position.dx,
+        overlay.size.height - position.dy,
+      ),
+      items: _menuItems(),
+    );
+    if (action != null && context.mounted) {
+      await _handleAction(context, ref, action);
+    }
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    WidgetRef ref,
+    String action,
+  ) async {
+    if (action == 'favorite') {
+      await ref
+          .read(appControllerProvider.notifier)
+          .toggleFavorite(track.id, !track.favorite);
+    } else if (action == 'queue') {
+      await ref.read(playbackProvider).addToQueue(track);
+    } else if (action == 'download') {
+      final app = ref.read(appControllerProvider);
+      if (app.session != null) {
+        await ref
+            .read(downloadProvider)
+            .download(app.session!, track, small: app.smallDownloads);
+      }
+    } else if (action == 'playlist') {
+      await _addToPlaylist(context, ref);
+    } else if (action == 'delete') {
+      await _deleteTrack(context, ref);
+    }
   }
 
   Future<void> _addToPlaylist(BuildContext context, WidgetRef ref) async {

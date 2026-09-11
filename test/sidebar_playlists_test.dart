@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,7 +71,7 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('More options'));
+    await _secondaryTap(tester, find.byType(TrackTile));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete permanently'));
     await tester.pumpAndSettle();
@@ -121,3 +122,14 @@ Track _track(String id, String albumId) => Track(
   normalizationGain: null,
   albumNormalizationGain: null,
 );
+
+Future<void> _secondaryTap(WidgetTester tester, Finder finder) async {
+  final position = tester.getCenter(finder);
+  final gesture = await tester.createGesture(
+    kind: PointerDeviceKind.mouse,
+    buttons: kSecondaryMouseButton,
+  );
+  await gesture.addPointer(location: position);
+  await gesture.down(position);
+  await gesture.up();
+}

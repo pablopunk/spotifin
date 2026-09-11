@@ -231,6 +231,16 @@ class AppController extends Notifier<AppState> {
       throw const JellyfinException('Sign in before deleting a song.');
     }
     await ref.read(jellyfinClientProvider).deleteItem(session, trackId);
+    await _removeLocalTrack(trackId);
+  }
+
+  Future<void> deleteAlbum(Iterable<String> trackIds) async {
+    for (final trackId in trackIds) {
+      await deleteTrack(trackId);
+    }
+  }
+
+  Future<void> _removeLocalTrack(String trackId) async {
     try {
       await ref.read(downloadProvider).remove(trackId);
     } catch (_) {}

@@ -10,6 +10,7 @@ import '../../services/mixes/mix_generator.dart';
 import '../../services/downtify/downtify_matcher.dart';
 import '../../services/downtify/downtify_models.dart';
 import '../common/artwork.dart';
+import '../common/album_context_menu.dart';
 import '../common/design_system.dart';
 import '../common/track_tile.dart';
 import '../downtify/external_track_tile.dart';
@@ -448,7 +449,7 @@ class _CollectionResults extends StatelessWidget {
       itemBuilder: (context, index) {
         final entry = entries[index];
         final first = entry.value.first;
-        return SpotifinCollectionCard(
+        final card = SpotifinCollectionCard(
           artwork: LayoutBuilder(
             builder: (context, constraints) => Artwork(
               itemId: first.albumId ?? first.id,
@@ -470,6 +471,13 @@ class _CollectionResults extends StatelessWidget {
             ),
           ),
         );
+        return artist
+            ? card
+            : AlbumContextMenu(
+                title: entry.key,
+                tracks: entry.value,
+                child: card,
+              );
       },
     ),
   );
