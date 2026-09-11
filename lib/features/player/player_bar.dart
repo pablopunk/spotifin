@@ -16,7 +16,9 @@ import 'player_bar_controls.dart';
 import 'player_collection_links.dart';
 
 class PlayerBar extends ConsumerWidget {
-  const PlayerBar({super.key});
+  const PlayerBar({this.integratedMobile = false, super.key});
+
+  final bool integratedMobile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -58,6 +60,7 @@ class PlayerBar extends ConsumerWidget {
                   onOpenPlayer: showPlayer,
                   glass: glassEffects,
                   glassOpacity: glassOpacity,
+                  integrated: integratedMobile,
                 ),
         );
       },

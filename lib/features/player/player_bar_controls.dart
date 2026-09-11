@@ -94,6 +94,7 @@ class MobilePlayerBar extends StatelessWidget {
     required this.onOpenPlayer,
     required this.glass,
     required this.glassOpacity,
+    this.integrated = false,
     super.key,
   });
 
@@ -102,6 +103,7 @@ class MobilePlayerBar extends StatelessWidget {
   final VoidCallback onOpenPlayer;
   final bool glass;
   final double glassOpacity;
+  final bool integrated;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +160,7 @@ class MobilePlayerBar extends StatelessWidget {
         ),
       ),
     );
+    if (integrated) return content;
     if (!glass) {
       return Material(
         color: SpotifinColors.surface,

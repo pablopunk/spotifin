@@ -211,33 +211,37 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         backgroundColor: SpotifinColors.background,
         settings: SpotifinGlass.settings(glassOpacity),
         topEdgeFade: false,
-        bottomBar: GlassTabBar.bottom(
-          settings: SpotifinGlass.settings(glassOpacity),
-          indicatorSettings: SpotifinGlass.settings(glassOpacity),
-          selectedIndex: selectedIndex,
-          onTabSelected: widget.controller.selectDestination,
-          selectedIconColor: SpotifinColors.text,
-          unselectedIconColor: SpotifinColors.textMuted,
-          selectedLabelColor: SpotifinColors.text,
-          unselectedLabelColor: SpotifinColors.textMuted,
-          interactionGlowColor: SpotifinColors.accent,
-          bottomAccessorySpacing: 0,
-          bottomAccessory: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: PlayerBar(),
-          ),
-          bottomAccessoryEnabled: hasTrack,
-          bottomAccessoryHeight: 74,
-          verticalPadding: 12,
-          tabs: _destinations
-              .map(
-                (item) => GlassTab(
-                  icon: Icon(item.icon),
-                  activeIcon: Icon(item.selectedIcon),
-                  label: item.label,
+        bottomBar: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: GlassContainer(
+            useOwnLayer: true,
+            quality: GlassQuality.premium,
+            settings: SpotifinGlass.settings(glassOpacity),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 28),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasTrack) const PlayerBar(integratedMobile: true),
+                NavigationBar(
+                  height: 64,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: widget.controller.selectDestination,
+                  destinations: _destinations
+                      .map(
+                        (item) => NavigationDestination(
+                          icon: Icon(item.icon),
+                          selectedIcon: Icon(item.selectedIcon),
+                          label: item.label,
+                        ),
+                      )
+                      .toList(),
                 ),
-              )
-              .toList(),
+              ],
+            ),
+          ),
         ),
         body: content,
       );
