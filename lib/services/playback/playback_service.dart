@@ -149,6 +149,20 @@ class PlaybackService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> removeTrack(String trackId) async {
+    _stopAutomaticQueueExpansion();
+    _context = _context.where((track) => track.id != trackId).toList();
+    _contextEnd = math.min(_contextEnd, _context.length);
+    for (var index = _queue.length - 1; index >= 0; index--) {
+      if (_queue[index].id != trackId) continue;
+      _queue.removeAt(index);
+      await _player.removeAudioSourceAt(index);
+    }
+    _tracksById.remove(trackId);
+    await _saveQueue();
+    notifyListeners();
+  }
+
   Future<void> reorder(int oldIndex, int newIndex) async {
     _stopAutomaticQueueExpansion();
     final track = _queue.removeAt(oldIndex);

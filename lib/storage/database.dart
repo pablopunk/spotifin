@@ -187,6 +187,22 @@ class AppDatabase extends _$AppDatabase {
     await (delete(tracks)..where((track) => track.id.isNotIn(ids))).go();
   }
 
+  Future<void> removeTrack(String id) => transaction(() async {
+    await (delete(tracks)..where((track) => track.id.equals(id))).go();
+    await (delete(
+      pendingWrites,
+    )..where((write) => write.targetId.equals(id))).go();
+    final storedPlaylists = await select(playlists).get();
+    for (final playlist in storedPlaylists) {
+      final ids = (jsonDecode(playlist.trackIds) as List<dynamic>)
+          .cast<String>();
+      if (!ids.contains(id)) continue;
+      ids.removeWhere((trackId) => trackId == id);
+      await (update(playlists)..where((row) => row.id.equals(playlist.id)))
+          .write(PlaylistsCompanion(trackIds: Value(jsonEncode(ids))));
+    }
+  });
+
   Future<void> setFavorite(String id, bool value) =>
       (update(tracks)..where((row) => row.id.equals(id))).write(
         TracksCompanion(favorite: Value(value)),

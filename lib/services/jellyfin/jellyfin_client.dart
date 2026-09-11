@@ -156,6 +156,14 @@ class JellyfinClient {
     _ensureSuccess(response);
   }
 
+  Future<void> deleteItem(JellyfinSession session, String itemId) async {
+    final response = await _http.delete(
+      _uri(session, '/Items/$itemId'),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
   Future<void> addToPlaylist(
     JellyfinSession session,
     String playlistId,

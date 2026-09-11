@@ -225,6 +225,21 @@ class AppController extends Notifier<AppState> {
     await _flushPending();
   }
 
+  Future<void> deleteTrack(String trackId) async {
+    final session = state.session;
+    if (session == null) {
+      throw const JellyfinException('Sign in before deleting a song.');
+    }
+    await ref.read(jellyfinClientProvider).deleteItem(session, trackId);
+    try {
+      await ref.read(downloadProvider).remove(trackId);
+    } catch (_) {}
+    await ref.read(databaseProvider).removeTrack(trackId);
+    try {
+      await ref.read(playbackProvider).removeTrack(trackId);
+    } catch (_) {}
+  }
+
   Future<void> addToPlaylist(String playlistId, String trackId) async {
     final session = state.session;
     if (session == null) return;

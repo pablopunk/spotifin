@@ -79,6 +79,8 @@ class TrackTile extends ConsumerWidget {
                   }
                 } else if (action == 'playlist') {
                   await _addToPlaylist(context, ref);
+                } else if (action == 'delete') {
+                  await _deleteTrack(context, ref);
                 }
               },
               itemBuilder: (_) => [
@@ -116,6 +118,15 @@ class TrackTile extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.download_rounded),
                     title: Text('Download'),
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.delete_forever_rounded),
+                    title: Text('Delete permanently'),
                   ),
                 ),
               ],
@@ -159,6 +170,41 @@ class TrackTile extends ConsumerWidget {
       await ref
           .read(appControllerProvider.notifier)
           .addToPlaylist(selected, track.id);
+    }
+  }
+
+  Future<void> _deleteTrack(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete song permanently?'),
+        content: Text(
+          '“${track.name}” will be deleted from Jellyfin and its storage. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(appControllerProvider.notifier).deleteTrack(track.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Deleted “${track.name}”.')));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete “${track.name}”: $error')),
+      );
     }
   }
 }

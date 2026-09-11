@@ -250,4 +250,29 @@ void main() {
     expect(request.url.path, '/Library/Refresh');
     expect(request.headers['X-Emby-Token'], 'token');
   });
+
+  test('permanently deletes an authenticated Jellyfin item', () async {
+    late http.Request request;
+    final client = JellyfinClient(
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('', 204);
+      }),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await client.deleteItem(session, 'track-id');
+
+    expect(request.method, 'DELETE');
+    expect(request.url.path, '/Items/track-id');
+    expect(request.headers['X-Emby-Token'], 'token');
+  });
 }

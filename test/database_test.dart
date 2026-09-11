@@ -39,6 +39,30 @@ void main() {
     expect(await database.pendingOperations(), hasLength(2));
   });
 
+  test('removing a track clears its local library references', () async {
+    await database.upsertTracks([
+      TracksCompanion.insert(id: 'deleted', name: 'Deleted'),
+      TracksCompanion.insert(id: 'kept', name: 'Kept'),
+    ]);
+    await database.replacePlaylists([
+      PlaylistsCompanion.insert(
+        id: 'playlist',
+        name: 'Playlist',
+        trackIds: const Value('["deleted","kept","deleted"]'),
+      ),
+    ]);
+    await database.saveFavoriteEdit('deleted', true);
+
+    await database.removeTrack('deleted');
+
+    expect((await database.allTracks()).map((track) => track.id), ['kept']);
+    expect(
+      (await database.select(database.playlists).getSingle()).trackIds,
+      '["kept"]',
+    );
+    expect(await database.pendingOperations(), isEmpty);
+  });
+
   test('search filters in sqlite and limits results', () async {
     await database.upsertTracks([
       TracksCompanion.insert(
