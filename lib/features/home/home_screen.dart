@@ -7,12 +7,17 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../../services/mixes/mix_generator.dart';
+import '../../services/downtify/downtify_matcher.dart';
+import '../../services/downtify/downtify_models.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/track_tile.dart';
+import '../downtify/external_track_tile.dart';
 import '../library/library_screen.dart';
 
 enum _SearchFilter { all, songs, artists, albums }
+
+enum _SearchSource { all, library, downtify }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({this.searchFocusNode, super.key});
@@ -30,6 +35,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Timer? _searchDebounce;
   String _query = '';
   _SearchFilter _searchFilter = _SearchFilter.all;
+  _SearchSource _searchSource = _SearchSource.all;
   Stream<List<Track>> _searchResults = const Stream.empty();
 
   @override
@@ -53,9 +59,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (query.isEmpty) _searchFilter = _SearchFilter.all;
     });
     if (query.isEmpty) {
+      ref.read(downtifyControllerProvider.notifier).search('');
       setState(() => _searchResults = const Stream.empty());
       return;
     }
+    ref.read(downtifyControllerProvider.notifier).search(query);
     _searchDebounce = Timer(const Duration(milliseconds: 40), () {
       if (!mounted || query != _query) return;
       final words = query.toLowerCase().split(RegExp(r'\s+'));
@@ -102,136 +110,166 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<List<Track>>(
-    stream: ref.watch(databaseProvider).watchTracks(),
-    builder: (context, snapshot) {
-      final tracks = snapshot.data ?? const [];
-      if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      final catalog = _catalogFor(tracks);
-      return RefreshIndicator(
-        onRefresh: ref.read(appControllerProvider.notifier).refresh,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              toolbarHeight: 80,
-              titleSpacing: SpotifinSpacing.lg,
-              title: Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: SearchBar(
-                    focusNode: _searchFocusNode,
-                    hintText: 'What do you want to listen to?',
-                    leading: const Icon(Icons.search_rounded),
-                    onChanged: _search,
+  Widget build(BuildContext context) {
+    final downtify = ref.watch(downtifyControllerProvider);
+    final externalAvailable = downtify.available;
+    final source = externalAvailable
+        ? _searchSource
+        : _searchSource == _SearchSource.downtify
+        ? _SearchSource.all
+        : _searchSource;
+    return StreamBuilder<List<Track>>(
+      stream: ref.watch(databaseProvider).watchTracks(),
+      builder: (context, snapshot) {
+        final tracks = snapshot.data ?? const [];
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final catalog = _catalogFor(tracks);
+        return RefreshIndicator(
+          onRefresh: ref.read(appControllerProvider.notifier).refresh,
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                toolbarHeight: 80,
+                titleSpacing: SpotifinSpacing.lg,
+                title: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: SearchBar(
+                      focusNode: _searchFocusNode,
+                      hintText: 'What do you want to listen to?',
+                      leading: const Icon(Icons.search_rounded),
+                      onChanged: _search,
+                    ),
                   ),
                 ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Refresh library',
+                    onPressed: ref.watch(appControllerProvider).syncing
+                        ? null
+                        : ref.read(appControllerProvider.notifier).refresh,
+                    icon: ref.watch(appControllerProvider).syncing
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ),
-              actions: [
-                IconButton(
-                  tooltip: 'Refresh library',
-                  onPressed: ref.watch(appControllerProvider).syncing
-                      ? null
-                      : ref.read(appControllerProvider.notifier).refresh,
-                  icon: ref.watch(appControllerProvider).syncing
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
+              if (_query.isNotEmpty) ...[
+                if (externalAvailable)
+                  SliverToBoxAdapter(
+                    child: _SearchSources(
+                      selected: source,
+                      onSelected: (value) =>
+                          setState(() => _searchSource = value),
+                    ),
+                  ),
+                if (source != _SearchSource.downtify)
+                  SliverToBoxAdapter(
+                    child: _SearchFilters(
+                      selected: _searchFilter,
+                      onSelected: (filter) =>
+                          setState(() => _searchFilter = filter),
+                    ),
+                  ),
+                _SearchResults(
+                  query: _query,
+                  filter: _searchFilter,
+                  source: source,
+                  results: _searchResults,
+                  libraryTracks: tracks,
+                  externalResults: downtify.results,
+                  externalSearching: downtify.searching,
                 ),
-                const SizedBox(width: 8),
-              ],
-            ),
-            if (_query.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: _SearchFilters(
-                  selected: _searchFilter,
-                  onSelected: (filter) =>
-                      setState(() => _searchFilter = filter),
-                ),
-              ),
-              _SearchResults(
-                query: _query,
-                filter: _searchFilter,
-                results: _searchResults,
-              ),
-            ] else if (tracks.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyCatalog(),
-              )
-            else ...[
-              if (catalog.recent.isNotEmpty)
+              ] else if (tracks.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _EmptyCatalog(),
+                )
+              else ...[
+                if (catalog.recent.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _HorizontalSection(
+                      title: 'Recently played',
+                      tracks: catalog.recent.take(12).toList(),
+                      contextTracks: catalog.recent,
+                    ),
+                  ),
                 SliverToBoxAdapter(
                   child: _HorizontalSection(
-                    title: 'Recently played',
-                    tracks: catalog.recent.take(12).toList(),
-                    contextTracks: catalog.recent,
+                    title: 'Recently added',
+                    tracks: catalog.added.take(12).toList(),
+                    contextTracks: catalog.added,
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: _HorizontalSection(
-                  title: 'Recently added',
-                  tracks: catalog.added.take(12).toList(),
-                  contextTracks: catalog.added,
-                ),
-              ),
-              if (catalog.favorites.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: _HorizontalSection(
-                    title: 'Favorites',
-                    tracks: catalog.favorites.take(12).toList(),
-                    contextTracks: catalog.favorites,
+                if (catalog.favorites.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _HorizontalSection(
+                      title: 'Favorites',
+                      tracks: catalog.favorites.take(12).toList(),
+                      contextTracks: catalog.favorites,
+                    ),
                   ),
-                ),
-              ...catalog.mixes
-                  .take(3)
-                  .map(
-                    (mix) => SliverToBoxAdapter(
-                      child: _HorizontalSection(
-                        title: mix.name,
-                        tracks: mix.tracks.take(12).toList(),
-                        contextTracks: mix.tracks,
-                        action: IconButton(
-                          tooltip: 'Save ${mix.name} as playlist',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _saveMix(mix),
-                          icon: const Icon(Icons.playlist_add_rounded),
+                ...catalog.mixes
+                    .take(3)
+                    .map(
+                      (mix) => SliverToBoxAdapter(
+                        child: _HorizontalSection(
+                          title: mix.name,
+                          tracks: mix.tracks.take(12).toList(),
+                          contextTracks: mix.tracks,
+                          action: IconButton(
+                            tooltip: 'Save ${mix.name} as playlist',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _saveMix(mix),
+                            icon: const Icon(Icons.playlist_add_rounded),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              const SliverToBoxAdapter(child: SpotifinPageTitle('All songs')),
-              SliverList.builder(
-                itemCount: tracks.length,
-                itemBuilder: (context, index) =>
-                    TrackTile(track: tracks[index], contextTracks: tracks),
+                const SliverToBoxAdapter(child: SpotifinPageTitle('All songs')),
+                SliverList.builder(
+                  itemCount: tracks.length,
+                  itemBuilder: (context, index) =>
+                      TrackTile(track: tracks[index], contextTracks: tracks),
+                ),
+              ],
+              SliverToBoxAdapter(
+                child: SizedBox(height: SpotifinChromeInsets.bottomOf(context)),
               ),
             ],
-            SliverToBoxAdapter(
-              child: SizedBox(height: SpotifinChromeInsets.bottomOf(context)),
-            ),
-          ],
-        ),
-      );
-    },
-  );
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _SearchResults extends StatelessWidget {
   const _SearchResults({
     required this.query,
     required this.filter,
+    required this.source,
     required this.results,
+    required this.libraryTracks,
+    required this.externalResults,
+    required this.externalSearching,
   });
 
   final String query;
   final _SearchFilter filter;
+  final _SearchSource source;
   final Stream<List<Track>> results;
+  final List<Track> libraryTracks;
+  final List<DowntifySong> externalResults;
+  final bool externalSearching;
 
   @override
   Widget build(BuildContext context) => StreamBuilder<List<Track>>(
@@ -244,14 +282,36 @@ class _SearchResults extends StatelessWidget {
         (track) => track.artist.split(';'),
       );
       final albums = _matchingGroups(tracks, query, (track) => [track.album]);
-      final hasResults = switch (filter) {
+      final visibleExternal = source == _SearchSource.all
+          ? externalResults
+                .where(
+                  (song) =>
+                      !const DowntifyMatcher().isDuplicate(song, libraryTracks),
+                )
+                .toList()
+          : source == _SearchSource.downtify
+          ? externalResults
+          : const <DowntifySong>[];
+      final localHasResults = switch (filter) {
         _SearchFilter.all =>
           tracks.isNotEmpty || artists.isNotEmpty || albums.isNotEmpty,
         _SearchFilter.songs => tracks.isNotEmpty,
         _SearchFilter.artists => artists.isNotEmpty,
         _SearchFilter.albums => albums.isNotEmpty,
       };
+      final showExternal =
+          source != _SearchSource.library &&
+          (filter == _SearchFilter.all || filter == _SearchFilter.songs);
+      final hasResults = source == _SearchSource.downtify
+          ? visibleExternal.isNotEmpty
+          : localHasResults || showExternal && visibleExternal.isNotEmpty;
       if (!hasResults) {
+        if (source == _SearchSource.downtify && externalSearching) {
+          return const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
         return const SliverFillRemaining(
           hasScrollBody: false,
           child: SpotifinEmptyState(
@@ -262,30 +322,46 @@ class _SearchResults extends StatelessWidget {
         );
       }
       return SliverMainAxisGroup(
-        slivers: switch (filter) {
-          _SearchFilter.all => [
-            if (artists.isNotEmpty) ...[
-              const SliverToBoxAdapter(child: SpotifinPageTitle('Artists')),
-              _CollectionResults(
-                entries: artists.take(4).toList(),
-                artist: true,
-              ),
-            ],
-            if (albums.isNotEmpty) ...[
-              const SliverToBoxAdapter(child: SpotifinPageTitle('Albums')),
-              _CollectionResults(entries: albums.take(4).toList()),
-            ],
-            if (tracks.isNotEmpty) ...[
-              const SliverToBoxAdapter(child: SpotifinPageTitle('Songs')),
-              _SongResults(tracks: tracks),
-            ],
-          ],
-          _SearchFilter.songs => [_SongResults(tracks: tracks)],
-          _SearchFilter.artists => [
-            _CollectionResults(entries: artists, artist: true),
-          ],
-          _SearchFilter.albums => [_CollectionResults(entries: albums)],
-        },
+        slivers: source == _SearchSource.downtify
+            ? [_ExternalSongResults(songs: visibleExternal)]
+            : switch (filter) {
+                _SearchFilter.all => [
+                  if (artists.isNotEmpty) ...[
+                    const SliverToBoxAdapter(
+                      child: SpotifinPageTitle('Artists'),
+                    ),
+                    _CollectionResults(
+                      entries: artists.take(4).toList(),
+                      artist: true,
+                    ),
+                  ],
+                  if (albums.isNotEmpty) ...[
+                    const SliverToBoxAdapter(
+                      child: SpotifinPageTitle('Albums'),
+                    ),
+                    _CollectionResults(entries: albums.take(4).toList()),
+                  ],
+                  if (tracks.isNotEmpty) ...[
+                    const SliverToBoxAdapter(child: SpotifinPageTitle('Songs')),
+                    _SongResults(tracks: tracks),
+                  ],
+                  if (showExternal && visibleExternal.isNotEmpty) ...[
+                    const SliverToBoxAdapter(
+                      child: SpotifinPageTitle('Add to library'),
+                    ),
+                    _ExternalSongResults(songs: visibleExternal),
+                  ],
+                ],
+                _SearchFilter.songs => [
+                  if (tracks.isNotEmpty) _SongResults(tracks: tracks),
+                  if (showExternal && visibleExternal.isNotEmpty)
+                    _ExternalSongResults(songs: visibleExternal),
+                ],
+                _SearchFilter.artists => [
+                  _CollectionResults(entries: artists, artist: true),
+                ],
+                _SearchFilter.albums => [_CollectionResults(entries: albums)],
+              },
       );
     },
   );
@@ -311,6 +387,26 @@ class _SearchFilters extends StatelessWidget {
   );
 }
 
+class _SearchSources extends StatelessWidget {
+  const _SearchSources({required this.selected, required this.onSelected});
+
+  final _SearchSource selected;
+  final ValueChanged<_SearchSource> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
+    child: DefaultTabController(
+      length: _SearchSource.values.length,
+      initialIndex: selected.index,
+      child: SpotifinTabBar(
+        labels: _SearchSource.values.map(_sourceLabel).toList(),
+        onTap: (index) => onSelected(_SearchSource.values[index]),
+      ),
+    ),
+  );
+}
+
 class _SongResults extends StatelessWidget {
   const _SongResults({required this.tracks});
 
@@ -321,6 +417,18 @@ class _SongResults extends StatelessWidget {
     itemCount: tracks.length,
     itemBuilder: (context, index) =>
         TrackTile(track: tracks[index], contextTracks: tracks),
+  );
+}
+
+class _ExternalSongResults extends StatelessWidget {
+  const _ExternalSongResults({required this.songs});
+
+  final List<DowntifySong> songs;
+
+  @override
+  Widget build(BuildContext context) => SliverList.builder(
+    itemCount: songs.length,
+    itemBuilder: (context, index) => ExternalTrackTile(song: songs[index]),
   );
 }
 
@@ -396,6 +504,12 @@ String _filterLabel(_SearchFilter filter) => switch (filter) {
   _SearchFilter.songs => 'Songs',
   _SearchFilter.artists => 'Artists',
   _SearchFilter.albums => 'Albums',
+};
+
+String _sourceLabel(_SearchSource source) => switch (source) {
+  _SearchSource.all => 'All',
+  _SearchSource.library => 'Library',
+  _SearchSource.downtify => 'Downtify',
 };
 
 class _HomeCatalog {

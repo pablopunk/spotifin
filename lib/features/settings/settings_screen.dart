@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../downtify/downtify_settings_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -128,6 +129,22 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 title: const Text('Sign out'),
                 onTap: () => _confirmSignOut(context, ref),
+              ),
+            ],
+          ),
+          SpotifinSettingsGroup(
+            title: 'Integrations',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.cloud_download_outlined),
+                title: const Text('Downtify'),
+                subtitle: const Text('Add external songs to Jellyfin'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DowntifySettingsScreen(),
+                  ),
+                ),
               ),
             ],
           ),

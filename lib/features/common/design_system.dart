@@ -143,11 +143,15 @@ class SpotifinSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: const BoxDecoration(
-      color: SpotifinColors.surface,
       borderRadius: BorderRadius.all(Radius.circular(SpotifinRadii.card)),
       boxShadow: [SpotifinShadows.elevated],
     ),
-    child: Padding(padding: padding, child: child),
+    child: Material(
+      color: SpotifinColors.surface,
+      borderRadius: const BorderRadius.all(Radius.circular(SpotifinRadii.card)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(padding: padding, child: child),
+    ),
   );
 }
 
