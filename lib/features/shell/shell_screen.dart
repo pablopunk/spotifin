@@ -200,6 +200,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         bottomBar: GlassTabBar.bottom(
           settings: SpotifinGlass.settings(glassOpacity),
           indicatorSettings: SpotifinGlass.settings(glassOpacity),
+          quality: GlassQuality.standard,
+          backgroundQuality: GlassQuality.standard,
+          showIndicator: false,
           selectedIndex: selectedIndex,
           onTabSelected: widget.controller.selectDestination,
           selectedIconColor: SpotifinColors.text,

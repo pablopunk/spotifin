@@ -106,6 +106,7 @@ class MobilePlayerBar extends StatelessWidget {
         onTap: onOpenPlayer,
         child: SafeArea(
           top: false,
+          bottom: !glass,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
