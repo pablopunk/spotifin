@@ -59,7 +59,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: Slider(
                   value: glassOpacity,
                   max: SpotifinGlass.maxOpacity,
-                  divisions: 16,
+                  divisions: 4,
                   label: '${(glassOpacity * 100).round()}%',
                   onChanged: ref
                       .read(appControllerProvider.notifier)
