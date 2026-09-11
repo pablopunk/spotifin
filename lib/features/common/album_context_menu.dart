@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
+import 'context_menu.dart';
 
 class AlbumContextMenu extends ConsumerWidget {
   const AlbumContextMenu({
@@ -27,36 +28,31 @@ class AlbumContextMenu extends ConsumerWidget {
 
   List<PopupMenuEntry<String>> _items() => const [
     PopupMenuItem(
+      height: 40,
       value: 'play',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.play_arrow_rounded),
-        title: Text('Play'),
-      ),
+      child: SpotifinMenuLabel(icon: Icons.play_arrow_rounded, label: 'Play'),
     ),
     PopupMenuItem(
+      height: 40,
       value: 'queue',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.playlist_add_rounded),
-        title: Text('Add to queue'),
+      child: SpotifinMenuLabel(
+        icon: Icons.playlist_add_rounded,
+        label: 'Add to queue',
       ),
     ),
     PopupMenuItem(
+      height: 40,
       value: 'download',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.download_rounded),
-        title: Text('Download'),
-      ),
+      child: SpotifinMenuLabel(icon: Icons.download_rounded, label: 'Download'),
     ),
-    PopupMenuDivider(),
+    PopupMenuDivider(height: 9),
     PopupMenuItem(
+      height: 40,
       value: 'delete',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.delete_forever_rounded),
-        title: Text('Delete album permanently'),
+      child: SpotifinMenuLabel(
+        icon: Icons.delete_forever_rounded,
+        label: 'Delete album permanently',
+        destructive: true,
       ),
     ),
   ];
@@ -66,18 +62,11 @@ class AlbumContextMenu extends ConsumerWidget {
     WidgetRef ref,
     Offset globalPosition,
   ) async {
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final position = overlay.globalToLocal(globalPosition);
     final action = await showMenu<String>(
       context: context,
       color: SpotifinColors.raised,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        overlay.size.width - position.dx,
-        overlay.size.height - position.dy,
-      ),
+      constraints: spotifinMenuConstraints,
+      position: spotifinMenuPosition(context, globalPosition),
       items: _items(),
     );
     if (action == null || !context.mounted) return;
@@ -119,6 +108,10 @@ class AlbumContextMenu extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: SpotifinColors.negative,
+              foregroundColor: SpotifinColors.voidBlack,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete album'),
           ),

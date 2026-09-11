@@ -587,42 +587,46 @@ class _HorizontalSection extends StatelessWidget {
                 const SizedBox(width: SpotifinSpacing.md),
             itemBuilder: (context, index) {
               final track = tracks[index];
-              return DraggableTrack(
+              return TrackContextMenu(
                 track: track,
-                child: SizedBox(
-                  width: 164,
-                  child: Card(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(SpotifinRadii.card),
-                      onTap: () =>
-                          ProviderScope.containerOf(context)
-                              .read(playbackProvider)
-                              .playTrack(track, contextTracks),
-                      child: Padding(
-                        padding: const EdgeInsets.all(SpotifinSpacing.sm),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Artwork(
-                              itemId: track.albumId ?? track.id,
-                              size: 140,
-                              borderRadius: SpotifinRadii.small,
-                            ),
-                            const SizedBox(height: SpotifinSpacing.sm),
-                            Text(
-                              track.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              track.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
+                contextTracks: contextTracks,
+                child: DraggableTrack(
+                  track: track,
+                  child: SizedBox(
+                    width: 164,
+                    child: Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(SpotifinRadii.card),
+                        onTap: () =>
+                            ProviderScope.containerOf(context)
+                                .read(playbackProvider)
+                                .playTrack(track, contextTracks),
+                        child: Padding(
+                          padding: const EdgeInsets.all(SpotifinSpacing.sm),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Artwork(
+                                itemId: track.albumId ?? track.id,
+                                size: 140,
+                                borderRadius: SpotifinRadii.small,
+                              ),
+                              const SizedBox(height: SpotifinSpacing.sm),
+                              Text(
+                                track.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                track.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

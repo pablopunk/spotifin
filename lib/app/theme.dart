@@ -313,8 +313,9 @@ ThemeData buildTheme() {
       color: SpotifinColors.raised,
       surfaceTintColor: Colors.transparent,
       elevation: 16,
+      menuPadding: EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(SpotifinRadii.card)),
+        borderRadius: BorderRadius.all(Radius.circular(SpotifinRadii.panel)),
       ),
     ),
     bottomSheetTheme: const BottomSheetThemeData(

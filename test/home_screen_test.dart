@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/features/common/design_system.dart';
+import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/home/home_screen.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -37,6 +39,22 @@ void main() {
     expect(find.byType(SearchBar), findsOneWidget);
     expect(find.byTooltip('Save Rock mix as playlist'), findsOneWidget);
 
+    await _secondaryTap(tester, find.byType(TrackContextMenu).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete permanently'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Delete permanently'),
+        matching: find.byType(ListTile),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.text('Delete permanently'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete song permanently?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byTooltip('Save Rock mix as playlist'));
     await tester.pumpAndSettle();
     expect(find.text('Save mix as playlist'), findsOneWidget);
@@ -68,4 +86,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
+}
+
+Future<void> _secondaryTap(WidgetTester tester, Finder finder) async {
+  final position = tester.getCenter(finder);
+  final gesture = await tester.createGesture(
+    kind: PointerDeviceKind.mouse,
+    buttons: kSecondaryMouseButton,
+  );
+  await gesture.addPointer(location: position);
+  await gesture.down(position);
+  await gesture.up();
 }

@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import 'artwork.dart';
+import 'context_menu.dart';
 import 'design_system.dart';
 
 class TrackTile extends ConsumerWidget {
@@ -56,185 +57,236 @@ class TrackTile extends ConsumerWidget {
                     ref.read(playbackProvider).playTrack(track, contextTracks),
               ),
             ),
-            PopupMenuButton<String>(
-              color: SpotifinColors.raised,
-              tooltip: 'More options',
-              onSelected: (action) => _handleAction(context, ref, action),
-              itemBuilder: (_) => _menuItems(),
-            ),
+            TrackMenuButton(track: track, contextTracks: contextTracks),
           ],
         ),
       ),
     );
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onSecondaryTapDown: (details) =>
-          _showContextMenu(context, ref, details.globalPosition),
+    return TrackContextMenu(
+      track: track,
+      contextTracks: contextTracks,
       child: DraggableTrack(track: track, child: tile),
     );
   }
+}
 
-  List<PopupMenuEntry<String>> _menuItems() => [
-    PopupMenuItem(
-      value: 'favorite',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(track.favorite ? Icons.favorite : Icons.favorite_border),
-        title: Text(track.favorite ? 'Remove favorite' : 'Favorite'),
-      ),
-    ),
-    const PopupMenuItem(
-      value: 'playlist',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.library_add_rounded),
-        title: Text('Add to playlist'),
-      ),
-    ),
-    const PopupMenuItem(
-      value: 'queue',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.playlist_add_rounded),
-        title: Text('Add to queue'),
-      ),
-    ),
-    const PopupMenuItem(
-      value: 'download',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.download_rounded),
-        title: Text('Download'),
-      ),
-    ),
-    const PopupMenuDivider(),
-    const PopupMenuItem(
-      value: 'delete',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.delete_forever_rounded),
-        title: Text('Delete permanently'),
-      ),
-    ),
-  ];
+enum _TrackAction { favorite, playlist, queue, download, delete }
 
-  Future<void> _showContextMenu(
-    BuildContext context,
-    WidgetRef ref,
-    Offset globalPosition,
-  ) async {
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final position = overlay.globalToLocal(globalPosition);
-    final action = await showMenu<String>(
-      context: context,
-      color: SpotifinColors.raised,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        overlay.size.width - position.dx,
-        overlay.size.height - position.dy,
-      ),
-      items: _menuItems(),
-    );
-    if (action != null && context.mounted) {
-      await _handleAction(context, ref, action);
-    }
+class TrackContextMenu extends ConsumerWidget {
+  const TrackContextMenu({
+    required this.track,
+    required this.contextTracks,
+    required this.child,
+    super.key,
+  });
+
+  final Track track;
+  final List<Track> contextTracks;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onSecondaryTapDown: (details) => _showTrackMenu(
+      context,
+      ref,
+      track,
+      contextTracks,
+      details.globalPosition,
+    ),
+    child: child,
+  );
+}
+
+class TrackMenuButton extends ConsumerWidget {
+  const TrackMenuButton({
+    required this.track,
+    required this.contextTracks,
+    super.key,
+  });
+
+  final Track track;
+  final List<Track> contextTracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      PopupMenuButton<_TrackAction>(
+        color: SpotifinColors.raised,
+        constraints: spotifinMenuConstraints,
+        tooltip: 'More options',
+        onSelected: (action) =>
+            _handleTrackAction(context, ref, track, contextTracks, action),
+        itemBuilder: (_) => _trackMenuItems(track),
+      );
+}
+
+List<PopupMenuEntry<_TrackAction>> _trackMenuItems(Track track) => [
+  PopupMenuItem(
+    height: 40,
+    value: _TrackAction.favorite,
+    child: SpotifinMenuLabel(
+      icon: track.favorite ? Icons.favorite : Icons.favorite_border,
+      label: track.favorite ? 'Remove favorite' : 'Favorite',
+    ),
+  ),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.playlist,
+    child: SpotifinMenuLabel(
+      icon: Icons.library_add_rounded,
+      label: 'Add to playlist',
+    ),
+  ),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.queue,
+    child: SpotifinMenuLabel(
+      icon: Icons.playlist_add_rounded,
+      label: 'Add to queue',
+    ),
+  ),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.download,
+    child: SpotifinMenuLabel(icon: Icons.download_rounded, label: 'Download'),
+  ),
+  const PopupMenuDivider(height: 9),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.delete,
+    child: SpotifinMenuLabel(
+      icon: Icons.delete_forever_rounded,
+      label: 'Delete permanently',
+      destructive: true,
+    ),
+  ),
+];
+
+Future<void> _showTrackMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Track track,
+  List<Track> contextTracks,
+  Offset globalPosition,
+) async {
+  final action = await showMenu<_TrackAction>(
+    context: context,
+    color: SpotifinColors.raised,
+    constraints: spotifinMenuConstraints,
+    position: spotifinMenuPosition(context, globalPosition),
+    items: _trackMenuItems(track),
+  );
+  if (action != null && context.mounted) {
+    await _handleTrackAction(context, ref, track, contextTracks, action);
   }
+}
 
-  Future<void> _handleAction(
-    BuildContext context,
-    WidgetRef ref,
-    String action,
-  ) async {
-    if (action == 'favorite') {
+Future<void> _handleTrackAction(
+  BuildContext context,
+  WidgetRef ref,
+  Track track,
+  List<Track> contextTracks,
+  _TrackAction action,
+) async {
+  if (action == _TrackAction.favorite) {
+    await ref
+        .read(appControllerProvider.notifier)
+        .toggleFavorite(track.id, !track.favorite);
+  } else if (action == _TrackAction.queue) {
+    await ref.read(playbackProvider).addToQueue(track);
+  } else if (action == _TrackAction.download) {
+    final app = ref.read(appControllerProvider);
+    if (app.session != null) {
       await ref
-          .read(appControllerProvider.notifier)
-          .toggleFavorite(track.id, !track.favorite);
-    } else if (action == 'queue') {
-      await ref.read(playbackProvider).addToQueue(track);
-    } else if (action == 'download') {
-      final app = ref.read(appControllerProvider);
-      if (app.session != null) {
-        await ref
-            .read(downloadProvider)
-            .download(app.session!, track, small: app.smallDownloads);
-      }
-    } else if (action == 'playlist') {
-      await _addToPlaylist(context, ref);
-    } else if (action == 'delete') {
-      await _deleteTrack(context, ref);
+          .read(downloadProvider)
+          .download(app.session!, track, small: app.smallDownloads);
     }
+  } else if (action == _TrackAction.playlist) {
+    await _addToPlaylist(context, ref, track);
+  } else if (action == _TrackAction.delete) {
+    await _deleteTrack(context, ref, track);
   }
+}
 
-  Future<void> _addToPlaylist(BuildContext context, WidgetRef ref) async {
-    final playlists = await ref
-        .read(databaseProvider)
-        .select(ref.read(databaseProvider).playlists)
-        .get();
+Future<void> _addToPlaylist(
+  BuildContext context,
+  WidgetRef ref,
+  Track track,
+) async {
+  final playlists = await ref
+      .read(databaseProvider)
+      .select(ref.read(databaseProvider).playlists)
+      .get();
+  if (!context.mounted) return;
+  if (playlists.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Create a playlist from the sidebar first.'),
+      ),
+    );
+    return;
+  }
+  final selected = await showDialog<String>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: const Text('Add to playlist'),
+      children: playlists
+          .map(
+            (playlist) => SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, playlist.id),
+              child: Text(playlist.name),
+            ),
+          )
+          .toList(),
+    ),
+  );
+  if (selected != null) {
+    await ref
+        .read(appControllerProvider.notifier)
+        .addToPlaylist(selected, track.id);
+  }
+}
+
+Future<void> _deleteTrack(
+  BuildContext context,
+  WidgetRef ref,
+  Track track,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete song permanently?'),
+      content: Text(
+        '“${track.name}” will be deleted from Jellyfin and its storage. '
+        'This cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: SpotifinColors.negative,
+            foregroundColor: SpotifinColors.voidBlack,
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    await ref.read(appControllerProvider.notifier).deleteTrack(track.id);
     if (!context.mounted) return;
-    if (playlists.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Create a playlist from the sidebar first.'),
-        ),
-      );
-      return;
-    }
-    final selected = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Add to playlist'),
-        children: playlists
-            .map(
-              (playlist) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, playlist.id),
-                child: Text(playlist.name),
-              ),
-            )
-            .toList(),
-      ),
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Deleted “${track.name}”.')));
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not delete “${track.name}”: $error')),
     );
-    if (selected != null) {
-      await ref
-          .read(appControllerProvider.notifier)
-          .addToPlaylist(selected, track.id);
-    }
-  }
-
-  Future<void> _deleteTrack(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete song permanently?'),
-        content: Text(
-          '“${track.name}” will be deleted from Jellyfin and its storage. '
-          'This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref.read(appControllerProvider.notifier).deleteTrack(track.id);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Deleted “${track.name}”.')));
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete “${track.name}”: $error')),
-      );
-    }
   }
 }
 
