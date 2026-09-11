@@ -106,7 +106,7 @@ void _showLyrics(
   );
 }
 
-class _NowPlaying extends ConsumerWidget {
+class _NowPlaying extends ConsumerStatefulWidget {
   const _NowPlaying({
     required this.playback,
     required this.glass,
@@ -117,9 +117,17 @@ class _NowPlaying extends ConsumerWidget {
   final double glassOpacity;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ListenableBuilder(
-    listenable: playback,
+  ConsumerState<_NowPlaying> createState() => _NowPlayingState();
+}
+
+class _NowPlayingState extends ConsumerState<_NowPlaying> {
+  var _showLyrics = false;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.playback,
     builder: (context, _) {
+      final playback = widget.playback;
       final track = playback.currentTrack;
       if (track == null) return const SizedBox.shrink();
       final queue = playback.queue;
@@ -128,8 +136,8 @@ class _NowPlaying extends ConsumerWidget {
         initialChildSize: .92,
         minChildSize: .55,
         builder: (context, controller) => _NowPlayingSurface(
-          glass: glass,
-          glassOpacity: glassOpacity,
+          glass: widget.glass,
+          glassOpacity: widget.glassOpacity,
           child: CustomScrollView(
             controller: controller,
             slivers: [
@@ -153,10 +161,28 @@ class _NowPlaying extends ConsumerWidget {
                         constraints: const BoxConstraints(maxWidth: 420),
                         child: AspectRatio(
                           aspectRatio: 1,
-                          child: Artwork(
-                            itemId: track.albumId ?? track.id,
-                            size: 420,
-                            borderRadius: SpotifinRadii.card,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: _showLyrics
+                                ? ClipRRect(
+                                    key: const ValueKey('lyrics'),
+                                    borderRadius: BorderRadius.circular(
+                                      SpotifinRadii.card,
+                                    ),
+                                    child: ColoredBox(
+                                      color: SpotifinColors.raised,
+                                      child: _LyricsContent(
+                                        track: track,
+                                        playback: playback,
+                                      ),
+                                    ),
+                                  )
+                                : Artwork(
+                                    key: const ValueKey('artwork'),
+                                    itemId: track.albumId ?? track.id,
+                                    size: 420,
+                                    borderRadius: SpotifinRadii.card,
+                                  ),
                           ),
                         ),
                       ),
@@ -258,22 +284,23 @@ class _NowPlaying extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => showModalBottomSheet<void>(
-                              context: context,
-                              isScrollControlled: true,
-                              useSafeArea: true,
-                              constraints: const BoxConstraints(maxWidth: 720),
-                              backgroundColor: glass
-                                  ? Colors.transparent
-                                  : null,
-                              builder: (_) => _LyricsSheet(
-                                track: track,
-                                playback: playback,
-                                glass: glass,
-                                glassOpacity: glassOpacity,
-                              ),
+                            onPressed: () =>
+                                setState(() => _showLyrics = !_showLyrics),
+                            style: _showLyrics
+                                ? OutlinedButton.styleFrom(
+                                    foregroundColor: SpotifinColors.accent,
+                                    backgroundColor: SpotifinColors.accent
+                                        .withValues(alpha: .12),
+                                    side: const BorderSide(
+                                      color: SpotifinColors.accent,
+                                    ),
+                                  )
+                                : null,
+                            icon: Icon(
+                              _showLyrics
+                                  ? Icons.lyrics_rounded
+                                  : Icons.lyrics_outlined,
                             ),
-                            icon: const Icon(Icons.lyrics_outlined),
                             label: const Text('Lyrics'),
                           ),
                         ),
@@ -368,78 +395,95 @@ class _LyricsSheet extends ConsumerWidget {
   final double glassOpacity;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(appControllerProvider).session;
-    return _SheetSurface(
-      glass: glass,
-      glassOpacity: glassOpacity,
-      child: SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .82,
-          child: session == null
-              ? const Center(child: Text('Lyrics are unavailable offline.'))
-              : FutureBuilder<List<LyricLine>>(
-                  future: ref.read(lyricsProvider).find(session, track),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return SpotifinEmptyState(
-                        icon: Icons.sync_problem_rounded,
-                        title: 'Could not load lyrics',
-                        message: snapshot.error.toString(),
-                      );
-                    }
-                    final lines = snapshot.data ?? const [];
-                    if (lines.isEmpty) {
-                      return const Center(child: Text('No lyrics found'));
-                    }
-                    return StreamBuilder<Duration>(
-                      stream: playback.player.positionStream,
-                      builder: (context, positionSnapshot) {
-                        final position = positionSnapshot.data ?? Duration.zero;
-                        final active = _activeLine(lines, position);
-                        return ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
-                          itemCount: lines.length,
-                          itemBuilder: (context, index) {
-                            final line = lines[index];
-                            return InkWell(
-                              onTap: line.start == null
-                                  ? null
-                                  : () => playback.seek(line.start!),
-                              borderRadius: BorderRadius.circular(
-                                SpotifinRadii.small,
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                child: Text(
-                                  line.text,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: index == active
-                                            ? SpotifinColors.accent
-                                            : SpotifinColors.textMuted,
-                                        fontWeight: index == active
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
+  Widget build(BuildContext context, WidgetRef ref) => _SheetSurface(
+    glass: glass,
+    glassOpacity: glassOpacity,
+    child: SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .82,
+        child: _LyricsContent(track: track, playback: playback),
       ),
+    ),
+  );
+}
+
+class _LyricsContent extends ConsumerStatefulWidget {
+  const _LyricsContent({required this.track, required this.playback});
+
+  final Track track;
+  final PlaybackService playback;
+
+  @override
+  ConsumerState<_LyricsContent> createState() => _LyricsContentState();
+}
+
+class _LyricsContentState extends ConsumerState<_LyricsContent> {
+  Object? _session;
+  String? _trackId;
+  Future<List<LyricLine>>? _lyrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(appControllerProvider).session;
+    if (session == null) {
+      return const Center(child: Text('Lyrics are unavailable offline.'));
+    }
+    if (_session != session || _trackId != widget.track.id) {
+      _session = session;
+      _trackId = widget.track.id;
+      _lyrics = ref.read(lyricsProvider).find(session, widget.track);
+    }
+    return FutureBuilder<List<LyricLine>>(
+      future: _lyrics,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return SpotifinEmptyState(
+            icon: Icons.sync_problem_rounded,
+            title: 'Could not load lyrics',
+            message: snapshot.error.toString(),
+          );
+        }
+        final lines = snapshot.data ?? const [];
+        if (lines.isEmpty) return const Center(child: Text('No lyrics found'));
+        return StreamBuilder<Duration>(
+          stream: widget.playback.player.positionStream,
+          builder: (context, positionSnapshot) {
+            final position = positionSnapshot.data ?? Duration.zero;
+            final active = _activeLine(lines, position);
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
+              itemCount: lines.length,
+              itemBuilder: (context, index) {
+                final line = lines[index];
+                return InkWell(
+                  onTap: line.start == null
+                      ? null
+                      : () => widget.playback.seek(line.start!),
+                  borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      line.text,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: index == active
+                                ? SpotifinColors.accent
+                                : SpotifinColors.textMuted,
+                            fontWeight: index == active
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
