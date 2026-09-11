@@ -21,10 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
+        if: matrix.flutter_architecture == 'x64'
         with:
           flutter-version: 3.47.3
           channel: stable
           cache: true
+      - name: Install Flutter on ARM64
+        if: matrix.flutter_architecture == 'arm64'
+        run: |
+          git clone --branch 3.47.3 --depth 1 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" precache --linux
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze
