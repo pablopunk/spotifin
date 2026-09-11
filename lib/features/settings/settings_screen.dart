@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
+import '../../app/features.dart';
 import '../../app/theme.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
@@ -134,22 +135,23 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          SpotifinSettingsGroup(
-            title: 'Integrations',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.cloud_download_outlined),
-                title: const Text('Downtify'),
-                subtitle: const Text('Add external songs to Jellyfin'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DowntifySettingsScreen(),
+          if (AppFeatures.downtify)
+            SpotifinSettingsGroup(
+              title: 'Integrations',
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.cloud_download_outlined),
+                  title: const Text('Downtify'),
+                  subtitle: const Text('Add external songs to Jellyfin'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DowntifySettingsScreen(),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           SpotifinSettingsGroup(
             title: 'About',
             children: [
@@ -213,9 +215,8 @@ class SettingsScreen extends ConsumerWidget {
       mode: LaunchMode.externalApplication,
     );
     if (opened || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open GitHub.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Could not open GitHub.')));
   }
 
   Future<void> _chooseQuality(

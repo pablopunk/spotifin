@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../app/providers.dart';
+import '../../app/features.dart';
 import '../../app/theme.dart';
 import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
@@ -86,16 +87,18 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           .showSnackBar(SnackBar(content: Text(error)));
       ref.read(appControllerProvider.notifier).clearError();
     });
-    ref.listen(downtifyControllerProvider.select((state) => state.notices), (
-      _,
-      notices,
-    ) {
-      if (notices.isEmpty) return;
-      final notice = notices.first;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(notice.message)));
-      ref.read(downtifyControllerProvider.notifier).dismissNotice(notice.id);
-    });
+    if (AppFeatures.downtify) {
+      ref.listen(downtifyControllerProvider.select((state) => state.notices), (
+        _,
+        notices,
+      ) {
+        if (notices.isEmpty) return;
+        final notice = notices.first;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(notice.message)));
+        ref.read(downtifyControllerProvider.notifier).dismissNotice(notice.id);
+      });
+    }
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) => _buildShell(context),

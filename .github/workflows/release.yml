@@ -1,0 +1,198 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version used for dry-run artifacts
+        required: true
+        default: 0.0.0-ci
+
+env:
+  RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  checks:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test
+      - name: Verify Apple-safe feature selection
+        run: flutter test test/apple_build_test.dart --dart-define=SPOTIFIN_DOWNTIFY=false --dart-define=SPOTIFIN_EXPECT_DOWNTIFY=false
+
+  macos:
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - name: Import Developer ID certificate
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+          certificate="$RUNNER_TEMP/certificate.p12"
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -s "$keychain"
+          rm -f "$certificate"
+      - name: Build, sign, and notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ env.RELEASE_VERSION }}
+        run: ./scripts/build-macos-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/Spotifin-*-mac-universal.zip
+          if-no-files-found: error
+
+  ios:
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build full and Apple-safe IPAs
+        env:
+          VERSION: ${{ env.RELEASE_VERSION }}
+        run: ./scripts/build-ios-variants.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: dist/Spotifin-*-ios-*.ipa
+          if-no-files-found: error
+
+  android:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.p12
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.p12
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          EOF
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build APK and app bundle
+        run: |
+          version="${RELEASE_VERSION#v}"
+          flutter build apk --release --build-name "$version" --build-number "$BUILD_NUMBER" --dart-define=SPOTIFIN_DOWNTIFY=true
+          flutter build appbundle --release --build-name "$version" --build-number "$BUILD_NUMBER" --dart-define=SPOTIFIN_DOWNTIFY=true
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/Spotifin-$version-android.apk"
+          cp build/app/outputs/bundle/release/app-release.aab "dist/Spotifin-$version-android.aab"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/Spotifin-*-android.*
+          if-no-files-found: error
+
+  windows:
+    needs: checks
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build Windows bundle
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_VERSION.TrimStart('v')
+          flutter build windows --release --build-name $version --build-number $env:BUILD_NUMBER --dart-define=SPOTIFIN_DOWNTIFY=true
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/Spotifin-$version-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/Spotifin-*-windows-x64.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [macos, ios, android, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum Spotifin-* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: spotifin-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber

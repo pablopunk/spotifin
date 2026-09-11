@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/features.dart';
+import '../../app/state/downtify_controller.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../../services/mixes/mix_generator.dart';
@@ -57,11 +59,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (query.isEmpty) _searchFilter = _SearchFilter.all;
     });
     if (query.isEmpty) {
-      ref.read(downtifyControllerProvider.notifier).search('');
+      if (AppFeatures.downtify) {
+        ref.read(downtifyControllerProvider.notifier).search('');
+      }
       setState(() => _searchResults = const Stream.empty());
       return;
     }
-    ref.read(downtifyControllerProvider.notifier).search(query);
+    if (AppFeatures.downtify) {
+      ref.read(downtifyControllerProvider.notifier).search(query);
+    }
     _searchDebounce = Timer(const Duration(milliseconds: 40), () {
       if (!mounted || query != _query) return;
       final words = query.toLowerCase().split(RegExp(r'\s+'));
@@ -109,8 +115,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final downtify = ref.watch(downtifyControllerProvider);
-    final externalAvailable = downtify.available;
+    final downtify = AppFeatures.downtify
+        ? ref.watch(downtifyControllerProvider)
+        : const DowntifyState(availability: DowntifyAvailability.unconfigured);
+    final externalAvailable = AppFeatures.downtify && downtify.available;
     final filter = externalAvailable
         ? _searchFilter
         : _searchFilter == _SearchFilter.downtify

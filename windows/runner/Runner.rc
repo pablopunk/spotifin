@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "app.spotifin" "\0"
-            VALUE "FileDescription", "spotifin" "\0"
+            VALUE "FileDescription", "Spotifin" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "spotifin" "\0"
+            VALUE "InternalName", "Spotifin" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 app.spotifin. All rights reserved." "\0"
-            VALUE "OriginalFilename", "spotifin.exe" "\0"
-            VALUE "ProductName", "spotifin" "\0"
+            VALUE "OriginalFilename", "Spotifin.exe" "\0"
+            VALUE "ProductName", "Spotifin" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
