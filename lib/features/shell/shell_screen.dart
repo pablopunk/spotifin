@@ -168,7 +168,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                                 ),
                                 const Expanded(
                                   child: Padding(
-                                    padding: EdgeInsets.fromLTRB(0, 8, 8, 88),
+                                    padding: EdgeInsets.fromLTRB(0, 8, 8, 96),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.all(
                                         Radius.circular(SpotifinRadii.card),
