@@ -200,9 +200,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         bottomBar: GlassTabBar.bottom(
           settings: SpotifinGlass.settings(glassOpacity),
           indicatorSettings: SpotifinGlass.settings(glassOpacity),
-          quality: GlassQuality.standard,
-          backgroundQuality: GlassQuality.standard,
-          showIndicator: false,
           selectedIndex: selectedIndex,
           onTabSelected: widget.controller.selectDestination,
           selectedIconColor: SpotifinColors.text,
@@ -217,18 +214,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           bottomAccessoryEnabled: hasTrack,
           bottomAccessoryHeight: 74,
           tabs: _destinations
-              .asMap()
-              .entries
               .map(
-                (entry) => GlassTab(
-                  icon: _GlassTabIcon(
-                    icon: entry.key == selectedIndex
-                        ? entry.value.selectedIcon
-                        : entry.value.icon,
-                    selected: entry.key == selectedIndex,
-                  ),
-                  activeIcon: Icon(entry.value.selectedIcon),
-                  label: entry.value.label,
+                (item) => GlassTab(
+                  icon: Icon(item.icon),
+                  activeIcon: Icon(item.selectedIcon),
+                  label: item.label,
                 ),
               )
               .toList(),
@@ -268,46 +258,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     key: _navigatorKeys[index],
     onGenerateRoute: (_) =>
         MaterialPageRoute<void>(builder: (_) => _screens[index]),
-  );
-}
-
-class _GlassTabIcon extends StatelessWidget {
-  const _GlassTabIcon({required this.icon, required this.selected});
-
-  final IconData icon;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 64,
-    height: 24,
-    child: Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        if (selected)
-          Positioned(
-            left: -14,
-            right: -14,
-            top: -10,
-            bottom: -30,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: SpotifinColors.accent.withValues(alpha: .1),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: SpotifinColors.accent.withValues(alpha: .55),
-                    blurRadius: 22,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        Icon(icon, color: selected ? SpotifinColors.accent : null),
-      ],
-    ),
   );
 }
 
