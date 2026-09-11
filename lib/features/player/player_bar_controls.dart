@@ -9,6 +9,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import 'player_collection_links.dart';
 import 'volume_scale.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
@@ -128,10 +129,8 @@ class MobilePlayerBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                subtitle: Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                subtitle: PlayerCollectionLinks(
+                  track: track,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 trailing: Row(
@@ -211,10 +210,8 @@ class _TrackSummary extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                PlayerCollectionLinks(
+                  track: track,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

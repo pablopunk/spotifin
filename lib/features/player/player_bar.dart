@@ -13,6 +13,7 @@ import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'player_bar_controls.dart';
+import 'player_collection_links.dart';
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({super.key});
@@ -192,8 +193,8 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                       track.name,
                       style: Theme.of(context).textTheme.headlineLarge,
                     ),
-                    Text(
-                      track.artist,
+                    PlayerCollectionLinks(
+                      track: track,
                       style: Theme.of(context).textTheme.titleMedium
                           ?.copyWith(color: SpotifinColors.textMuted),
                     ),

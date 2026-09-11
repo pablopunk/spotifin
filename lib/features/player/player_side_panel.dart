@@ -11,6 +11,7 @@ import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'player_collection_links.dart';
 
 class PlayerSidePanel extends ConsumerWidget {
   const PlayerSidePanel({super.key});
@@ -222,10 +223,8 @@ class _PlayerPanel extends StatelessWidget {
         const SizedBox(height: SpotifinSpacing.xxs),
         Align(
           alignment: Alignment.centerLeft,
-          child: Text(
-            track.artist,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: PlayerCollectionLinks(
+            track: track,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),

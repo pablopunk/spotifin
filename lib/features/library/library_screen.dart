@@ -312,11 +312,12 @@ class CollectionScreen extends ConsumerWidget {
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: SpotifinSpacing.md),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: SpotifinSpacing.sm,
+                          runSpacing: SpotifinSpacing.sm,
                           children: [
                             SpotifinCountLabel(tracks.length),
-                            const SizedBox(width: SpotifinSpacing.md),
                             SpotifinPlayButton(
                               onPressed: tracks.isEmpty
                                   ? null
@@ -324,7 +325,6 @@ class CollectionScreen extends ConsumerWidget {
                                         .read(playbackProvider)
                                         .replaceQueue(tracks),
                             ),
-                            const SizedBox(width: SpotifinSpacing.sm),
                             CollectionDownloadButton(tracks: tracks),
                           ],
                         ),
