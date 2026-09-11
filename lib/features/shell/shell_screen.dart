@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-// ignore: implementation_imports
-import 'package:liquid_glass_widgets/src/renderer/internal/liquid_glass_self_scale_scope.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
@@ -195,44 +193,58 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     }
     if (glassEffects) {
       final hasTrack = _playback.currentTrack != null;
-      return LiquidGlassSelfScaleScope(
-        selfScaled: true,
-        child: GlassScaffold(
-          backgroundColor: SpotifinColors.background,
+      return GlassScaffold(
+        backgroundColor: SpotifinColors.background,
+        settings: SpotifinGlass.settings(glassOpacity),
+        topEdgeFade: false,
+        bottomBar: GlassTabBar.bottom(
           settings: SpotifinGlass.settings(glassOpacity),
-          topEdgeFade: false,
-          bottomBar: GlassTabBar.bottom(
-            settings: SpotifinGlass.settings(glassOpacity),
-            indicatorSettings: SpotifinGlass.settings(glassOpacity),
-            quality: GlassQuality.standard,
-            backgroundQuality: GlassQuality.standard,
-            showIndicator: true,
-            indicatorPinchStrength: 0,
-            selectedIndex: selectedIndex,
-            onTabSelected: widget.controller.selectDestination,
-            selectedIconColor: SpotifinColors.text,
-            unselectedIconColor: SpotifinColors.textMuted,
-            selectedLabelColor: SpotifinColors.text,
-            unselectedLabelColor: SpotifinColors.textMuted,
-            interactionGlowColor: SpotifinColors.accent,
-            bottomAccessory: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: PlayerBar(),
-            ),
-            bottomAccessoryEnabled: hasTrack,
-            bottomAccessoryHeight: 74,
-            tabs: _destinations
-                .map(
-                  (item) => GlassTab(
-                    icon: Icon(item.icon),
-                    activeIcon: Icon(item.selectedIcon),
-                    label: item.label,
-                  ),
-                )
-                .toList(),
+          indicatorSettings: SpotifinGlass.settings(glassOpacity),
+          quality: GlassQuality.standard,
+          backgroundQuality: GlassQuality.standard,
+          showIndicator: false,
+          selectedIndex: selectedIndex,
+          onTabSelected: widget.controller.selectDestination,
+          selectedIconColor: SpotifinColors.text,
+          unselectedIconColor: SpotifinColors.textMuted,
+          selectedLabelColor: SpotifinColors.text,
+          unselectedLabelColor: SpotifinColors.textMuted,
+          interactionGlowColor: SpotifinColors.accent,
+          bottomAccessory: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: PlayerBar(),
           ),
-          body: content,
+          bottomAccessoryEnabled: hasTrack,
+          bottomAccessoryHeight: 74,
+          tabs: _destinations
+              .asMap()
+              .entries
+              .map(
+                (entry) => GlassTab(
+                  icon: Icon(
+                    entry.key == selectedIndex
+                        ? entry.value.selectedIcon
+                        : entry.value.icon,
+                    color: entry.key == selectedIndex
+                        ? SpotifinColors.accent
+                        : null,
+                    shadows: entry.key == selectedIndex
+                        ? const [
+                            Shadow(
+                              color: SpotifinColors.accent,
+                              blurRadius: 16,
+                              offset: Offset(0, 5),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  activeIcon: Icon(entry.value.selectedIcon),
+                  label: entry.value.label,
+                ),
+              )
+              .toList(),
         ),
+        body: content,
       );
     }
     return Scaffold(
