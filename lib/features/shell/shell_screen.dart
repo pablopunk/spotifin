@@ -221,12 +221,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           selectedLabelColor: SpotifinColors.text,
           unselectedLabelColor: SpotifinColors.textMuted,
           interactionGlowColor: SpotifinColors.accent,
+          bottomAccessorySpacing: 0,
           bottomAccessory: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: PlayerBar(),
           ),
           bottomAccessoryEnabled: hasTrack,
           bottomAccessoryHeight: 74,
+          verticalPadding: 12,
           tabs: _destinations
               .map(
                 (item) => GlassTab(
