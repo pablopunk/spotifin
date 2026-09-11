@@ -47,7 +47,10 @@ final lyricsProvider = Provider<LyricsService>(
 final sessionStoreProvider = Provider<SessionStore>(
   (ref) => const SessionStore(
     FlutterSecureStorage(
-      mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+      mOptions: MacOsOptions(
+        accountName: 'com.pablopunk.spotifin.session',
+        usesDataProtectionKeychain: false,
+      ),
     ),
   ),
 );
