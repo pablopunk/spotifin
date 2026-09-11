@@ -8,6 +8,7 @@ import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/glass.dart';
 import 'volume_scale.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
@@ -18,6 +19,7 @@ class DesktopPlayerBar extends StatelessWidget {
     required this.onOpenQueue,
     required this.onOpenLyrics,
     required this.glass,
+    required this.glassOpacity,
     super.key,
   });
 
@@ -27,6 +29,7 @@ class DesktopPlayerBar extends StatelessWidget {
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
   final bool glass;
+  final double glassOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +74,7 @@ class DesktopPlayerBar extends StatelessWidget {
     return GlassContainer(
       useOwnLayer: true,
       quality: GlassQuality.premium,
+      settings: SpotifinGlass.settings(glassOpacity),
       shape: const LiquidRoundedSuperellipse(borderRadius: 16),
       clipBehavior: Clip.antiAlias,
       child: content,
@@ -84,6 +88,7 @@ class MobilePlayerBar extends StatelessWidget {
     required this.playback,
     required this.onOpenPlayer,
     required this.glass,
+    required this.glassOpacity,
     super.key,
   });
 
@@ -91,6 +96,7 @@ class MobilePlayerBar extends StatelessWidget {
   final PlaybackService playback;
   final VoidCallback onOpenPlayer;
   final bool glass;
+  final double glassOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +165,7 @@ class MobilePlayerBar extends StatelessWidget {
     return GlassContainer(
       useOwnLayer: true,
       quality: GlassQuality.premium,
+      settings: SpotifinGlass.settings(glassOpacity),
       shape: const LiquidRoundedSuperellipse(borderRadius: 16),
       clipBehavior: Clip.antiAlias,
       child: content,

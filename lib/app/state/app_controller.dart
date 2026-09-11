@@ -20,6 +20,7 @@ class AppState {
     this.smallDownloads = false,
     this.normalization = false,
     this.glassEffects = true,
+    this.glassOpacity = .35,
   });
 
   final AppStatus status;
@@ -30,6 +31,7 @@ class AppState {
   final bool smallDownloads;
   final bool normalization;
   final bool glassEffects;
+  final double glassOpacity;
 
   AppState copyWith({
     AppStatus? status,
@@ -42,6 +44,7 @@ class AppState {
     bool? smallDownloads,
     bool? normalization,
     bool? glassEffects,
+    double? glassOpacity,
   }) => AppState(
     status: status ?? this.status,
     session: clearSession ? null : session ?? this.session,
@@ -51,6 +54,7 @@ class AppState {
     smallDownloads: smallDownloads ?? this.smallDownloads,
     normalization: normalization ?? this.normalization,
     glassEffects: glassEffects ?? this.glassEffects,
+    glassOpacity: glassOpacity ?? this.glassOpacity,
   );
 }
 
@@ -64,6 +68,7 @@ class AppController extends Notifier<AppState> {
     final smallDownloads = preferences.getBool('smallDownloads') ?? false;
     final normalization = preferences.getBool('normalization') ?? false;
     final glassEffects = preferences.getBool('glassEffects') ?? true;
+    final glassOpacity = preferences.getDouble('glassOpacity') ?? .35;
     const developmentLogin = DevelopmentLogin.fromEnvironment();
     if (developmentLogin.canSignIn) {
       state = AppState(
@@ -71,6 +76,7 @@ class AppController extends Notifier<AppState> {
         smallDownloads: smallDownloads,
         normalization: normalization,
         glassEffects: glassEffects,
+        glassOpacity: glassOpacity,
       );
       await signIn(
         developmentLogin.server,
@@ -87,6 +93,7 @@ class AppController extends Notifier<AppState> {
         smallDownloads: smallDownloads,
         normalization: normalization,
         glassEffects: glassEffects,
+        glassOpacity: glassOpacity,
       );
       return;
     }
@@ -96,6 +103,7 @@ class AppController extends Notifier<AppState> {
       smallDownloads: smallDownloads,
       normalization: normalization,
       glassEffects: glassEffects,
+      glassOpacity: glassOpacity,
     );
     await ref
         .read(playbackProvider)
@@ -339,5 +347,11 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(glassEffects: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('glassEffects', value);
+  }
+
+  Future<void> setGlassOpacity(double value) async {
+    state = state.copyWith(glassOpacity: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setDouble('glassOpacity', value);
   }
 }

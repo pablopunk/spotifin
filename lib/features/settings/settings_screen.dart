@@ -13,6 +13,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
     final session = state.session;
+    final glassOpacity = ref.watch(glassOpacityProvider);
     final desktop =
         MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
     return Scaffold(
@@ -47,6 +48,22 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('Liquid glass effects'),
                 subtitle: const Text(
                   'Refracting navigation, player, and sheet chrome',
+                ),
+              ),
+              ListTile(
+                title: const Text('Glass opacity'),
+                trailing: Text('${(glassOpacity * 100).round()}%'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Slider(
+                  value: glassOpacity,
+                  max: .8,
+                  divisions: 16,
+                  label: '${(glassOpacity * 100).round()}%',
+                  onChanged: ref
+                      .read(appControllerProvider.notifier)
+                      .setGlassOpacity,
                 ),
               ),
             ],

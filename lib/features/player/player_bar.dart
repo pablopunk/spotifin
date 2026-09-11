@@ -28,16 +28,17 @@ class PlayerBar extends ConsumerWidget {
         final useSidePanel =
             MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.playerPanel;
         final glassEffects = ref.watch(glassEffectsProvider);
+        final glassOpacity = ref.watch(glassOpacityProvider);
         void showPlayer() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).togglePlayer()
-            : _showNowPlaying(context, playback, glassEffects);
+            : _showNowPlaying(context, playback, glassEffects, glassOpacity);
 
         void showQueue() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleQueue()
-            : _showNowPlaying(context, playback, glassEffects);
+            : _showNowPlaying(context, playback, glassEffects, glassOpacity);
         void showLyrics() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleLyrics()
-            : _showLyrics(context, track, playback, glassEffects);
+            : _showLyrics(context, track, playback, glassEffects, glassOpacity);
         return LayoutBuilder(
           builder: (context, constraints) =>
               constraints.maxWidth >= SpotifinBreakpoints.rail
@@ -48,12 +49,14 @@ class PlayerBar extends ConsumerWidget {
                   onOpenQueue: showQueue,
                   onOpenLyrics: showLyrics,
                   glass: glassEffects,
+                  glassOpacity: glassOpacity,
                 )
               : MobilePlayerBar(
                   track: track,
                   playback: playback,
                   onOpenPlayer: showPlayer,
                   glass: glassEffects,
+                  glassOpacity: glassOpacity,
                 ),
         );
       },
@@ -65,6 +68,7 @@ void _showNowPlaying(
   BuildContext context,
   PlaybackService playback,
   bool glass,
+  double glassOpacity,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -72,7 +76,11 @@ void _showNowPlaying(
     useSafeArea: true,
     constraints: const BoxConstraints(maxWidth: 720),
     backgroundColor: glass ? Colors.transparent : SpotifinColors.surface,
-    builder: (_) => _NowPlaying(playback: playback, glass: glass),
+    builder: (_) => _NowPlaying(
+      playback: playback,
+      glass: glass,
+      glassOpacity: glassOpacity,
+    ),
   );
 }
 
@@ -81,6 +89,7 @@ void _showLyrics(
   Track track,
   PlaybackService playback,
   bool glass,
+  double glassOpacity,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -88,15 +97,24 @@ void _showLyrics(
     useSafeArea: true,
     constraints: const BoxConstraints(maxWidth: 720),
     backgroundColor: glass ? Colors.transparent : null,
-    builder: (_) =>
-        _LyricsSheet(track: track, playback: playback, glass: glass),
+    builder: (_) => _LyricsSheet(
+      track: track,
+      playback: playback,
+      glass: glass,
+      glassOpacity: glassOpacity,
+    ),
   );
 }
 
 class _NowPlaying extends ConsumerWidget {
-  const _NowPlaying({required this.playback, required this.glass});
+  const _NowPlaying({
+    required this.playback,
+    required this.glass,
+    required this.glassOpacity,
+  });
   final PlaybackService playback;
   final bool glass;
+  final double glassOpacity;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => ListenableBuilder(
@@ -111,6 +129,7 @@ class _NowPlaying extends ConsumerWidget {
         minChildSize: .55,
         builder: (context, controller) => _NowPlayingSurface(
           glass: glass,
+          glassOpacity: glassOpacity,
           child: CustomScrollView(
             controller: controller,
             slivers: [
@@ -251,6 +270,7 @@ class _NowPlaying extends ConsumerWidget {
                                 track: track,
                                 playback: playback,
                                 glass: glass,
+                                glassOpacity: glassOpacity,
                               ),
                             ),
                             icon: const Icon(Icons.lyrics_outlined),
@@ -340,16 +360,19 @@ class _LyricsSheet extends ConsumerWidget {
     required this.track,
     required this.playback,
     required this.glass,
+    required this.glassOpacity,
   });
   final Track track;
   final PlaybackService playback;
   final bool glass;
+  final double glassOpacity;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(appControllerProvider).session;
     return _SheetSurface(
       glass: glass,
+      glassOpacity: glassOpacity,
       child: SafeArea(
         child: SizedBox(
           height: MediaQuery.sizeOf(context).height * .82,
@@ -424,14 +447,19 @@ class _LyricsSheet extends ConsumerWidget {
 }
 
 class _NowPlayingSurface extends StatelessWidget {
-  const _NowPlayingSurface({required this.glass, required this.child});
+  const _NowPlayingSurface({
+    required this.glass,
+    required this.glassOpacity,
+    required this.child,
+  });
 
   final bool glass;
+  final double glassOpacity;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    if (glass) return _glassSheet(child);
+    if (glass) return _glassSheet(child, glassOpacity);
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -446,20 +474,26 @@ class _NowPlayingSurface extends StatelessWidget {
 }
 
 class _SheetSurface extends StatelessWidget {
-  const _SheetSurface({required this.glass, required this.child});
+  const _SheetSurface({
+    required this.glass,
+    required this.glassOpacity,
+    required this.child,
+  });
 
   final bool glass;
+  final double glassOpacity;
   final Widget child;
 
   @override
   Widget build(BuildContext context) => glass
-      ? _glassSheet(child)
+      ? _glassSheet(child, glassOpacity)
       : ColoredBox(color: SpotifinColors.surface, child: child);
 }
 
-Widget _glassSheet(Widget child) => GlassContainer(
+Widget _glassSheet(Widget child, double opacity) => GlassContainer(
   useOwnLayer: true,
   quality: GlassQuality.standard,
+  settings: SpotifinGlass.settings(opacity),
   shape: const LiquidRoundedSuperellipse(borderRadius: 24),
   clipBehavior: Clip.antiAlias,
   child: child,

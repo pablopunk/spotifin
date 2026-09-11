@@ -44,6 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: _LoginCard(
                   glass: ref.watch(glassEffectsProvider),
+                  glassOpacity: ref.watch(glassOpacityProvider),
                   child: Padding(
                     padding: const EdgeInsets.all(SpotifinSpacing.xxl),
                     child: Form(
@@ -176,9 +177,14 @@ class _LoginBackdrop extends StatelessWidget {
 }
 
 class _LoginCard extends StatelessWidget {
-  const _LoginCard({required this.glass, required this.child});
+  const _LoginCard({
+    required this.glass,
+    required this.glassOpacity,
+    required this.child,
+  });
 
   final bool glass;
+  final double glassOpacity;
   final Widget child;
 
   @override
@@ -187,6 +193,7 @@ class _LoginCard extends StatelessWidget {
       return GlassCard(
         useOwnLayer: true,
         quality: GlassQuality.premium,
+        settings: SpotifinGlass.settings(glassOpacity),
         padding: EdgeInsets.zero,
         shape: const LiquidRoundedSuperellipse(
           borderRadius: SpotifinRadii.panel,

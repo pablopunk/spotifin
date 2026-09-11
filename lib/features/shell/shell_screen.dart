@@ -104,6 +104,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         : 0.0;
     final selectedIndex = widget.controller.selectedIndex;
     final glassEffects = ref.watch(glassEffectsProvider);
+    final glassOpacity = ref.watch(glassOpacityProvider);
     _visitedDestinations.add(selectedIndex);
     final content = SpotifinChromeInsets(
       bottom: !wide && glassEffects
@@ -194,8 +195,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       final hasTrack = _playback.currentTrack != null;
       return GlassScaffold(
         backgroundColor: SpotifinColors.background,
+        settings: SpotifinGlass.settings(glassOpacity),
         topEdgeFade: false,
         bottomBar: GlassTabBar.bottom(
+          settings: SpotifinGlass.settings(glassOpacity),
+          indicatorSettings: SpotifinGlass.settings(glassOpacity),
           selectedIndex: selectedIndex,
           onTabSelected: widget.controller.selectDestination,
           selectedIconColor: SpotifinColors.text,
