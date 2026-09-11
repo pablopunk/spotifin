@@ -169,8 +169,45 @@ jobs:
           path: dist/Spotifin-*-windows-x64.zip
           if-no-files-found: error
 
+  linux:
+    needs: checks
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            flutter_architecture: x64
+            runner: ubuntu-latest
+          - architecture: aarch64
+            flutter_architecture: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build AppImage
+        env:
+          VERSION: ${{ env.RELEASE_VERSION }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+          FLUTTER_ARCHITECTURE: ${{ matrix.flutter_architecture }}
+        run: ./scripts/build-linux-appimage.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.architecture }}
+          path: dist/Spotifin-*-linux-${{ matrix.architecture }}.AppImage
+          if-no-files-found: error
+
   publish:
-    needs: [macos, ios, android, windows]
+    needs: [macos, ios, android, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
