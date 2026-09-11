@@ -66,10 +66,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     widget.controller.selectDestination(1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _navigatorKeys[1].currentState?.push(
+      _navigatorKeys[1].currentState?.pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (_) => PlaylistScreen(playlistId: playlist.id),
         ),
+        (route) => route.isFirst,
       );
     });
   }
