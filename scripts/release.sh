@@ -18,5 +18,5 @@ git rev-parse "$tag" >/dev/null 2>&1 || git tag "$tag"
 git push origin "$(git branch --show-current)"
 git push origin "$tag"
 
-echo "CI will publish the signed and notarized macOS release at:"
+echo "CI will publish all platform artifacts at:"
 echo "https://github.com/pablopunk/spotifin/releases/tag/$tag"
