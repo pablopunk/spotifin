@@ -210,6 +210,14 @@ class JellyfinClient {
     _ensureSuccess(response);
   }
 
+  Future<void> requestLibraryRefresh(JellyfinSession session) async {
+    final response = await _http.post(
+      _uri(session, '/Library/Refresh'),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
   Future<void> reportPlayback(
     JellyfinSession session,
     String endpoint,
@@ -328,6 +336,9 @@ class JellyfinClient {
     var result = value.trim();
     if (!result.startsWith('http://') && !result.startsWith('https://')) {
       result = 'https://$result';
+    }
+    if (!result.startsWith('https://')) {
+      throw const JellyfinException('Jellyfin requires an HTTPS address.');
     }
     return result.replaceFirst(RegExp(r'/+$'), '');
   }

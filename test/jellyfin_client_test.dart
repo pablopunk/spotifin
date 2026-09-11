@@ -38,6 +38,23 @@ void main() {
     expect(requests.last.headers['Authorization'], contains('spotifin-device'));
   });
 
+  test('rejects an insecure Jellyfin address', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    addTearDown(client.close);
+
+    expect(
+      () => client.authenticate(
+        serverUrl: 'http://example.com',
+        username: 'Pablo',
+        password: 'secret',
+        deviceId: 'spotifin-device',
+      ),
+      throwsA(isA<JellyfinException>()),
+    );
+  });
+
   test('reports an authentication failure without exposing a body', () async {
     final client = JellyfinClient(
       httpClient: MockClient((request) async {
@@ -207,5 +224,30 @@ void main() {
     expect(captured.method, 'POST');
     expect(captured.url.path, '/Playlists/playlist-id');
     expect(jsonDecode(captured.body), {'Name': 'New name'});
+  });
+
+  test('starts an authenticated Jellyfin library refresh', () async {
+    late http.Request request;
+    final client = JellyfinClient(
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('', 204);
+      }),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await client.requestLibraryRefresh(session);
+
+    expect(request.method, 'POST');
+    expect(request.url.path, '/Library/Refresh');
+    expect(request.headers['X-Emby-Token'], 'token');
   });
 }
