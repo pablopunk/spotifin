@@ -203,6 +203,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           quality: GlassQuality.standard,
           backgroundQuality: GlassQuality.standard,
           showIndicator: true,
+          indicatorPinchStrength: 0,
           selectedIndex: selectedIndex,
           onTabSelected: widget.controller.selectDestination,
           selectedIconColor: SpotifinColors.text,
