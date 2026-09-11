@@ -10,64 +10,16 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 
 | Web app  | Web app (responsive) |
 | -------- | -------- |
-| ![Web screenshot](assets/screenshots/web%20full.png) | ![Web small](assets/screenshots/web%20small.png) 
+| ![Web screenshot](assets/screenshots/web%20full.png) | ![Web small](assets/screenshots/web%20small.png)
 
 | iOS App (player)  | iOS App (library) |
 | -------- | -------- |
 | ![ios app player](assets/screenshots/ios1.jpg) | ![ios app library](assets/screenshots/ios2.jpg) |
 
-## Run
+## Downloads songs to your library with the Downtify integration
 
-Install the pinned toolchain with [mise](https://mise.jdx.dev/), then run:
+Select your downtify server and search results will include Downtify songs you can add to your library with one click.
 
-```sh
-mise install
-mise exec -- flutter pub get
-mise exec -- dart run build_runner build
-mise exec -- flutter run -d chrome
-```
-
-For development auto-login, copy `.env.example` to `.env`, enter your Jellyfin
-details, and run:
-
-```sh
-mise run dev
-```
-
-Flutter listens on all interfaces at port 8080 but opens Chrome at the secure
-`localhost` origin. The ignored `.env` credentials are compiled into this
-development build, so use HTTPS for remote access and do not expose it to
-untrusted networks.
-
-For an iPhone, enable Developer Mode, pair it with Xcode, then select it from
-`mise exec -- flutter devices` and use `mise exec -- flutter run -d <device-id>`.
-
-## App icon
-
-`assets/branding/app_icon.png` is the source for all supported platform app
-icons and is bundled for Linux packaging. Regenerate the native and web assets
-after changing it:
-
-```sh
-scripts/generate-app-icons.sh
-```
-
-## Checks
-
-```sh
-mise exec -- flutter analyze
-mise exec -- flutter test
-mise exec -- flutter build web --release
-mise exec -- flutter build ios --release --no-codesign
-```
-
-The iOS build needs the matching iOS platform component in Xcode and the
-CarPlay audio entitlement before distribution.
-
-## Deploy
-
-- Vercel uses `vercel.json` and `scripts/build-web.sh` for the static web app.
-- Codemagic uses `codemagic.yaml` for signed TestFlight builds after its App
-  Store Connect integration and signing profile are configured.
-
-Product and engineering decisions are in [`docs/`](docs/).
+| Downtify config | Downtify integration |
+| -------- | -------- |
+| ![Downtify config](assets/screenshots/downtify-config.jpg) | ![Downtify integration](assets/screenshots/downtify-search.jpg) |
