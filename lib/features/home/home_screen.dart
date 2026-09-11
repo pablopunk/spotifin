@@ -313,7 +313,12 @@ class _SearchResults extends StatelessWidget {
       }
       return SliverMainAxisGroup(
         slivers: filter == _SearchFilter.downtify
-            ? [_ExternalSongResults(songs: visibleExternal)]
+            ? [
+                _ExternalSongResults(
+                  songs: visibleExternal,
+                  libraryTracks: libraryTracks,
+                ),
+              ]
             : switch (filter) {
                 _SearchFilter.all => [
                   if (artists.isNotEmpty) ...[
@@ -395,15 +400,32 @@ class _SongResults extends StatelessWidget {
 }
 
 class _ExternalSongResults extends StatelessWidget {
-  const _ExternalSongResults({required this.songs});
+  const _ExternalSongResults({
+    required this.songs,
+    this.libraryTracks = const [],
+  });
 
   final List<DowntifySong> songs;
+  final List<Track> libraryTracks;
 
   @override
-  Widget build(BuildContext context) => SliverList.builder(
-    itemCount: songs.length,
-    itemBuilder: (context, index) => ExternalTrackTile(song: songs[index]),
-  );
+  Widget build(BuildContext context) {
+    const matcher = DowntifyMatcher();
+    final matches = {
+      for (final song in songs) song.id: matcher.findMatch(song, libraryTracks),
+    };
+    final matchedTracks = matches.values.whereType<Track>().toList();
+    return SliverList.builder(
+      itemCount: songs.length,
+      itemBuilder: (context, index) {
+        final song = songs[index];
+        final match = matches[song.id];
+        return match == null
+            ? ExternalTrackTile(song: song)
+            : TrackTile(track: match, contextTracks: matchedTracks);
+      },
+    );
+  }
 }
 
 class _CollectionResults extends StatelessWidget {

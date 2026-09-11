@@ -9,13 +9,14 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotifin/app/providers.dart';
+import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/downtify/external_track_tile.dart';
 import 'package:spotifin/features/home/home_screen.dart';
 import 'package:spotifin/services/downtify/downtify_client.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
-  testWidgets('merges Downtify results and hides duplicates only in All', (
+  testWidgets('replaces confirmed Downtify results with library tracks', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -79,7 +80,20 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, 'Downtify'));
     await tester.pump();
 
-    expect(find.byType(ExternalTrackTile), findsNWidgets(2));
+    expect(find.byType(TrackTile), findsOneWidget);
+    expect(find.byType(ExternalTrackTile), findsOneWidget);
+
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'imported',
+        name: 'One More Time Again',
+        artist: const Value('Daft Punk'),
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TrackTile), findsNWidgets(2));
+    expect(find.byType(ExternalTrackTile), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
