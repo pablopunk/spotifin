@@ -115,9 +115,12 @@ class _RemoteDevicesSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: service,
-    builder: (context, _) => SizedBox(
-      height: MediaQuery.sizeOf(context).height * .78,
+    builder: (context, _) => ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .78,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
             leading: Icon(
@@ -156,7 +159,7 @@ class _RemoteDevicesSheet extends StatelessWidget {
               ),
             ),
           const Divider(),
-          Expanded(
+          Flexible(
             child: service.sessions.isEmpty
                 ? const SpotifinEmptyState(
                     icon: Icons.devices_other_rounded,
@@ -164,6 +167,7 @@ class _RemoteDevicesSheet extends StatelessWidget {
                     message: 'Open Spotifin on another signed-in device.',
                   )
                 : ListView.separated(
+                    shrinkWrap: true,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                     itemCount: service.sessions.length,
                     separatorBuilder: (_, _) =>
