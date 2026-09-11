@@ -89,4 +89,30 @@ void main() {
 
     expect(await database.allTracks(), isEmpty);
   });
+
+  test('persists Downtify imports per Jellyfin account', () async {
+    final now = DateTime(2026);
+    await database.putDowntifyImport(
+      DowntifyImportsCompanion.insert(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        downtifyUrl: 'https://downtify.example.com',
+        externalSongId: 'song',
+        songJson: '{}',
+        status: 'queued',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    expect(await database.getDowntifyImports('server', 'user'), hasLength(1));
+    expect(await database.getDowntifyImports('server', 'other'), isEmpty);
+  });
+
+  test('version 5 migration creates Downtify imports', () async {
+    await database.migration.onUpgrade(Migrator(database), 4, 5);
+
+    expect(database.downtifyImports.actualTableName, 'downtify_imports');
+  });
 }

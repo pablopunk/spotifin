@@ -2002,6 +2002,882 @@ class PendingWritesCompanion extends UpdateCompanion<PendingWrite> {
   }
 }
 
+class $DowntifyImportsTable extends DowntifyImports
+    with TableInfo<$DowntifyImportsTable, DowntifyImport> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DowntifyImportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _jellyfinServerIdMeta = const VerificationMeta(
+    'jellyfinServerId',
+  );
+  @override
+  late final GeneratedColumn<String> jellyfinServerId = GeneratedColumn<String>(
+    'jellyfin_server_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _jellyfinUserIdMeta = const VerificationMeta(
+    'jellyfinUserId',
+  );
+  @override
+  late final GeneratedColumn<String> jellyfinUserId = GeneratedColumn<String>(
+    'jellyfin_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _downtifyUrlMeta = const VerificationMeta(
+    'downtifyUrl',
+  );
+  @override
+  late final GeneratedColumn<String> downtifyUrl = GeneratedColumn<String>(
+    'downtify_url',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalSongIdMeta = const VerificationMeta(
+    'externalSongId',
+  );
+  @override
+  late final GeneratedColumn<String> externalSongId = GeneratedColumn<String>(
+    'external_song_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _jobIdMeta = const VerificationMeta('jobId');
+  @override
+  late final GeneratedColumn<String> jobId = GeneratedColumn<String>(
+    'job_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _songJsonMeta = const VerificationMeta(
+    'songJson',
+  );
+  @override
+  late final GeneratedColumn<String> songJson = GeneratedColumn<String>(
+    'song_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _progressMeta = const VerificationMeta(
+    'progress',
+  );
+  @override
+  late final GeneratedColumn<double> progress = GeneratedColumn<double>(
+    'progress',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _messageMeta = const VerificationMeta(
+    'message',
+  );
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+    'message',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _filenameMeta = const VerificationMeta(
+    'filename',
+  );
+  @override
+  late final GeneratedColumn<String> filename = GeneratedColumn<String>(
+    'filename',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _matchedTrackIdMeta = const VerificationMeta(
+    'matchedTrackId',
+  );
+  @override
+  late final GeneratedColumn<String> matchedTrackId = GeneratedColumn<String>(
+    'matched_track_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _messageShownMeta = const VerificationMeta(
+    'messageShown',
+  );
+  @override
+  late final GeneratedColumn<bool> messageShown = GeneratedColumn<bool>(
+    'message_shown',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("message_shown" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    jellyfinServerId,
+    jellyfinUserId,
+    downtifyUrl,
+    externalSongId,
+    jobId,
+    songJson,
+    status,
+    progress,
+    message,
+    filename,
+    matchedTrackId,
+    messageShown,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'downtify_imports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DowntifyImport> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('jellyfin_server_id')) {
+      context.handle(
+        _jellyfinServerIdMeta,
+        jellyfinServerId.isAcceptableOrUnknown(
+          data['jellyfin_server_id']!,
+          _jellyfinServerIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_jellyfinServerIdMeta);
+    }
+    if (data.containsKey('jellyfin_user_id')) {
+      context.handle(
+        _jellyfinUserIdMeta,
+        jellyfinUserId.isAcceptableOrUnknown(
+          data['jellyfin_user_id']!,
+          _jellyfinUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_jellyfinUserIdMeta);
+    }
+    if (data.containsKey('downtify_url')) {
+      context.handle(
+        _downtifyUrlMeta,
+        downtifyUrl.isAcceptableOrUnknown(
+          data['downtify_url']!,
+          _downtifyUrlMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_downtifyUrlMeta);
+    }
+    if (data.containsKey('external_song_id')) {
+      context.handle(
+        _externalSongIdMeta,
+        externalSongId.isAcceptableOrUnknown(
+          data['external_song_id']!,
+          _externalSongIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_externalSongIdMeta);
+    }
+    if (data.containsKey('job_id')) {
+      context.handle(
+        _jobIdMeta,
+        jobId.isAcceptableOrUnknown(data['job_id']!, _jobIdMeta),
+      );
+    }
+    if (data.containsKey('song_json')) {
+      context.handle(
+        _songJsonMeta,
+        songJson.isAcceptableOrUnknown(data['song_json']!, _songJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_songJsonMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('progress')) {
+      context.handle(
+        _progressMeta,
+        progress.isAcceptableOrUnknown(data['progress']!, _progressMeta),
+      );
+    }
+    if (data.containsKey('message')) {
+      context.handle(
+        _messageMeta,
+        message.isAcceptableOrUnknown(data['message']!, _messageMeta),
+      );
+    }
+    if (data.containsKey('filename')) {
+      context.handle(
+        _filenameMeta,
+        filename.isAcceptableOrUnknown(data['filename']!, _filenameMeta),
+      );
+    }
+    if (data.containsKey('matched_track_id')) {
+      context.handle(
+        _matchedTrackIdMeta,
+        matchedTrackId.isAcceptableOrUnknown(
+          data['matched_track_id']!,
+          _matchedTrackIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('message_shown')) {
+      context.handle(
+        _messageShownMeta,
+        messageShown.isAcceptableOrUnknown(
+          data['message_shown']!,
+          _messageShownMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DowntifyImport map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DowntifyImport(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      jellyfinServerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}jellyfin_server_id'],
+      )!,
+      jellyfinUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}jellyfin_user_id'],
+      )!,
+      downtifyUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}downtify_url'],
+      )!,
+      externalSongId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_song_id'],
+      )!,
+      jobId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}job_id'],
+      ),
+      songJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}song_json'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      progress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}progress'],
+      )!,
+      message: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message'],
+      )!,
+      filename: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}filename'],
+      ),
+      matchedTrackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}matched_track_id'],
+      ),
+      messageShown: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}message_shown'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $DowntifyImportsTable createAlias(String alias) {
+    return $DowntifyImportsTable(attachedDatabase, alias);
+  }
+}
+
+class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
+  final String id;
+  final String jellyfinServerId;
+  final String jellyfinUserId;
+  final String downtifyUrl;
+  final String externalSongId;
+  final String? jobId;
+  final String songJson;
+  final String status;
+  final double progress;
+  final String message;
+  final String? filename;
+  final String? matchedTrackId;
+  final bool messageShown;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const DowntifyImport({
+    required this.id,
+    required this.jellyfinServerId,
+    required this.jellyfinUserId,
+    required this.downtifyUrl,
+    required this.externalSongId,
+    this.jobId,
+    required this.songJson,
+    required this.status,
+    required this.progress,
+    required this.message,
+    this.filename,
+    this.matchedTrackId,
+    required this.messageShown,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['jellyfin_server_id'] = Variable<String>(jellyfinServerId);
+    map['jellyfin_user_id'] = Variable<String>(jellyfinUserId);
+    map['downtify_url'] = Variable<String>(downtifyUrl);
+    map['external_song_id'] = Variable<String>(externalSongId);
+    if (!nullToAbsent || jobId != null) {
+      map['job_id'] = Variable<String>(jobId);
+    }
+    map['song_json'] = Variable<String>(songJson);
+    map['status'] = Variable<String>(status);
+    map['progress'] = Variable<double>(progress);
+    map['message'] = Variable<String>(message);
+    if (!nullToAbsent || filename != null) {
+      map['filename'] = Variable<String>(filename);
+    }
+    if (!nullToAbsent || matchedTrackId != null) {
+      map['matched_track_id'] = Variable<String>(matchedTrackId);
+    }
+    map['message_shown'] = Variable<bool>(messageShown);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  DowntifyImportsCompanion toCompanion(bool nullToAbsent) {
+    return DowntifyImportsCompanion(
+      id: Value(id),
+      jellyfinServerId: Value(jellyfinServerId),
+      jellyfinUserId: Value(jellyfinUserId),
+      downtifyUrl: Value(downtifyUrl),
+      externalSongId: Value(externalSongId),
+      jobId: jobId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(jobId),
+      songJson: Value(songJson),
+      status: Value(status),
+      progress: Value(progress),
+      message: Value(message),
+      filename: filename == null && nullToAbsent
+          ? const Value.absent()
+          : Value(filename),
+      matchedTrackId: matchedTrackId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchedTrackId),
+      messageShown: Value(messageShown),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory DowntifyImport.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DowntifyImport(
+      id: serializer.fromJson<String>(json['id']),
+      jellyfinServerId: serializer.fromJson<String>(json['jellyfinServerId']),
+      jellyfinUserId: serializer.fromJson<String>(json['jellyfinUserId']),
+      downtifyUrl: serializer.fromJson<String>(json['downtifyUrl']),
+      externalSongId: serializer.fromJson<String>(json['externalSongId']),
+      jobId: serializer.fromJson<String?>(json['jobId']),
+      songJson: serializer.fromJson<String>(json['songJson']),
+      status: serializer.fromJson<String>(json['status']),
+      progress: serializer.fromJson<double>(json['progress']),
+      message: serializer.fromJson<String>(json['message']),
+      filename: serializer.fromJson<String?>(json['filename']),
+      matchedTrackId: serializer.fromJson<String?>(json['matchedTrackId']),
+      messageShown: serializer.fromJson<bool>(json['messageShown']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'jellyfinServerId': serializer.toJson<String>(jellyfinServerId),
+      'jellyfinUserId': serializer.toJson<String>(jellyfinUserId),
+      'downtifyUrl': serializer.toJson<String>(downtifyUrl),
+      'externalSongId': serializer.toJson<String>(externalSongId),
+      'jobId': serializer.toJson<String?>(jobId),
+      'songJson': serializer.toJson<String>(songJson),
+      'status': serializer.toJson<String>(status),
+      'progress': serializer.toJson<double>(progress),
+      'message': serializer.toJson<String>(message),
+      'filename': serializer.toJson<String?>(filename),
+      'matchedTrackId': serializer.toJson<String?>(matchedTrackId),
+      'messageShown': serializer.toJson<bool>(messageShown),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  DowntifyImport copyWith({
+    String? id,
+    String? jellyfinServerId,
+    String? jellyfinUserId,
+    String? downtifyUrl,
+    String? externalSongId,
+    Value<String?> jobId = const Value.absent(),
+    String? songJson,
+    String? status,
+    double? progress,
+    String? message,
+    Value<String?> filename = const Value.absent(),
+    Value<String?> matchedTrackId = const Value.absent(),
+    bool? messageShown,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => DowntifyImport(
+    id: id ?? this.id,
+    jellyfinServerId: jellyfinServerId ?? this.jellyfinServerId,
+    jellyfinUserId: jellyfinUserId ?? this.jellyfinUserId,
+    downtifyUrl: downtifyUrl ?? this.downtifyUrl,
+    externalSongId: externalSongId ?? this.externalSongId,
+    jobId: jobId.present ? jobId.value : this.jobId,
+    songJson: songJson ?? this.songJson,
+    status: status ?? this.status,
+    progress: progress ?? this.progress,
+    message: message ?? this.message,
+    filename: filename.present ? filename.value : this.filename,
+    matchedTrackId: matchedTrackId.present
+        ? matchedTrackId.value
+        : this.matchedTrackId,
+    messageShown: messageShown ?? this.messageShown,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  DowntifyImport copyWithCompanion(DowntifyImportsCompanion data) {
+    return DowntifyImport(
+      id: data.id.present ? data.id.value : this.id,
+      jellyfinServerId: data.jellyfinServerId.present
+          ? data.jellyfinServerId.value
+          : this.jellyfinServerId,
+      jellyfinUserId: data.jellyfinUserId.present
+          ? data.jellyfinUserId.value
+          : this.jellyfinUserId,
+      downtifyUrl: data.downtifyUrl.present
+          ? data.downtifyUrl.value
+          : this.downtifyUrl,
+      externalSongId: data.externalSongId.present
+          ? data.externalSongId.value
+          : this.externalSongId,
+      jobId: data.jobId.present ? data.jobId.value : this.jobId,
+      songJson: data.songJson.present ? data.songJson.value : this.songJson,
+      status: data.status.present ? data.status.value : this.status,
+      progress: data.progress.present ? data.progress.value : this.progress,
+      message: data.message.present ? data.message.value : this.message,
+      filename: data.filename.present ? data.filename.value : this.filename,
+      matchedTrackId: data.matchedTrackId.present
+          ? data.matchedTrackId.value
+          : this.matchedTrackId,
+      messageShown: data.messageShown.present
+          ? data.messageShown.value
+          : this.messageShown,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DowntifyImport(')
+          ..write('id: $id, ')
+          ..write('jellyfinServerId: $jellyfinServerId, ')
+          ..write('jellyfinUserId: $jellyfinUserId, ')
+          ..write('downtifyUrl: $downtifyUrl, ')
+          ..write('externalSongId: $externalSongId, ')
+          ..write('jobId: $jobId, ')
+          ..write('songJson: $songJson, ')
+          ..write('status: $status, ')
+          ..write('progress: $progress, ')
+          ..write('message: $message, ')
+          ..write('filename: $filename, ')
+          ..write('matchedTrackId: $matchedTrackId, ')
+          ..write('messageShown: $messageShown, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    jellyfinServerId,
+    jellyfinUserId,
+    downtifyUrl,
+    externalSongId,
+    jobId,
+    songJson,
+    status,
+    progress,
+    message,
+    filename,
+    matchedTrackId,
+    messageShown,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DowntifyImport &&
+          other.id == this.id &&
+          other.jellyfinServerId == this.jellyfinServerId &&
+          other.jellyfinUserId == this.jellyfinUserId &&
+          other.downtifyUrl == this.downtifyUrl &&
+          other.externalSongId == this.externalSongId &&
+          other.jobId == this.jobId &&
+          other.songJson == this.songJson &&
+          other.status == this.status &&
+          other.progress == this.progress &&
+          other.message == this.message &&
+          other.filename == this.filename &&
+          other.matchedTrackId == this.matchedTrackId &&
+          other.messageShown == this.messageShown &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
+  final Value<String> id;
+  final Value<String> jellyfinServerId;
+  final Value<String> jellyfinUserId;
+  final Value<String> downtifyUrl;
+  final Value<String> externalSongId;
+  final Value<String?> jobId;
+  final Value<String> songJson;
+  final Value<String> status;
+  final Value<double> progress;
+  final Value<String> message;
+  final Value<String?> filename;
+  final Value<String?> matchedTrackId;
+  final Value<bool> messageShown;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const DowntifyImportsCompanion({
+    this.id = const Value.absent(),
+    this.jellyfinServerId = const Value.absent(),
+    this.jellyfinUserId = const Value.absent(),
+    this.downtifyUrl = const Value.absent(),
+    this.externalSongId = const Value.absent(),
+    this.jobId = const Value.absent(),
+    this.songJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.message = const Value.absent(),
+    this.filename = const Value.absent(),
+    this.matchedTrackId = const Value.absent(),
+    this.messageShown = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DowntifyImportsCompanion.insert({
+    required String id,
+    required String jellyfinServerId,
+    required String jellyfinUserId,
+    required String downtifyUrl,
+    required String externalSongId,
+    this.jobId = const Value.absent(),
+    required String songJson,
+    required String status,
+    this.progress = const Value.absent(),
+    this.message = const Value.absent(),
+    this.filename = const Value.absent(),
+    this.matchedTrackId = const Value.absent(),
+    this.messageShown = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       jellyfinServerId = Value(jellyfinServerId),
+       jellyfinUserId = Value(jellyfinUserId),
+       downtifyUrl = Value(downtifyUrl),
+       externalSongId = Value(externalSongId),
+       songJson = Value(songJson),
+       status = Value(status),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<DowntifyImport> custom({
+    Expression<String>? id,
+    Expression<String>? jellyfinServerId,
+    Expression<String>? jellyfinUserId,
+    Expression<String>? downtifyUrl,
+    Expression<String>? externalSongId,
+    Expression<String>? jobId,
+    Expression<String>? songJson,
+    Expression<String>? status,
+    Expression<double>? progress,
+    Expression<String>? message,
+    Expression<String>? filename,
+    Expression<String>? matchedTrackId,
+    Expression<bool>? messageShown,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (jellyfinServerId != null) 'jellyfin_server_id': jellyfinServerId,
+      if (jellyfinUserId != null) 'jellyfin_user_id': jellyfinUserId,
+      if (downtifyUrl != null) 'downtify_url': downtifyUrl,
+      if (externalSongId != null) 'external_song_id': externalSongId,
+      if (jobId != null) 'job_id': jobId,
+      if (songJson != null) 'song_json': songJson,
+      if (status != null) 'status': status,
+      if (progress != null) 'progress': progress,
+      if (message != null) 'message': message,
+      if (filename != null) 'filename': filename,
+      if (matchedTrackId != null) 'matched_track_id': matchedTrackId,
+      if (messageShown != null) 'message_shown': messageShown,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DowntifyImportsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? jellyfinServerId,
+    Value<String>? jellyfinUserId,
+    Value<String>? downtifyUrl,
+    Value<String>? externalSongId,
+    Value<String?>? jobId,
+    Value<String>? songJson,
+    Value<String>? status,
+    Value<double>? progress,
+    Value<String>? message,
+    Value<String?>? filename,
+    Value<String?>? matchedTrackId,
+    Value<bool>? messageShown,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return DowntifyImportsCompanion(
+      id: id ?? this.id,
+      jellyfinServerId: jellyfinServerId ?? this.jellyfinServerId,
+      jellyfinUserId: jellyfinUserId ?? this.jellyfinUserId,
+      downtifyUrl: downtifyUrl ?? this.downtifyUrl,
+      externalSongId: externalSongId ?? this.externalSongId,
+      jobId: jobId ?? this.jobId,
+      songJson: songJson ?? this.songJson,
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+      message: message ?? this.message,
+      filename: filename ?? this.filename,
+      matchedTrackId: matchedTrackId ?? this.matchedTrackId,
+      messageShown: messageShown ?? this.messageShown,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (jellyfinServerId.present) {
+      map['jellyfin_server_id'] = Variable<String>(jellyfinServerId.value);
+    }
+    if (jellyfinUserId.present) {
+      map['jellyfin_user_id'] = Variable<String>(jellyfinUserId.value);
+    }
+    if (downtifyUrl.present) {
+      map['downtify_url'] = Variable<String>(downtifyUrl.value);
+    }
+    if (externalSongId.present) {
+      map['external_song_id'] = Variable<String>(externalSongId.value);
+    }
+    if (jobId.present) {
+      map['job_id'] = Variable<String>(jobId.value);
+    }
+    if (songJson.present) {
+      map['song_json'] = Variable<String>(songJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (progress.present) {
+      map['progress'] = Variable<double>(progress.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    if (filename.present) {
+      map['filename'] = Variable<String>(filename.value);
+    }
+    if (matchedTrackId.present) {
+      map['matched_track_id'] = Variable<String>(matchedTrackId.value);
+    }
+    if (messageShown.present) {
+      map['message_shown'] = Variable<bool>(messageShown.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DowntifyImportsCompanion(')
+          ..write('id: $id, ')
+          ..write('jellyfinServerId: $jellyfinServerId, ')
+          ..write('jellyfinUserId: $jellyfinUserId, ')
+          ..write('downtifyUrl: $downtifyUrl, ')
+          ..write('externalSongId: $externalSongId, ')
+          ..write('jobId: $jobId, ')
+          ..write('songJson: $songJson, ')
+          ..write('status: $status, ')
+          ..write('progress: $progress, ')
+          ..write('message: $message, ')
+          ..write('filename: $filename, ')
+          ..write('matchedTrackId: $matchedTrackId, ')
+          ..write('messageShown: $messageShown, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2009,6 +2885,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PlaylistsTable playlists = $PlaylistsTable(this);
   late final $DownloadsTable downloads = $DownloadsTable(this);
   late final $PendingWritesTable pendingWrites = $PendingWritesTable(this);
+  late final $DowntifyImportsTable downtifyImports = $DowntifyImportsTable(
+    this,
+  );
   late final Index tracksName = Index(
     'tracks_name',
     'CREATE INDEX tracks_name ON tracks (name)',
@@ -2022,6 +2901,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     playlists,
     downloads,
     pendingWrites,
+    downtifyImports,
     tracksName,
   ];
 }
@@ -3059,6 +3939,423 @@ typedef $$PendingWritesTableProcessedTableManager =
       PendingWrite,
       PrefetchHooks Function()
     >;
+typedef $$DowntifyImportsTableCreateCompanionBuilder =
+    DowntifyImportsCompanion Function({
+      required String id,
+      required String jellyfinServerId,
+      required String jellyfinUserId,
+      required String downtifyUrl,
+      required String externalSongId,
+      Value<String?> jobId,
+      required String songJson,
+      required String status,
+      Value<double> progress,
+      Value<String> message,
+      Value<String?> filename,
+      Value<String?> matchedTrackId,
+      Value<bool> messageShown,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$DowntifyImportsTableUpdateCompanionBuilder =
+    DowntifyImportsCompanion Function({
+      Value<String> id,
+      Value<String> jellyfinServerId,
+      Value<String> jellyfinUserId,
+      Value<String> downtifyUrl,
+      Value<String> externalSongId,
+      Value<String?> jobId,
+      Value<String> songJson,
+      Value<String> status,
+      Value<double> progress,
+      Value<String> message,
+      Value<String?> filename,
+      Value<String?> matchedTrackId,
+      Value<bool> messageShown,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$DowntifyImportsTableFilterComposer
+    extends Composer<_$AppDatabase, $DowntifyImportsTable> {
+  $$DowntifyImportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get jellyfinServerId => $composableBuilder(
+    column: $table.jellyfinServerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get jellyfinUserId => $composableBuilder(
+    column: $table.jellyfinUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get downtifyUrl => $composableBuilder(
+    column: $table.downtifyUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalSongId => $composableBuilder(
+    column: $table.externalSongId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get jobId => $composableBuilder(
+    column: $table.jobId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get songJson => $composableBuilder(
+    column: $table.songJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filename => $composableBuilder(
+    column: $table.filename,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchedTrackId => $composableBuilder(
+    column: $table.matchedTrackId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get messageShown => $composableBuilder(
+    column: $table.messageShown,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DowntifyImportsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DowntifyImportsTable> {
+  $$DowntifyImportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get jellyfinServerId => $composableBuilder(
+    column: $table.jellyfinServerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get jellyfinUserId => $composableBuilder(
+    column: $table.jellyfinUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get downtifyUrl => $composableBuilder(
+    column: $table.downtifyUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalSongId => $composableBuilder(
+    column: $table.externalSongId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get jobId => $composableBuilder(
+    column: $table.jobId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get songJson => $composableBuilder(
+    column: $table.songJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filename => $composableBuilder(
+    column: $table.filename,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchedTrackId => $composableBuilder(
+    column: $table.matchedTrackId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get messageShown => $composableBuilder(
+    column: $table.messageShown,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DowntifyImportsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DowntifyImportsTable> {
+  $$DowntifyImportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get jellyfinServerId => $composableBuilder(
+    column: $table.jellyfinServerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get jellyfinUserId => $composableBuilder(
+    column: $table.jellyfinUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get downtifyUrl => $composableBuilder(
+    column: $table.downtifyUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalSongId => $composableBuilder(
+    column: $table.externalSongId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get jobId =>
+      $composableBuilder(column: $table.jobId, builder: (column) => column);
+
+  GeneratedColumn<String> get songJson =>
+      $composableBuilder(column: $table.songJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<double> get progress =>
+      $composableBuilder(column: $table.progress, builder: (column) => column);
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+
+  GeneratedColumn<String> get filename =>
+      $composableBuilder(column: $table.filename, builder: (column) => column);
+
+  GeneratedColumn<String> get matchedTrackId => $composableBuilder(
+    column: $table.matchedTrackId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get messageShown => $composableBuilder(
+    column: $table.messageShown,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$DowntifyImportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DowntifyImportsTable,
+          DowntifyImport,
+          $$DowntifyImportsTableFilterComposer,
+          $$DowntifyImportsTableOrderingComposer,
+          $$DowntifyImportsTableAnnotationComposer,
+          $$DowntifyImportsTableCreateCompanionBuilder,
+          $$DowntifyImportsTableUpdateCompanionBuilder,
+          (
+            DowntifyImport,
+            BaseReferences<
+              _$AppDatabase,
+              $DowntifyImportsTable,
+              DowntifyImport
+            >,
+          ),
+          DowntifyImport,
+          PrefetchHooks Function()
+        > {
+  $$DowntifyImportsTableTableManager(
+    _$AppDatabase db,
+    $DowntifyImportsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DowntifyImportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DowntifyImportsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DowntifyImportsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> jellyfinServerId = const Value.absent(),
+                Value<String> jellyfinUserId = const Value.absent(),
+                Value<String> downtifyUrl = const Value.absent(),
+                Value<String> externalSongId = const Value.absent(),
+                Value<String?> jobId = const Value.absent(),
+                Value<String> songJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<double> progress = const Value.absent(),
+                Value<String> message = const Value.absent(),
+                Value<String?> filename = const Value.absent(),
+                Value<String?> matchedTrackId = const Value.absent(),
+                Value<bool> messageShown = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DowntifyImportsCompanion(
+                id: id,
+                jellyfinServerId: jellyfinServerId,
+                jellyfinUserId: jellyfinUserId,
+                downtifyUrl: downtifyUrl,
+                externalSongId: externalSongId,
+                jobId: jobId,
+                songJson: songJson,
+                status: status,
+                progress: progress,
+                message: message,
+                filename: filename,
+                matchedTrackId: matchedTrackId,
+                messageShown: messageShown,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String jellyfinServerId,
+                required String jellyfinUserId,
+                required String downtifyUrl,
+                required String externalSongId,
+                Value<String?> jobId = const Value.absent(),
+                required String songJson,
+                required String status,
+                Value<double> progress = const Value.absent(),
+                Value<String> message = const Value.absent(),
+                Value<String?> filename = const Value.absent(),
+                Value<String?> matchedTrackId = const Value.absent(),
+                Value<bool> messageShown = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DowntifyImportsCompanion.insert(
+                id: id,
+                jellyfinServerId: jellyfinServerId,
+                jellyfinUserId: jellyfinUserId,
+                downtifyUrl: downtifyUrl,
+                externalSongId: externalSongId,
+                jobId: jobId,
+                songJson: songJson,
+                status: status,
+                progress: progress,
+                message: message,
+                filename: filename,
+                matchedTrackId: matchedTrackId,
+                messageShown: messageShown,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DowntifyImportsTable, DowntifyImport>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $DowntifyImportsTable,
+                    DowntifyImport
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DowntifyImportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DowntifyImportsTable,
+      DowntifyImport,
+      $$DowntifyImportsTableFilterComposer,
+      $$DowntifyImportsTableOrderingComposer,
+      $$DowntifyImportsTableAnnotationComposer,
+      $$DowntifyImportsTableCreateCompanionBuilder,
+      $$DowntifyImportsTableUpdateCompanionBuilder,
+      (
+        DowntifyImport,
+        BaseReferences<_$AppDatabase, $DowntifyImportsTable, DowntifyImport>,
+      ),
+      DowntifyImport,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3071,4 +4368,6 @@ class $AppDatabaseManager {
       $$DownloadsTableTableManager(_db, _db.downloads);
   $$PendingWritesTableTableManager get pendingWrites =>
       $$PendingWritesTableTableManager(_db, _db.pendingWrites);
+  $$DowntifyImportsTableTableManager get downtifyImports =>
+      $$DowntifyImportsTableTableManager(_db, _db.downtifyImports);
 }

@@ -62,7 +62,30 @@ class PendingWrites extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Tracks, Playlists, Downloads, PendingWrites])
+class DowntifyImports extends Table {
+  TextColumn get id => text()();
+  TextColumn get jellyfinServerId => text()();
+  TextColumn get jellyfinUserId => text()();
+  TextColumn get downtifyUrl => text()();
+  TextColumn get externalSongId => text()();
+  TextColumn get jobId => text().nullable()();
+  TextColumn get songJson => text()();
+  TextColumn get status => text()();
+  RealColumn get progress => real().withDefault(const Constant(0))();
+  TextColumn get message => text().withDefault(const Constant(''))();
+  TextColumn get filename => text().nullable()();
+  TextColumn get matchedTrackId => text().nullable()();
+  BoolColumn get messageShown => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [Tracks, Playlists, Downloads, PendingWrites, DowntifyImports],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase()
     : super(
@@ -78,7 +101,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +110,7 @@ class AppDatabase extends _$AppDatabase {
       await migrator.createTable(playlists);
       await migrator.createTable(downloads);
       await migrator.createTable(pendingWrites);
+      await migrator.createTable(downtifyImports);
       await customStatement(
         'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
       );
@@ -104,6 +128,7 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
         );
       }
+      if (from < 5) await migrator.createTable(downtifyImports);
     },
   );
 
@@ -239,6 +264,36 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> removeDownload(String trackId) =>
       (delete(downloads)..where((row) => row.trackId.equals(trackId))).go();
+
+  Stream<List<DowntifyImport>> watchDowntifyImports(
+    String serverId,
+    String userId,
+  ) =>
+      (select(downtifyImports)
+            ..where(
+              (row) =>
+                  row.jellyfinServerId.equals(serverId) &
+                  row.jellyfinUserId.equals(userId),
+            )
+            ..orderBy([(row) => OrderingTerm.desc(row.updatedAt)]))
+          .watch();
+
+  Future<List<DowntifyImport>> getDowntifyImports(
+    String serverId,
+    String userId,
+  ) =>
+      (select(downtifyImports)..where(
+            (row) =>
+                row.jellyfinServerId.equals(serverId) &
+                row.jellyfinUserId.equals(userId),
+          ))
+          .get();
+
+  Future<void> putDowntifyImport(DowntifyImportsCompanion row) =>
+      into(downtifyImports).insertOnConflictUpdate(row);
+
+  Future<void> removeDowntifyImport(String id) =>
+      (delete(downtifyImports)..where((row) => row.id.equals(id))).go();
 
   Future<void> clearAccountData() => transaction(() async {
     await delete(pendingWrites).go();
