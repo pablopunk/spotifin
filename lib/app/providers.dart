@@ -45,7 +45,11 @@ final lyricsProvider = Provider<LyricsService>(
 );
 
 final sessionStoreProvider = Provider<SessionStore>(
-  (ref) => const SessionStore(FlutterSecureStorage()),
+  (ref) => const SessionStore(
+    FlutterSecureStorage(
+      mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+    ),
+  ),
 );
 
 final downloadProvider = Provider<DownloadService>((ref) {
