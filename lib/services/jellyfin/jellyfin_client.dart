@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../storage/database.dart';
 import '../lyrics/lyric_line.dart';
+import 'remote_session.dart';
 import 'session.dart';
 
 class JellyfinException implements Exception {
@@ -233,6 +235,11 @@ class JellyfinClient {
     Duration position, {
     required String playSessionId,
     bool paused = false,
+    String? playlistItemId,
+    List<Map<String, String>> queue = const [],
+    int volume = 100,
+    String repeatMode = 'RepeatNone',
+    bool shuffle = false,
   }) async {
     final response = await _http.post(
       _uri(session, endpoint),
@@ -244,9 +251,111 @@ class JellyfinClient {
         'CanSeek': true,
         'PlayMethod': 'DirectStream',
         'PlaySessionId': playSessionId,
+        'PlaylistItemId': playlistItemId,
+        'NowPlayingQueue': queue,
+        'VolumeLevel': volume,
+        'RepeatMode': repeatMode,
+        'PlaybackOrder': shuffle ? 'Shuffle' : 'Default',
       }),
     );
     _ensureSuccess(response);
+  }
+
+  Future<List<RemoteSession>> fetchSessions(JellyfinSession session) async {
+    final response = await _http.get(
+      _uri(session, '/Sessions', {
+        'controllableByUserId': session.userId,
+        'activeWithinSeconds': '90',
+      }),
+      headers: _headers(session),
+    );
+    final body = _decodeResponseList(response);
+    return body
+        .whereType<Map<String, dynamic>>()
+        .map(RemoteSession.fromJson)
+        .where(
+          (item) =>
+              item.id.isNotEmpty &&
+              item.userId == session.userId &&
+              item.client == _clientName &&
+              item.deviceId != session.deviceId &&
+              item.supportsMediaControl &&
+              item.isActive,
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> advertiseRemoteCapabilities(JellyfinSession session) async {
+    final response = await _http.post(
+      _uri(session, '/Sessions/Capabilities/Full'),
+      headers: {..._headers(session), 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'PlayableMediaTypes': ['Audio'],
+        'SupportedCommands': ['SetVolume', 'SetShuffleQueue', 'SetRepeatMode'],
+        'SupportsMediaControl': true,
+        'SupportsPersistentIdentifier': true,
+      }),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<void> sendPlaystateCommand(
+    JellyfinSession session,
+    String sessionId,
+    String command, {
+    Duration? position,
+  }) async {
+    final response = await _http.post(
+      _uri(session, '/Sessions/$sessionId/Playing/$command', {
+        if (position != null)
+          'seekPositionTicks': '${position.inMicroseconds * 10}',
+      }),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<void> sendGeneralCommand(
+    JellyfinSession session,
+    String sessionId,
+    String name,
+    Map<String, String> arguments,
+  ) async {
+    final response = await _http.post(
+      _uri(session, '/Sessions/$sessionId/Command'),
+      headers: {..._headers(session), 'Content-Type': 'application/json'},
+      body: jsonEncode({'Name': name, 'Arguments': arguments}),
+    );
+    _ensureSuccess(response);
+  }
+
+  Future<void> sendPlayCommand(
+    JellyfinSession session,
+    String sessionId,
+    List<String> itemIds, {
+    int startIndex = 0,
+    Duration position = Duration.zero,
+  }) async {
+    final response = await _http.post(
+      _uri(session, '/Sessions/$sessionId/Playing', {
+        'playCommand': 'PlayNow',
+        'itemIds': itemIds.join(','),
+        'startIndex': '$startIndex',
+        'startPositionTicks': '${position.inMicroseconds * 10}',
+      }),
+      headers: _headers(session),
+    );
+    _ensureSuccess(response);
+  }
+
+  Uri webSocketUri(JellyfinSession session) {
+    final server = Uri.parse(session.serverUrl);
+    return server.replace(
+      scheme: server.scheme == 'https' ? 'wss' : 'ws',
+      path:
+          '${server.path.endsWith('/') ? server.path.substring(0, server.path.length - 1) : server.path}/socket',
+      queryParameters: {'ApiKey': session.accessToken},
+    );
   }
 
   Future<List<LyricLine>> fetchLyrics(
@@ -330,8 +439,20 @@ class JellyfinClient {
 
   String _authorization(String deviceId, {String? token}) {
     final tokenPart = token == null ? '' : ', Token="$token"';
-    return 'MediaBrowser Client="$_clientName", Device="Flutter", '
+    return 'MediaBrowser Client="$_clientName", Device="$_deviceName", '
         'DeviceId="$deviceId", Version="$_version"$tokenPart';
+  }
+
+  String get _deviceName {
+    if (kIsWeb) return 'Spotifin Web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'Spotifin on Android',
+      TargetPlatform.iOS => 'Spotifin on iPhone',
+      TargetPlatform.macOS => 'Spotifin on macOS',
+      TargetPlatform.windows => 'Spotifin on Windows',
+      TargetPlatform.linux => 'Spotifin on Linux',
+      TargetPlatform.fuchsia => 'Spotifin',
+    };
   }
 
   Uri _uri(
@@ -369,6 +490,15 @@ class JellyfinClient {
     _ensureSuccess(response, signingIn: signingIn);
     try {
       return jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw const JellyfinException('The server returned invalid data.');
+    }
+  }
+
+  List<dynamic> _decodeResponseList(http.Response response) {
+    _ensureSuccess(response);
+    try {
+      return jsonDecode(response.body) as List<dynamic>;
     } on FormatException {
       throw const JellyfinException('The server returned invalid data.');
     }

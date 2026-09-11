@@ -23,6 +23,7 @@ class SpotifinSidebar extends StatelessWidget {
     required this.onDestinationSelected,
     required this.extended,
     this.extendedContent,
+    this.footer,
     super.key,
   });
 
@@ -31,6 +32,7 @@ class SpotifinSidebar extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final bool extended;
   final Widget? extendedContent;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) => ColoredBox(
@@ -51,7 +53,17 @@ class SpotifinSidebar extends StatelessWidget {
             ),
           ),
           if (extended && extendedContent != null)
-            Expanded(child: extendedContent!),
+            Expanded(child: extendedContent!)
+          else
+            const Spacer(),
+          if (footer != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: SpotifinSpacing.sm),
+              child: Align(
+                alignment: extended ? Alignment.centerLeft : Alignment.center,
+                child: footer,
+              ),
+            ),
         ],
       ),
     ),

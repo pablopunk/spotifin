@@ -53,6 +53,7 @@ dependencies:
   liquid_glass_widgets: ^1.4.3
   url_launcher: ^6.3.2
   flutter_svg: ^2.3.0
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   flutter_test:

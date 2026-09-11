@@ -10,6 +10,7 @@ import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'player_collection_links.dart';
+import 'remote_devices.dart';
 import 'volume_scale.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
@@ -138,6 +139,7 @@ class MobilePlayerBar extends StatelessWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const RemoteDeviceButton(),
                     IconButton(
                       tooltip: 'Previous',
                       onPressed: playback.previous,
@@ -390,6 +392,7 @@ class _DesktopUtilities extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
+      const RemoteDeviceButton(),
       IconButton(
         tooltip: 'Lyrics',
         onPressed: onOpenLyrics,

@@ -13,8 +13,9 @@ import '../../storage/database.dart';
 import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
+import 'remote_playback.dart';
 
-class PlaybackService extends ChangeNotifier {
+class PlaybackService extends ChangeNotifier implements RemotePlayback {
   PlaybackService(this._client, this._downloads) {
     _subscriptions.add(
       _player.playerStateStream.listen((playerState) {
@@ -56,6 +57,7 @@ class PlaybackService extends ChangeNotifier {
   final List<StreamSubscription<Object?>> _subscriptions = [];
   JellyfinSession? _session;
   List<Track> _queue = [];
+  List<String> _playlistItemIds = [];
   final Map<String, Track> _tracksById = {};
   bool _loadingSources = false;
   bool _smallStreaming = false;
@@ -65,6 +67,7 @@ class PlaybackService extends ChangeNotifier {
   bool _shuffle = false;
   LoopMode _loopMode = LoopMode.off;
   String? _reportedTrackId;
+  String? _reportedPlaylistItemId;
   String? _playSessionId;
   int _lastReportedSecond = -1;
   int _lastSavedSecond = -1;
@@ -118,9 +121,11 @@ class PlaybackService extends ChangeNotifier {
     _context = List.of(tracks);
     _contextEnd = math.min(tracks.length, start + _initialQueueSize);
     _queue = _context.sublist(start, _contextEnd);
+    _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
     await _loadSources(initialIndex: safeIndex - start);
-    await _player.play();
+    unawaited(_player.play());
+    await _reportProgress(force: true);
   }
 
   Future<void> playTrack(Track track, List<Track> context) async {
@@ -128,15 +133,36 @@ class PlaybackService extends ChangeNotifier {
     await replaceQueue(context, startIndex: index < 0 ? 0 : index);
   }
 
+  @override
   Future<void> addToQueue(Track track) async {
     final session = _session;
     if (session == null) return;
     _stopAutomaticQueueExpansion();
     _queue = [..._queue, track];
+    _playlistItemIds.add(_newPlaylistItemId());
     _rememberTracks([track]);
     final sources = await _sources(session, [track]);
     await _player.addAudioSource(sources.single);
     await _saveQueue();
+    await _reportProgress(force: true);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> addNextToQueue(List<Track> tracks) async {
+    final session = _session;
+    if (session == null || tracks.isEmpty) return;
+    _stopAutomaticQueueExpansion();
+    final insertAt = math.min((currentIndex ?? -1) + 1, _queue.length);
+    _queue.insertAll(insertAt, tracks);
+    _playlistItemIds.insertAll(
+      insertAt,
+      tracks.map((_) => _newPlaylistItemId()),
+    );
+    _rememberTracks(tracks);
+    await _player.insertAudioSources(insertAt, await _sources(session, tracks));
+    await _saveQueue();
+    await _reportProgress(force: true);
     notifyListeners();
   }
 
@@ -144,8 +170,10 @@ class PlaybackService extends ChangeNotifier {
     if (index < 0 || index >= _queue.length) return;
     _stopAutomaticQueueExpansion();
     _queue.removeAt(index);
+    _playlistItemIds.removeAt(index);
     await _player.removeAudioSourceAt(index);
     await _saveQueue();
+    await _reportProgress(force: true);
     notifyListeners();
   }
 
@@ -156,62 +184,98 @@ class PlaybackService extends ChangeNotifier {
     for (var index = _queue.length - 1; index >= 0; index--) {
       if (_queue[index].id != trackId) continue;
       _queue.removeAt(index);
+      _playlistItemIds.removeAt(index);
       await _player.removeAudioSourceAt(index);
     }
     _tracksById.remove(trackId);
     await _saveQueue();
+    await _reportProgress(force: true);
     notifyListeners();
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
     _stopAutomaticQueueExpansion();
     final track = _queue.removeAt(oldIndex);
+    final playlistItemId = _playlistItemIds.removeAt(oldIndex);
     _queue.insert(newIndex, track);
+    _playlistItemIds.insert(newIndex, playlistItemId);
     await _player.moveAudioSource(oldIndex, newIndex);
     await _saveQueue();
+    await _reportProgress(force: true);
     notifyListeners();
   }
 
+  @override
   Future<void> toggle() async {
     if (_player.playing) {
       await _savePosition(_player.position);
-      await _player.pause();
+      await pause();
       return;
     }
-    await _player.play();
+    await play();
   }
 
+  @override
+  Future<void> pause() async {
+    if (!_player.playing) return;
+    await _player.pause();
+    await _reportProgress(force: true);
+  }
+
+  @override
+  Future<void> play() async {
+    if (_player.playing) return;
+    unawaited(_player.play());
+    await _reportProgress(force: true);
+  }
+
+  @override
+  Future<void> stop() async {
+    await _reportStop();
+    await _player.stop();
+    notifyListeners();
+  }
+
+  @override
   Future<void> next() => _player.seekToNext();
 
   Future<void> playQueueIndex(int index) async {
     if (index < 0 || index >= _queue.length) return;
     await _player.seek(Duration.zero, index: index);
-    await _player.play();
+    unawaited(_player.play());
+    await _reportProgress(force: true);
   }
 
+  @override
   Future<void> previous() async {
     if (_player.position > const Duration(seconds: 4)) {
       await _player.seek(Duration.zero);
+      await _reportProgress(force: true);
     } else {
       await _player.seekToPrevious();
     }
   }
 
+  @override
   Future<void> seek(Duration position) async {
     await _player.seek(position);
     await _savePosition(position);
+    await _reportProgress(force: true);
   }
 
+  @override
   Future<void> setVolume(double volume) async {
     _userVolume = volume.clamp(0.0, 1.0);
     _volumeController.add(_userVolume);
     await _updateOutputVolume();
+    await _reportProgress(force: true);
   }
 
   Future<void> toggleShuffle() async {
     _shuffle = !_shuffle;
     await _player.setShuffleModeEnabled(_shuffle);
     if (_shuffle) await _player.shuffle();
+    await _reportProgress(force: true);
     notifyListeners();
   }
 
@@ -222,7 +286,45 @@ class PlaybackService extends ChangeNotifier {
       LoopMode.one => LoopMode.off,
     };
     await _player.setLoopMode(_loopMode);
+    await _reportProgress(force: true);
     notifyListeners();
+  }
+
+  @override
+  Future<void> setShuffle(bool enabled) async {
+    if (_shuffle == enabled) return;
+    await toggleShuffle();
+  }
+
+  @override
+  Future<void> setRepeatMode(LoopMode mode) async {
+    if (_loopMode == mode) return;
+    _loopMode = mode;
+    await _player.setLoopMode(mode);
+    await _reportProgress(force: true);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> takeOver(
+    List<Track> tracks, {
+    required int startIndex,
+    required Duration position,
+  }) async {
+    if (tracks.isEmpty || _session == null) return;
+    final safeIndex = startIndex.clamp(0, tracks.length - 1);
+    _context = List.of(tracks);
+    _contextEnd = tracks.length;
+    _queue = List.of(tracks);
+    _playlistItemIds = tracks.map((_) => _newPlaylistItemId()).toList();
+    _rememberTracks(tracks);
+    final duration = Duration(
+      microseconds: tracks[safeIndex].durationTicks ~/ 10,
+    );
+    final safePosition = position > duration ? duration : position;
+    await _loadSources(initialIndex: safeIndex, initialPosition: safePosition);
+    unawaited(_player.play());
+    await _reportProgress(force: true);
   }
 
   Future<void> restore(List<Track> catalog) async {
@@ -236,6 +338,7 @@ class PlaybackService extends ChangeNotifier {
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
+    _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
     _context = List.of(_queue);
     _contextEnd = _context.length;
@@ -253,6 +356,7 @@ class PlaybackService extends ChangeNotifier {
     await _reportStop();
     await _player.stop();
     _queue = [];
+    _playlistItemIds = [];
     _tracksById.clear();
     _context = const [];
     _contextEnd = 0;
@@ -326,13 +430,18 @@ class PlaybackService extends ChangeNotifier {
   Future<void> _handleTrackChange() async {
     final track = currentTrack;
     final session = _session;
-    if (track == null || session == null || track.id == _reportedTrackId) {
+    final playlistItemId = _currentPlaylistItemId;
+    if (track == null ||
+        session == null ||
+        track.id == _reportedTrackId &&
+            playlistItemId == _reportedPlaylistItemId) {
       return;
     }
     unawaited(_extendQueueIfNeeded());
     await _applyGain(track);
     await _reportStop();
     _reportedTrackId = track.id;
+    _reportedPlaylistItemId = playlistItemId;
     _playSessionId = '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
     _lastReportedSecond = -1;
     try {
@@ -343,6 +452,11 @@ class PlaybackService extends ChangeNotifier {
         _player.position,
         playSessionId: _playSessionId!,
         paused: !_player.playing,
+        playlistItemId: playlistItemId,
+        queue: _reportedQueue,
+        volume: (_userVolume * 100).round(),
+        repeatMode: _reportedRepeatMode,
+        shuffle: _shuffle,
       );
     } catch (_) {}
   }
@@ -364,6 +478,7 @@ class PlaybackService extends ChangeNotifier {
       _rememberTracks(tracks);
       await _player.addAudioSources(await _sources(session, tracks));
       _queue = [..._queue, ...tracks];
+      _playlistItemIds.addAll(tracks.map((_) => _newPlaylistItemId()));
       _contextEnd = end;
       await _saveQueue();
       notifyListeners();
@@ -413,13 +528,13 @@ class PlaybackService extends ChangeNotifier {
   Future<void> _updateOutputVolume() =>
       _player.setVolume(_userVolume * _normalizationMultiplier);
 
-  Future<void> _reportProgress() async {
+  Future<void> _reportProgress({bool force = false}) async {
     final session = _session;
     final trackId = _reportedTrackId;
     final playSessionId = _playSessionId;
     final second = _player.position.inSeconds;
     if (session == null || trackId == null || playSessionId == null) return;
-    if (second == _lastReportedSecond) return;
+    if (!force && second == _lastReportedSecond) return;
     _lastReportedSecond = second;
     try {
       await _client.reportPlayback(
@@ -429,9 +544,35 @@ class PlaybackService extends ChangeNotifier {
         _player.position,
         playSessionId: playSessionId,
         paused: !_player.playing,
+        playlistItemId: _currentPlaylistItemId,
+        queue: _reportedQueue,
+        volume: (_userVolume * 100).round(),
+        repeatMode: _reportedRepeatMode,
+        shuffle: _shuffle,
       );
     } catch (_) {}
   }
+
+  String? get _currentPlaylistItemId {
+    final index = currentIndex;
+    return index == null || index < 0 || index >= _playlistItemIds.length
+        ? null
+        : _playlistItemIds[index];
+  }
+
+  List<Map<String, String>> get _reportedQueue => [
+    for (var index = 0; index < _queue.length; index++)
+      {'Id': _queue[index].id, 'PlaylistItemId': _playlistItemIds[index]},
+  ];
+
+  String get _reportedRepeatMode => switch (_loopMode) {
+    LoopMode.off => 'RepeatNone',
+    LoopMode.all => 'RepeatAll',
+    LoopMode.one => 'RepeatOne',
+  };
+
+  String _newPlaylistItemId() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${math.Random().nextInt(1 << 32)}';
 
   Future<void> _reportStop() async {
     final session = _session;
@@ -439,6 +580,7 @@ class PlaybackService extends ChangeNotifier {
     final playSessionId = _playSessionId;
     if (session == null || trackId == null || playSessionId == null) return;
     _reportedTrackId = null;
+    _reportedPlaylistItemId = null;
     _playSessionId = null;
     try {
       await _client.reportPlayback(

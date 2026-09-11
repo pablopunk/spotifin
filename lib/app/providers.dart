@@ -8,6 +8,7 @@ import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
+import '../services/playback/remote_session_service.dart';
 import '../platform/download_store.dart';
 import '../platform/carplay_service.dart';
 import '../storage/database.dart';
@@ -76,6 +77,16 @@ final playbackProvider = Provider<PlaybackService>((ref) {
   final service = PlaybackService(
     ref.watch(jellyfinClientProvider),
     ref.watch(downloadProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final remoteSessionProvider = Provider<RemoteSessionService>((ref) {
+  final service = RemoteSessionService(
+    ref.watch(jellyfinClientProvider),
+    ref.watch(playbackProvider),
+    ref.watch(databaseProvider),
   );
   ref.onDispose(service.dispose);
   return service;

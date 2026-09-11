@@ -121,6 +121,7 @@ class AppController extends Notifier<AppState> {
           smallStreaming: smallStreaming,
           normalization: normalization,
         );
+    await ref.read(remoteSessionProvider).configure(session);
     final cached = await ref.read(databaseProvider).allTracks();
     if (cached.isNotEmpty) {
       await ref.read(playbackProvider).restore(cached);
@@ -151,6 +152,7 @@ class AppController extends Notifier<AppState> {
             smallStreaming: state.smallStreaming,
             normalization: state.normalization,
           );
+      await ref.read(remoteSessionProvider).configure(session);
       state = state.copyWith(
         status: AppStatus.ready,
         session: session,
@@ -316,6 +318,7 @@ class AppController extends Notifier<AppState> {
 
   Future<void> signOut() async {
     final session = state.session;
+    await ref.read(remoteSessionProvider).clear();
     if (session != null) {
       try {
         await ref.read(jellyfinClientProvider).logout(session);
@@ -354,6 +357,7 @@ class AppController extends Notifier<AppState> {
 
   Future<void> _expireSession() async {
     await ref.read(downloadProvider).suspend();
+    await ref.read(remoteSessionProvider).clear();
     await ref.read(playbackProvider).clear();
     await ref.read(sessionStoreProvider).clear();
     state = state.copyWith(

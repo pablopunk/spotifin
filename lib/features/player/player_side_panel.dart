@@ -12,6 +12,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import 'player_collection_links.dart';
+import 'remote_devices.dart';
 
 class PlayerSidePanel extends ConsumerWidget {
   const PlayerSidePanel({super.key});
@@ -109,6 +110,7 @@ class _PanelHeader extends ConsumerWidget {
           onPressed: ref.read(playerPanelProvider.notifier).toggleQueue,
         ),
         const Spacer(),
+        const RemoteDeviceButton(),
       ],
     ),
   );

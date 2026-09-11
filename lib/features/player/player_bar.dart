@@ -14,6 +14,7 @@ import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'player_bar_controls.dart';
 import 'player_collection_links.dart';
+import 'remote_devices.dart';
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({this.integratedMobile = false, super.key});
@@ -312,6 +313,8 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                           const SizedBox(width: SpotifinSpacing.sm),
                           const AirPlayControl(),
                         ],
+                        const SizedBox(width: SpotifinSpacing.sm),
+                        const RemoteDeviceButton(),
                       ],
                     ),
                     const SizedBox(height: 30),

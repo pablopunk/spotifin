@@ -14,6 +14,7 @@ import '../home/home_screen.dart';
 import '../library/library_screen.dart';
 import '../player/player_bar.dart';
 import '../player/player_side_panel.dart';
+import '../player/remote_devices.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
@@ -109,10 +110,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
     final playerPanels = ref.watch(playerPanelProvider);
+    final hasLocalTrack = _playback.currentTrack != null;
     final showPlayerPanel =
         width >= SpotifinBreakpoints.playerPanel &&
         !playerPanels.isEmpty &&
-        _playback.currentTrack != null;
+        hasLocalTrack;
     final playerPanelWidth = showPlayerPanel
         ? _playerPanelWidth.clamp(_minimumPlayerPanelWidth, width * 0.5)
         : 0.0;
@@ -148,6 +150,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                     extendedContent: SidebarPlaylists(
                       onSelected: _openPlaylist,
                     ),
+                    footer: const RemoteDeviceButton(),
                   ),
                   Expanded(
                     child: Row(
@@ -206,7 +209,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       );
     }
     if (glassEffects) {
-      final hasTrack = _playback.currentTrack != null;
       return GlassScaffold(
         backgroundColor: SpotifinColors.background,
         settings: SpotifinGlass.settings(glassOpacity),
@@ -222,7 +224,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (hasTrack) const PlayerBar(integratedMobile: true),
+                if (hasLocalTrack)
+                  const PlayerBar(integratedMobile: true)
+                else
+                  const RemoteNowPlayingBar(),
                 NavigationBar(
                   height: 64,
                   backgroundColor: Colors.transparent,
@@ -248,18 +253,24 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     }
     return Scaffold(
       body: content,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: widget.controller.selectDestination,
-        destinations: _destinations
-            .map(
-              (item) => NavigationDestination(
-                icon: Icon(item.icon),
-                selectedIcon: Icon(item.selectedIcon),
-                label: item.label,
-              ),
-            )
-            .toList(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!hasLocalTrack) const RemoteNowPlayingBar(),
+          NavigationBar(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: widget.controller.selectDestination,
+            destinations: _destinations
+                .map(
+                  (item) => NavigationDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.selectedIcon),
+                    label: item.label,
+                  ),
+                )
+                .toList(),
+          ),
+        ],
       ),
     );
   }
