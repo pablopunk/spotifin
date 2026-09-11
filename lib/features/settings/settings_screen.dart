@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../common/design_system.dart';
+import '../common/glass.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -30,6 +31,21 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 title: Text(session?.userName ?? ''),
                 subtitle: Text(session?.serverUrl ?? ''),
+              ),
+            ],
+          ),
+          SpotifinSettingsGroup(
+            title: 'Appearance',
+            children: [
+              SwitchListTile(
+                value: ref.watch(glassEffectsProvider),
+                onChanged: ref
+                    .read(appControllerProvider.notifier)
+                    .setGlassEffects,
+                title: const Text('Liquid glass effects'),
+                subtitle: const Text(
+                  'Refracting navigation, player, and sheet chrome',
+                ),
               ),
             ],
           ),

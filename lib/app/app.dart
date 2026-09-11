@@ -42,6 +42,8 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp> {
       title: 'Spotifin',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      builder: (context, child) =>
+          Material(type: MaterialType.transparency, child: child!),
       shortcuts: buildAppShortcuts(enabled: status == AppStatus.ready),
       actions: buildAppActions(
         onTogglePlayback: _togglePlayback,
