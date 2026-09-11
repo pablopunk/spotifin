@@ -63,21 +63,25 @@ class DesktopPlayerBar extends StatelessWidget {
         ),
       ),
     );
-    if (!glass) {
-      return Material(
-        color: Colors.black,
-        elevation: 20,
-        shadowColor: Colors.black,
-        child: content,
-      );
-    }
-    return GlassContainer(
-      useOwnLayer: true,
-      quality: GlassQuality.premium,
-      settings: SpotifinGlass.settings(glassOpacity),
-      shape: const LiquidRoundedSuperellipse(borderRadius: 16),
-      clipBehavior: Clip.antiAlias,
-      child: content,
+    final surface = !glass
+        ? Material(
+            color: Colors.black,
+            elevation: 20,
+            shadowColor: Colors.black,
+            child: content,
+          )
+        : GlassContainer(
+            useOwnLayer: true,
+            quality: GlassQuality.premium,
+            settings: SpotifinGlass.settings(glassOpacity),
+            shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+            clipBehavior: Clip.antiAlias,
+            child: content,
+          );
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {},
+      child: surface,
     );
   }
 }
