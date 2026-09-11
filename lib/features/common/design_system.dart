@@ -19,6 +19,29 @@ abstract final class SpotifinBreakpoints {
   static const playerPanel = 1400.0;
 }
 
+class SpotifinChromeInsets extends InheritedWidget {
+  const SpotifinChromeInsets({
+    required this.bottom,
+    required super.child,
+    super.key,
+  });
+
+  static const fallbackBottom = 120.0;
+  static const glassMobileBottom = 200.0;
+
+  final double bottom;
+
+  static double bottomOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<SpotifinChromeInsets>()
+          ?.bottom ??
+      fallbackBottom;
+
+  @override
+  bool updateShouldNotify(SpotifinChromeInsets oldWidget) =>
+      bottom != oldWidget.bottom;
+}
+
 class SpotifinPageTitle extends StatelessWidget {
   const SpotifinPageTitle(this.title, {this.action, super.key});
 
@@ -259,14 +282,21 @@ class SpotifinCollectionCard extends StatelessWidget {
 Widget spotifinGrid({
   required int itemCount,
   required Widget Function(BuildContext, int) itemBuilder,
-}) => GridView.builder(
-  padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-    maxCrossAxisExtent: 220,
-    mainAxisExtent: 238,
-    crossAxisSpacing: 16,
-    mainAxisSpacing: 16,
+}) => Builder(
+  builder: (context) => GridView.builder(
+    padding: EdgeInsets.fromLTRB(
+      16,
+      16,
+      16,
+      SpotifinChromeInsets.bottomOf(context),
+    ),
+    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 220,
+      mainAxisExtent: 238,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+    ),
+    itemCount: itemCount,
+    itemBuilder: itemBuilder,
   ),
-  itemCount: itemCount,
-  itemBuilder: itemBuilder,
 );

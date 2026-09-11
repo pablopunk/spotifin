@@ -42,6 +42,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('chrome insets reach content grids', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SpotifinChromeInsets(
+          bottom: SpotifinChromeInsets.glassMobileBottom,
+          child: Scaffold(
+            body: spotifinGrid(
+              itemCount: 1,
+              itemBuilder: (_, _) => const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final grid = tester.widget<GridView>(find.byType(GridView));
+    expect(
+      grid.padding,
+      const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        SpotifinChromeInsets.glassMobileBottom,
+      ),
+    );
+  });
+
   testWidgets('tabs start without the Material 3 leading offset', (
     tester,
   ) async {

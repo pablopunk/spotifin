@@ -60,7 +60,7 @@ class _TrackList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView.builder(
-    padding: const EdgeInsets.only(bottom: 120),
+    padding: EdgeInsets.only(bottom: SpotifinChromeInsets.bottomOf(context)),
     itemCount: tracks.length,
     itemBuilder: (context, index) =>
         TrackTile(track: tracks[index], contextTracks: tracks),

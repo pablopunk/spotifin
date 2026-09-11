@@ -212,7 +212,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     TrackTile(track: tracks[index], contextTracks: tracks),
               ),
             ],
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            SliverToBoxAdapter(
+              child: SizedBox(height: SpotifinChromeInsets.bottomOf(context)),
+            ),
           ],
         ),
       );

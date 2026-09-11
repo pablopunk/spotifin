@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../common/brand_logo.dart';
 import '../common/design_system.dart';
+import '../common/glass.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -40,14 +42,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    color: SpotifinColors.surface,
-                    borderRadius: BorderRadius.all(
-                      Radius.circular(SpotifinRadii.panel),
-                    ),
-                    boxShadow: [SpotifinShadows.dialog],
-                  ),
+                child: _LoginCard(
+                  glass: ref.watch(glassEffectsProvider),
                   child: Padding(
                     padding: const EdgeInsets.all(SpotifinSpacing.xxl),
                     child: Form(
@@ -177,4 +173,35 @@ class _LoginBackdrop extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _LoginCard extends StatelessWidget {
+  const _LoginCard({required this.glass, required this.child});
+
+  final bool glass;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (glass) {
+      return GlassCard(
+        useOwnLayer: true,
+        quality: GlassQuality.premium,
+        padding: EdgeInsets.zero,
+        shape: const LiquidRoundedSuperellipse(
+          borderRadius: SpotifinRadii.panel,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      );
+    }
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: SpotifinColors.surface,
+        borderRadius: BorderRadius.all(Radius.circular(SpotifinRadii.panel)),
+        boxShadow: [SpotifinShadows.dialog],
+      ),
+      child: child,
+    );
+  }
 }

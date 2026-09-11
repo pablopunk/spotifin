@@ -105,12 +105,17 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final selectedIndex = widget.controller.selectedIndex;
     final glassEffects = ref.watch(glassEffectsProvider);
     _visitedDestinations.add(selectedIndex);
-    final content = Stack(
-      children: [
-        Positioned.fill(child: _buildDestinationStack(selectedIndex)),
-        if (!glassEffects)
-          const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
-      ],
+    final content = SpotifinChromeInsets(
+      bottom: !wide && glassEffects
+          ? SpotifinChromeInsets.glassMobileBottom
+          : SpotifinChromeInsets.fallbackBottom,
+      child: Stack(
+        children: [
+          Positioned.fill(child: _buildDestinationStack(selectedIndex)),
+          if (!glassEffects)
+            const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
+        ],
+      ),
     );
     if (wide) {
       return Scaffold(

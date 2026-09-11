@@ -18,7 +18,9 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: desktop ? null : AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 120),
+        padding: EdgeInsets.only(
+          bottom: SpotifinChromeInsets.bottomOf(context),
+        ),
         children: [
           SpotifinSettingsGroup(
             title: 'Account',

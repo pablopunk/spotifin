@@ -30,7 +30,9 @@ class DownloadsScreen extends ConsumerWidget {
               .whereType<Track>()
               .toList();
           return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 120),
+            padding: EdgeInsets.only(
+              bottom: SpotifinChromeInsets.bottomOf(context),
+            ),
             itemCount: downloads.length,
             itemBuilder: (context, index) {
               final download = downloads[index];

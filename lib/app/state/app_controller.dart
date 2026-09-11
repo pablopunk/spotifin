@@ -136,7 +136,12 @@ class AppController extends Notifier<AppState> {
       await refresh();
       return true;
     } catch (error) {
-      state = AppState(status: AppStatus.signedOut, error: error.toString());
+      state = state.copyWith(
+        status: AppStatus.signedOut,
+        syncing: false,
+        error: error.toString(),
+        clearSession: true,
+      );
       return false;
     }
   }

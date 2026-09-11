@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
@@ -29,14 +30,14 @@ class PlayerBar extends ConsumerWidget {
         final glassEffects = ref.watch(glassEffectsProvider);
         void showPlayer() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).togglePlayer()
-            : _showNowPlaying(context, playback);
+            : _showNowPlaying(context, playback, glassEffects);
 
         void showQueue() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleQueue()
-            : _showNowPlaying(context, playback);
+            : _showNowPlaying(context, playback, glassEffects);
         void showLyrics() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleLyrics()
-            : _showLyrics(context, track, playback);
+            : _showLyrics(context, track, playback, glassEffects);
         return LayoutBuilder(
           builder: (context, constraints) =>
               constraints.maxWidth >= SpotifinBreakpoints.rail
@@ -60,30 +61,42 @@ class PlayerBar extends ConsumerWidget {
   }
 }
 
-void _showNowPlaying(BuildContext context, PlaybackService playback) {
+void _showNowPlaying(
+  BuildContext context,
+  PlaybackService playback,
+  bool glass,
+) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     constraints: const BoxConstraints(maxWidth: 720),
-    backgroundColor: SpotifinColors.surface,
-    builder: (_) => _NowPlaying(playback: playback),
+    backgroundColor: glass ? Colors.transparent : SpotifinColors.surface,
+    builder: (_) => _NowPlaying(playback: playback, glass: glass),
   );
 }
 
-void _showLyrics(BuildContext context, Track track, PlaybackService playback) {
+void _showLyrics(
+  BuildContext context,
+  Track track,
+  PlaybackService playback,
+  bool glass,
+) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     constraints: const BoxConstraints(maxWidth: 720),
-    builder: (_) => _LyricsSheet(track: track, playback: playback),
+    backgroundColor: glass ? Colors.transparent : null,
+    builder: (_) =>
+        _LyricsSheet(track: track, playback: playback, glass: glass),
   );
 }
 
 class _NowPlaying extends ConsumerWidget {
-  const _NowPlaying({required this.playback});
+  const _NowPlaying({required this.playback, required this.glass});
   final PlaybackService playback;
+  final bool glass;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => ListenableBuilder(
@@ -96,14 +109,8 @@ class _NowPlaying extends ConsumerWidget {
         expand: false,
         initialChildSize: .92,
         minChildSize: .55,
-        builder: (context, controller) => DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.center,
-              colors: [SpotifinColors.raised, SpotifinColors.surface],
-            ),
-          ),
+        builder: (context, controller) => _NowPlayingSurface(
+          glass: glass,
           child: CustomScrollView(
             controller: controller,
             slivers: [
@@ -237,9 +244,13 @@ class _NowPlaying extends ConsumerWidget {
                               isScrollControlled: true,
                               useSafeArea: true,
                               constraints: const BoxConstraints(maxWidth: 720),
+                              backgroundColor: glass
+                                  ? Colors.transparent
+                                  : null,
                               builder: (_) => _LyricsSheet(
                                 track: track,
                                 playback: playback,
+                                glass: glass,
                               ),
                             ),
                             icon: const Icon(Icons.lyrics_outlined),
@@ -325,67 +336,79 @@ class _NowPlaying extends ConsumerWidget {
 }
 
 class _LyricsSheet extends ConsumerWidget {
-  const _LyricsSheet({required this.track, required this.playback});
+  const _LyricsSheet({
+    required this.track,
+    required this.playback,
+    required this.glass,
+  });
   final Track track;
   final PlaybackService playback;
+  final bool glass;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(appControllerProvider).session;
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .82,
-        child: session == null
-            ? const Center(child: Text('Lyrics are unavailable offline.'))
-            : FutureBuilder<List<LyricLine>>(
-                future: ref.read(lyricsProvider).find(session, track),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final lines = snapshot.data ?? const [];
-                  if (lines.isEmpty) {
-                    return const Center(child: Text('No lyrics found'));
-                  }
-                  return StreamBuilder<Duration>(
-                    stream: playback.player.positionStream,
-                    builder: (context, positionSnapshot) {
-                      final position = positionSnapshot.data ?? Duration.zero;
-                      final active = _activeLine(lines, position);
-                      return ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
-                        itemCount: lines.length,
-                        itemBuilder: (context, index) {
-                          final line = lines[index];
-                          return InkWell(
-                            onTap: line.start == null
-                                ? null
-                                : () => playback.seek(line.start!),
-                            borderRadius: BorderRadius.circular(
-                              SpotifinRadii.small,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                line.text,
-                                style: Theme.of(context).textTheme.headlineSmall
-                                    ?.copyWith(
-                                      color: index == active
-                                          ? SpotifinColors.accent
-                                          : SpotifinColors.textMuted,
-                                      fontWeight: index == active
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
+    return _SheetSurface(
+      glass: glass,
+      child: SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .82,
+          child: session == null
+              ? const Center(child: Text('Lyrics are unavailable offline.'))
+              : FutureBuilder<List<LyricLine>>(
+                  future: ref.read(lyricsProvider).find(session, track),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final lines = snapshot.data ?? const [];
+                    if (lines.isEmpty) {
+                      return const Center(child: Text('No lyrics found'));
+                    }
+                    return StreamBuilder<Duration>(
+                      stream: playback.player.positionStream,
+                      builder: (context, positionSnapshot) {
+                        final position = positionSnapshot.data ?? Duration.zero;
+                        final active = _activeLine(lines, position);
+                        return ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
+                          itemCount: lines.length,
+                          itemBuilder: (context, index) {
+                            final line = lines[index];
+                            return InkWell(
+                              onTap: line.start == null
+                                  ? null
+                                  : () => playback.seek(line.start!),
+                              borderRadius: BorderRadius.circular(
+                                SpotifinRadii.small,
                               ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  line.text,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: index == active
+                                            ? SpotifinColors.accent
+                                            : SpotifinColors.textMuted,
+                                        fontWeight: index == active
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -399,3 +422,45 @@ class _LyricsSheet extends ConsumerWidget {
     return result;
   }
 }
+
+class _NowPlayingSurface extends StatelessWidget {
+  const _NowPlayingSurface({required this.glass, required this.child});
+
+  final bool glass;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (glass) return _glassSheet(child);
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.center,
+          colors: [SpotifinColors.raised, SpotifinColors.surface],
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SheetSurface extends StatelessWidget {
+  const _SheetSurface({required this.glass, required this.child});
+
+  final bool glass;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => glass
+      ? _glassSheet(child)
+      : ColoredBox(color: SpotifinColors.surface, child: child);
+}
+
+Widget _glassSheet(Widget child) => GlassContainer(
+  useOwnLayer: true,
+  quality: GlassQuality.standard,
+  shape: const LiquidRoundedSuperellipse(borderRadius: 24),
+  clipBehavior: Clip.antiAlias,
+  child: child,
+);
