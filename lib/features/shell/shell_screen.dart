@@ -216,7 +216,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         bottomBar: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: GlassContainer(
-            height: 140,
             useOwnLayer: true,
             quality: GlassQuality.premium,
             settings: SpotifinGlass.settings(glassOpacity),
@@ -229,21 +228,25 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                   const PlayerBar(integratedMobile: true)
                 else
                   const RemoteNowPlayingBar(),
-                NavigationBar(
-                  height: 64,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: widget.controller.selectDestination,
-                  destinations: _destinations
-                      .map(
-                        (item) => NavigationDestination(
-                          icon: Icon(item.icon),
-                          selectedIcon: Icon(item.selectedIcon),
-                          label: item.label,
-                        ),
-                      )
-                      .toList(),
+                MediaQuery.removePadding(
+                  context: context,
+                  removeTop: true,
+                  child: NavigationBar(
+                    height: 64,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: widget.controller.selectDestination,
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: item.label,
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
               ],
             ),
