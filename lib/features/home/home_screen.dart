@@ -15,9 +15,7 @@ import '../common/track_tile.dart';
 import '../downtify/external_track_tile.dart';
 import '../library/library_screen.dart';
 
-enum _SearchFilter { all, songs, artists, albums }
-
-enum _SearchSource { all, library, downtify }
+enum _SearchFilter { all, songs, artists, albums, downtify }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({this.searchFocusNode, super.key});
@@ -35,7 +33,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Timer? _searchDebounce;
   String _query = '';
   _SearchFilter _searchFilter = _SearchFilter.all;
-  _SearchSource _searchSource = _SearchSource.all;
   Stream<List<Track>> _searchResults = const Stream.empty();
 
   @override
@@ -113,11 +110,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final downtify = ref.watch(downtifyControllerProvider);
     final externalAvailable = downtify.available;
-    final source = externalAvailable
-        ? _searchSource
-        : _searchSource == _SearchSource.downtify
-        ? _SearchSource.all
-        : _searchSource;
+    final filter = externalAvailable
+        ? _searchFilter
+        : _searchFilter == _SearchFilter.downtify
+        ? _SearchFilter.all
+        : _searchFilter;
     return StreamBuilder<List<Track>>(
       stream: ref.watch(databaseProvider).watchTracks(),
       builder: (context, snapshot) {
@@ -163,26 +160,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
               if (_query.isNotEmpty) ...[
-                if (externalAvailable)
-                  SliverToBoxAdapter(
-                    child: _SearchSources(
-                      selected: source,
-                      onSelected: (value) =>
-                          setState(() => _searchSource = value),
-                    ),
+                SliverToBoxAdapter(
+                  child: _SearchFilters(
+                    selected: filter,
+                    filters: externalAvailable
+                        ? _SearchFilter.values
+                        : _SearchFilter.values
+                              .where(
+                                (filter) => filter != _SearchFilter.downtify,
+                              )
+                              .toList(),
+                    onSelected: (filter) =>
+                        setState(() => _searchFilter = filter),
                   ),
-                if (source != _SearchSource.downtify)
-                  SliverToBoxAdapter(
-                    child: _SearchFilters(
-                      selected: _searchFilter,
-                      onSelected: (filter) =>
-                          setState(() => _searchFilter = filter),
-                    ),
-                  ),
+                ),
                 _SearchResults(
                   query: _query,
-                  filter: _searchFilter,
-                  source: source,
+                  filter: filter,
                   results: _searchResults,
                   libraryTracks: tracks,
                   externalResults: downtify.results,
@@ -256,7 +250,6 @@ class _SearchResults extends StatelessWidget {
   const _SearchResults({
     required this.query,
     required this.filter,
-    required this.source,
     required this.results,
     required this.libraryTracks,
     required this.externalResults,
@@ -265,7 +258,6 @@ class _SearchResults extends StatelessWidget {
 
   final String query;
   final _SearchFilter filter;
-  final _SearchSource source;
   final Stream<List<Track>> results;
   final List<Track> libraryTracks;
   final List<DowntifySong> externalResults;
@@ -282,14 +274,14 @@ class _SearchResults extends StatelessWidget {
         (track) => track.artist.split(';'),
       );
       final albums = _matchingGroups(tracks, query, (track) => [track.album]);
-      final visibleExternal = source == _SearchSource.all
+      final visibleExternal = filter == _SearchFilter.all
           ? externalResults
                 .where(
                   (song) =>
                       !const DowntifyMatcher().isDuplicate(song, libraryTracks),
                 )
                 .toList()
-          : source == _SearchSource.downtify
+          : filter == _SearchFilter.downtify
           ? externalResults
           : const <DowntifySong>[];
       final localHasResults = switch (filter) {
@@ -298,15 +290,13 @@ class _SearchResults extends StatelessWidget {
         _SearchFilter.songs => tracks.isNotEmpty,
         _SearchFilter.artists => artists.isNotEmpty,
         _SearchFilter.albums => albums.isNotEmpty,
+        _SearchFilter.downtify => false,
       };
-      final showExternal =
-          source != _SearchSource.library &&
-          (filter == _SearchFilter.all || filter == _SearchFilter.songs);
-      final hasResults = source == _SearchSource.downtify
+      final hasResults = filter == _SearchFilter.downtify
           ? visibleExternal.isNotEmpty
-          : localHasResults || showExternal && visibleExternal.isNotEmpty;
+          : localHasResults || visibleExternal.isNotEmpty;
       if (!hasResults) {
-        if (source == _SearchSource.downtify && externalSearching) {
+        if (filter == _SearchFilter.downtify && externalSearching) {
           return const SliverFillRemaining(
             hasScrollBody: false,
             child: Center(child: CircularProgressIndicator()),
@@ -322,7 +312,7 @@ class _SearchResults extends StatelessWidget {
         );
       }
       return SliverMainAxisGroup(
-        slivers: source == _SearchSource.downtify
+        slivers: filter == _SearchFilter.downtify
             ? [_ExternalSongResults(songs: visibleExternal)]
             : switch (filter) {
                 _SearchFilter.all => [
@@ -345,7 +335,7 @@ class _SearchResults extends StatelessWidget {
                     const SliverToBoxAdapter(child: SpotifinPageTitle('Songs')),
                     _SongResults(tracks: tracks),
                   ],
-                  if (showExternal && visibleExternal.isNotEmpty) ...[
+                  if (visibleExternal.isNotEmpty) ...[
                     const SliverToBoxAdapter(
                       child: SpotifinPageTitle('Add to library'),
                     ),
@@ -354,13 +344,12 @@ class _SearchResults extends StatelessWidget {
                 ],
                 _SearchFilter.songs => [
                   if (tracks.isNotEmpty) _SongResults(tracks: tracks),
-                  if (showExternal && visibleExternal.isNotEmpty)
-                    _ExternalSongResults(songs: visibleExternal),
                 ],
                 _SearchFilter.artists => [
                   _CollectionResults(entries: artists, artist: true),
                 ],
                 _SearchFilter.albums => [_CollectionResults(entries: albums)],
+                _SearchFilter.downtify => const [],
               },
       );
     },
@@ -368,40 +357,25 @@ class _SearchResults extends StatelessWidget {
 }
 
 class _SearchFilters extends StatelessWidget {
-  const _SearchFilters({required this.selected, required this.onSelected});
+  const _SearchFilters({
+    required this.selected,
+    required this.filters,
+    required this.onSelected,
+  });
 
   final _SearchFilter selected;
+  final List<_SearchFilter> filters;
   final ValueChanged<_SearchFilter> onSelected;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
     child: DefaultTabController(
-      length: _SearchFilter.values.length,
-      initialIndex: selected.index,
+      length: filters.length,
+      initialIndex: filters.indexOf(selected),
       child: SpotifinTabBar(
-        labels: _SearchFilter.values.map(_filterLabel).toList(),
-        onTap: (index) => onSelected(_SearchFilter.values[index]),
-      ),
-    ),
-  );
-}
-
-class _SearchSources extends StatelessWidget {
-  const _SearchSources({required this.selected, required this.onSelected});
-
-  final _SearchSource selected;
-  final ValueChanged<_SearchSource> onSelected;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
-    child: DefaultTabController(
-      length: _SearchSource.values.length,
-      initialIndex: selected.index,
-      child: SpotifinTabBar(
-        labels: _SearchSource.values.map(_sourceLabel).toList(),
-        onTap: (index) => onSelected(_SearchSource.values[index]),
+        labels: filters.map(_filterLabel).toList(),
+        onTap: (index) => onSelected(filters[index]),
       ),
     ),
   );
@@ -504,12 +478,7 @@ String _filterLabel(_SearchFilter filter) => switch (filter) {
   _SearchFilter.songs => 'Songs',
   _SearchFilter.artists => 'Artists',
   _SearchFilter.albums => 'Albums',
-};
-
-String _sourceLabel(_SearchSource source) => switch (source) {
-  _SearchSource.all => 'All',
-  _SearchSource.library => 'Library',
-  _SearchSource.downtify => 'Downtify',
+  _SearchFilter.downtify => 'Downtify',
 };
 
 class _HomeCatalog {

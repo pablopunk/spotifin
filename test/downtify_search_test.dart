@@ -70,6 +70,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
 
+    for (final label in ['All', 'Songs', 'Artists', 'Albums', 'Downtify']) {
+      expect(find.widgetWithText(Tab, label), findsOneWidget);
+    }
+    expect(find.widgetWithText(Tab, 'Library'), findsNothing);
     expect(find.byType(ExternalTrackTile), findsOneWidget);
 
     await tester.tap(find.widgetWithText(Tab, 'Downtify'));
