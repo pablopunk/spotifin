@@ -13,6 +13,7 @@ import '../../storage/database.dart';
 import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
+import 'queue_item_identity.dart';
 import 'remote_playback.dart';
 
 class PlaybackService extends ChangeNotifier implements RemotePlayback {
@@ -52,6 +53,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   final DownloadService _downloads;
   final PlaybackStateStore _stateStore = PlaybackStateStore();
   final AudioPlayer _player = AudioPlayer();
+  final QueueItemIdentity _queueItemIdentity = QueueItemIdentity();
   final StreamController<double> _volumeController =
       StreamController<double>.broadcast();
   final List<StreamSubscription<Object?>> _subscriptions = [];
@@ -571,8 +573,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     LoopMode.one => 'RepeatOne',
   };
 
-  String _newPlaylistItemId() =>
-      '${DateTime.now().microsecondsSinceEpoch}-${math.Random().nextInt(1 << 32)}';
+  String _newPlaylistItemId() => _queueItemIdentity.next();
 
   Future<void> _reportStop() async {
     final session = _session;
