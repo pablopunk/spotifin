@@ -6,7 +6,7 @@ void main() {
     const state = AppState();
 
     expect(state.glassEffects, isTrue);
-    expect(state.glassOpacity, .35);
+    expect(state.glassOpacity, .8);
 
     final changed = state.copyWith(glassEffects: false, glassOpacity: .7);
     expect(changed.glassEffects, isFalse);

@@ -20,7 +20,7 @@ class AppState {
     this.smallDownloads = false,
     this.normalization = false,
     this.glassEffects = true,
-    this.glassOpacity = .35,
+    this.glassOpacity = .8,
   });
 
   final AppStatus status;
@@ -68,7 +68,7 @@ class AppController extends Notifier<AppState> {
     final smallDownloads = preferences.getBool('smallDownloads') ?? false;
     final normalization = preferences.getBool('normalization') ?? false;
     final glassEffects = preferences.getBool('glassEffects') ?? true;
-    final glassOpacity = preferences.getDouble('glassOpacity') ?? .35;
+    final glassOpacity = preferences.getDouble('glassOpacity') ?? .8;
     const developmentLogin = DevelopmentLogin.fromEnvironment();
     if (developmentLogin.canSignIn) {
       state = AppState(
