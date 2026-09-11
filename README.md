@@ -10,9 +10,6 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 
 ## Ways to listen
 
-> **Start here → [spotifin.app](https://spotifin.app)**
-> Connect your Jellyfin library in the browser and get every feature on any device — the easiest, fastest way to enjoy Spotifin, nothing to install.
-
 | Way to listen | How |
 | --- | --- |
 | ⭐ **Web — start here** | **[spotifin.app](https://spotifin.app)** — your library, all features, all devices, no install |
