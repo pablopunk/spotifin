@@ -11,8 +11,7 @@ void main() {
     final first = await store.getDeviceId();
     final second = await store.getDeviceId();
 
-    expect(first, startsWith('spotifin-'));
-    expect(first, hasLength(41));
+    expect(first, matches(RegExp(r'^spotifin-[0-9a-f]{32}$')));
     expect(second, first);
   });
 }

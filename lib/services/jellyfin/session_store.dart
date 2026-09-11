@@ -52,7 +52,7 @@ class SessionStore {
     if (saved != null && saved.isNotEmpty) return saved;
     final random = Random.secure();
     final generated =
-        'spotifin-${List.generate(4, (_) => random.nextInt(1 << 32).toRadixString(16).padLeft(8, '0')).join()}';
+        'spotifin-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
     await preferences.setString('deviceId', generated);
     return generated;
   }
