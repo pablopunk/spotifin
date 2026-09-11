@@ -23,9 +23,15 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 | -------- | -------- |
 | ![Web screenshot](assets/screenshots/web%20full.png) | ![Web small](assets/screenshots/web%20small.png)
 
+
 | iOS App (player)  | iOS App (library) |
 | -------- | -------- |
 | ![ios app player](assets/screenshots/ios1.jpg) | ![ios app library](assets/screenshots/ios2.jpg) |
+
+
+| Remote play! |
+| -------- |
+| ![Web screenshot](assets/screenshots/remote%20play.png) |
 
 ## *Download songs* to your library with the [Downtify](https://downtify.henriquesebastiao.com/) integration
 
