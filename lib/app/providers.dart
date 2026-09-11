@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../services/jellyfin/jellyfin_client.dart';
+import '../services/downtify/downtify_client.dart';
+import '../services/downtify/downtify_store.dart';
 import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
@@ -10,6 +12,7 @@ import '../platform/download_store.dart';
 import '../platform/carplay_service.dart';
 import '../storage/database.dart';
 import 'state/app_controller.dart';
+import 'state/downtify_controller.dart';
 import 'state/player_panel_controller.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -23,6 +26,19 @@ final jellyfinClientProvider = Provider<JellyfinClient>((ref) {
   ref.onDispose(client.close);
   return client;
 });
+
+final downtifyClientProvider = Provider<DowntifyClient>((ref) {
+  final client = DowntifyClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final downtifyStoreProvider = Provider<DowntifyStore>(
+  (ref) => const DowntifyStore(),
+);
+
+final downtifyControllerProvider =
+    NotifierProvider<DowntifyController, DowntifyState>(DowntifyController.new);
 
 final lyricsProvider = Provider<LyricsService>(
   (ref) => LyricsService(ref.watch(jellyfinClientProvider)),
