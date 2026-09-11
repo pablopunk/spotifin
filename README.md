@@ -8,7 +8,7 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 > [!WARNING]
 > This is a work in progress. Expect bugs. We are not even in alpha.
 
-## Ways to listen
+## Download
 
 | Platform | How |
 | --- | --- |
