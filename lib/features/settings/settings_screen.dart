@@ -58,7 +58,7 @@ class SettingsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Slider(
                   value: glassOpacity,
-                  max: .8,
+                  max: SpotifinGlass.maxOpacity,
                   divisions: 16,
                   label: '${(glassOpacity * 100).round()}%',
                   onChanged: ref

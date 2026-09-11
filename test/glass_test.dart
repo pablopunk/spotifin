@@ -15,13 +15,27 @@ void main() {
     expect(changed.glassOpacity, .7);
   });
 
-  test('Apple glass opacity is calibrated for its stronger renderer', () {
+  test('glass opacity is calibrated for each renderer', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
     expect(SpotifinGlass.effectiveOpacity(.8), closeTo(.32, .001));
 
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    expect(SpotifinGlass.effectiveOpacity(0), .35);
     expect(SpotifinGlass.effectiveOpacity(.8), .8);
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    expect(SpotifinGlass.effectiveOpacity(.8), .8);
+  });
+
+  test('fallback renderers use shader tint so grouped glass is opaque', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    final settings = SpotifinGlass.settings(0);
+
+    expect(settings.glassColor.a, closeTo(.35, .001));
+    expect(settings.backerColor, isNull);
   });
 }

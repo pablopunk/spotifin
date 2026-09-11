@@ -7,6 +7,8 @@ import '../../app/theme.dart';
 
 abstract final class SpotifinGlass {
   static const _appleOpacityScale = .4;
+  static const _fallbackMinimumOpacity = .35;
+  static const maxOpacity = .8;
 
   static final theme = GlassThemeData.simple(
     blur: 8,
@@ -15,21 +17,40 @@ abstract final class SpotifinGlass {
     brightness: Brightness.dark,
   );
 
-  static LiquidGlassSettings settings(double opacity) => LiquidGlassSettings(
-    blur: 8,
-    thickness: 28,
-    backerColor: SpotifinColors.voidBlack.withValues(
-      alpha: effectiveOpacity(opacity),
-    ),
-  );
+  static LiquidGlassSettings settings(double opacity) {
+    final alpha = effectiveOpacity(opacity);
+    final fallbackRenderer = _usesFallbackRenderer;
+    return LiquidGlassSettings(
+      blur: 8,
+      thickness: 28,
+      glassColor: SpotifinColors.voidBlack.withValues(
+        alpha: fallbackRenderer ? alpha : 0,
+      ),
+      backerColor: fallbackRenderer
+          ? null
+          : SpotifinColors.voidBlack.withValues(alpha: alpha),
+    );
+  }
 
   static double effectiveOpacity(double opacity) {
-    final appleRenderer =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.macOS);
-    return appleRenderer ? opacity * _appleOpacityScale : opacity;
+    if (_usesAppleRenderer) return opacity * _appleOpacityScale;
+    if (_usesFallbackRenderer) {
+      final position = (opacity / maxOpacity).clamp(0.0, 1.0);
+      return _fallbackMinimumOpacity +
+          position * (maxOpacity - _fallbackMinimumOpacity);
+    }
+    return opacity;
   }
+
+  static bool get _usesAppleRenderer =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
+  static bool get _usesFallbackRenderer =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux;
 }
 
 final glassEffectsProvider = Provider<bool>(
