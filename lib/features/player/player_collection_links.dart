@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../library/library_screen.dart';
 
@@ -21,17 +22,21 @@ class PlayerCollectionLinks extends ConsumerWidget {
     children: [
       Flexible(
         child: _CollectionLink(
+          icon: Icons.person_rounded,
           label: track.artist,
-          style: style,
+          color: SpotifinColors.text,
+          style: style?.copyWith(color: SpotifinColors.text),
           onTap: () => _openArtist(context, ref),
         ),
       ),
       if (track.album.isNotEmpty) ...[
-        Text(' • ', style: style),
+        const SizedBox(width: 12),
         Flexible(
           child: _CollectionLink(
+            icon: Icons.album_rounded,
             label: track.album,
-            style: style,
+            color: SpotifinColors.textMuted,
+            style: style?.copyWith(color: SpotifinColors.textMuted),
             onTap: () => _openAlbum(context, ref),
           ),
         ),
@@ -79,12 +84,16 @@ class PlayerCollectionLinks extends ConsumerWidget {
 
 class _CollectionLink extends StatelessWidget {
   const _CollectionLink({
+    required this.icon,
     required this.label,
+    required this.color,
     required this.style,
     required this.onTap,
   });
 
+  final IconData icon;
   final String label;
+  final Color color;
   final TextStyle? style;
   final VoidCallback onTap;
 
@@ -92,11 +101,20 @@ class _CollectionLink extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     borderRadius: BorderRadius.circular(4),
-    child: Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: style?.copyWith(decoration: TextDecoration.underline),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: (style?.fontSize ?? 14) + 1, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+      ],
     ),
   );
 }
