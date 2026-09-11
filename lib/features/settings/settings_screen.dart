@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
@@ -148,10 +150,25 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SpotifinSettingsGroup(
+          SpotifinSettingsGroup(
             title: 'About',
             children: [
-              AboutListTile(
+              ListTile(
+                leading: SvgPicture.asset(
+                  'assets/branding/github.svg',
+                  width: 24,
+                  height: 24,
+                  colorFilter: const ColorFilter.mode(
+                    SpotifinColors.textMuted,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                title: const Text('GitHub'),
+                subtitle: const Text('Star the project and report issues'),
+                onTap: () => _openGitHub(context),
+              ),
+              const Divider(indent: 16, endIndent: 16),
+              const AboutListTile(
                 icon: Icon(Icons.info_outline_rounded),
                 applicationName: 'Spotifin',
                 applicationVersion: '1.0.0',
@@ -188,6 +205,17 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(appControllerProvider.notifier).signOut();
     }
+  }
+
+  Future<void> _openGitHub(BuildContext context) async {
+    final opened = await launchUrl(
+      Uri.parse('https://github.com/pablopunk/spotifin'),
+      mode: LaunchMode.externalApplication,
+    );
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open GitHub.')),
+    );
   }
 
   Future<void> _chooseQuality(
