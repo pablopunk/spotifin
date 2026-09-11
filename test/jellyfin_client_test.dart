@@ -128,6 +128,23 @@ void main() {
     expect(uri.queryParameters['static'], 'true');
   });
 
+  test('creates authenticated artwork URLs for system media controls', () {
+    final client = JellyfinClient();
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final uri = client.imageUri(session, 'album-id');
+
+    expect(uri.path, '/Items/album-id/Images/Primary');
+    expect(uri.queryParameters['api_key'], 'token');
+  });
+
   test('renames a playlist with the playlist update endpoint', () async {
     late http.Request captured;
     final client = JellyfinClient(

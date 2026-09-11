@@ -289,6 +289,7 @@ class PlaybackService extends ChangeNotifier {
         artist: track.artist,
         album: track.album,
         duration: Duration(microseconds: track.durationTicks ~/ 10),
+        artUri: _client.imageUri(session, track.albumId ?? track.id),
       ),
     );
   }
