@@ -31,7 +31,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   late final PlaybackService _playback;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
-  final _desktopNavigatorKeys = List.generate(
+  final _navigatorKeys = List.generate(
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
   );
@@ -64,7 +64,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     widget.controller.selectDestination(1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _desktopNavigatorKeys[1].currentState?.push(
+      _navigatorKeys[1].currentState?.push(
         MaterialPageRoute<void>(
           builder: (_) => PlaylistScreen(playlistId: playlist.id),
         ),
@@ -104,7 +104,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     _visitedDestinations.add(selectedIndex);
     final content = Stack(
       children: [
-        Positioned.fill(child: _screens[selectedIndex]),
+        Positioned.fill(child: _buildDestinationStack(selectedIndex)),
         const Positioned(left: 0, right: 0, bottom: 0, child: PlayerBar()),
       ],
     );
@@ -137,16 +137,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                               ),
                               child: ColoredBox(
                                 color: SpotifinColors.background,
-                                child: IndexedStack(
-                                  index: selectedIndex,
-                                  children: List.generate(
-                                    _screens.length,
-                                    (index) =>
-                                        _visitedDestinations.contains(index)
-                                        ? _buildDesktopNavigator(index)
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ),
+                                child: _buildDestinationStack(selectedIndex),
                               ),
                             ),
                           ),
@@ -208,8 +199,18 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     );
   }
 
-  Widget _buildDesktopNavigator(int index) => Navigator(
-    key: _desktopNavigatorKeys[index],
+  Widget _buildDestinationStack(int selectedIndex) => IndexedStack(
+    index: selectedIndex,
+    children: List.generate(
+      _screens.length,
+      (index) => _visitedDestinations.contains(index)
+          ? _buildDestinationNavigator(index)
+          : const SizedBox.shrink(),
+    ),
+  );
+
+  Widget _buildDestinationNavigator(int index) => Navigator(
+    key: _navigatorKeys[index],
     onGenerateRoute: (_) =>
         MaterialPageRoute<void>(builder: (_) => _screens[index]),
   );
