@@ -333,14 +333,25 @@ class JellyfinClient {
   ]) => Uri.parse('${session.serverUrl}$path').replace(queryParameters: query);
 
   String _normalizeServerUrl(String value) {
-    var result = value.trim();
-    if (!result.startsWith('http://') && !result.startsWith('https://')) {
-      result = 'https://$result';
+    final trimmed = value.trim();
+    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.isEmpty) {
+      throw const JellyfinException('Enter a valid Jellyfin address.');
     }
-    if (!result.startsWith('https://')) {
+    if (uri.scheme != 'https') {
       throw const JellyfinException('Jellyfin requires an HTTPS address.');
     }
-    return result.replaceFirst(RegExp(r'/+$'), '');
+    if (uri.userInfo.isNotEmpty ||
+        uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty) {
+      throw const JellyfinException(
+        'Enter a Jellyfin server address without credentials or parameters.',
+      );
+    }
+    return uri
+        .replace(path: uri.path.replaceFirst(RegExp(r'/+$'), ''))
+        .toString();
   }
 
   Map<String, dynamic> _decodeResponse(
