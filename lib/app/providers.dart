@@ -23,6 +23,26 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
+final allTracksStreamProvider = Provider<Stream<List<Track>>>(
+  (ref) => ref.watch(databaseProvider).watchTracks(),
+);
+
+final tracksByDateAddedStreamProvider = Provider<Stream<List<Track>>>(
+  (ref) => ref.watch(databaseProvider).watchTracksByDateAdded(),
+);
+
+final playlistsStreamProvider = Provider<Stream<List<Playlist>>>(
+  (ref) => ref.watch(databaseProvider).watchPlaylists(),
+);
+
+final downloadsStreamProvider = Provider<Stream<List<Download>>>(
+  (ref) => ref.watch(databaseProvider).watchDownloads(),
+);
+
+final albumDatesStreamProvider = Provider<Stream<Map<String, DateTime>>>(
+  (ref) => ref.watch(databaseProvider).watchAlbumDates(),
+);
+
 final jellyfinClientProvider = Provider<JellyfinClient>((ref) {
   final client = JellyfinClient();
   ref.onDispose(client.close);

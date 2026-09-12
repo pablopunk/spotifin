@@ -16,7 +16,7 @@ class PlaylistsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       StreamBuilder<List<Playlist>>(
-        stream: ref.watch(databaseProvider).watchPlaylists(),
+        stream: ref.watch(playlistsStreamProvider),
         builder: (context, snapshot) {
           final playlists = snapshot.data ?? const <Playlist>[];
           if (playlists.isEmpty) return const SizedBox.shrink();

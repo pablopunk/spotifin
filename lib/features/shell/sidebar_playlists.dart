@@ -15,14 +15,14 @@ class SidebarPlaylists extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       StreamBuilder<List<Track>>(
-        stream: ref.watch(databaseProvider).watchTracks(),
+        stream: ref.watch(allTracksStreamProvider),
         builder: (context, trackSnapshot) {
           final tracksById = {
             for (final track in trackSnapshot.data ?? const <Track>[])
               track.id: track,
           };
           return StreamBuilder<List<Playlist>>(
-            stream: ref.watch(databaseProvider).watchPlaylists(),
+            stream: ref.watch(playlistsStreamProvider),
             builder: (context, playlistSnapshot) {
               final playlists = playlistSnapshot.data ?? const [];
               return Column(

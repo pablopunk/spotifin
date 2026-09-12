@@ -31,7 +31,7 @@ class LibraryScreen extends ConsumerWidget {
           ),
         ),
         body: StreamBuilder<List<Track>>(
-          stream: ref.watch(databaseProvider).watchTracksByDateAdded(),
+          stream: ref.watch(tracksByDateAddedStreamProvider),
           builder: (context, trackSnapshot) {
             final tracks = trackSnapshot.data ?? const [];
             return TabBarView(
@@ -176,7 +176,7 @@ class _ArtistAlbumsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       StreamBuilder<Map<String, DateTime>>(
-        stream: ref.watch(databaseProvider).watchAlbumDates(),
+        stream: ref.watch(albumDatesStreamProvider),
         builder: (context, snapshot) {
           final albums = _sortedArtistAlbums(tracks, snapshot.data ?? const {});
           if (albums.isEmpty) {
@@ -278,7 +278,7 @@ class _PlaylistsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       StreamBuilder<List<Playlist>>(
-        stream: ref.watch(databaseProvider).watchPlaylists(),
+        stream: ref.watch(playlistsStreamProvider),
         builder: (context, snapshot) {
           final playlists = snapshot.data ?? const [];
           final byId = {for (final track in tracks) track.id: track};
@@ -333,7 +333,7 @@ class PlaylistScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       StreamBuilder<List<Playlist>>(
-        stream: ref.watch(databaseProvider).watchPlaylists(),
+        stream: ref.watch(playlistsStreamProvider),
         builder: (context, playlistSnapshot) {
           final playlist = playlistSnapshot.data?.firstWhereOrNull(
             (item) => item.id == playlistId,
@@ -347,7 +347,7 @@ class PlaylistScreen extends ConsumerWidget {
             );
           }
           return StreamBuilder<List<Track>>(
-            stream: ref.watch(databaseProvider).watchTracks(),
+            stream: ref.watch(allTracksStreamProvider),
             builder: (context, trackSnapshot) {
               final byId = {
                 for (final track in trackSnapshot.data ?? const <Track>[])

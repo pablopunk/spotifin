@@ -22,9 +22,9 @@ class DownloadsScreen extends ConsumerWidget {
               actions: [_ClearDownloadsButton(compact: true)],
             ),
       body: StreamBuilder<List<Track>>(
-        stream: ref.watch(databaseProvider).watchTracksByDateAdded(),
+        stream: ref.watch(tracksByDateAddedStreamProvider),
         builder: (context, trackSnapshot) => StreamBuilder<List<Download>>(
-          stream: ref.watch(databaseProvider).watchDownloads(),
+          stream: ref.watch(downloadsStreamProvider),
           builder: (context, downloadSnapshot) {
             final tracks = trackSnapshot.data ?? const [];
             final downloads = downloadSnapshot.data ?? const [];
