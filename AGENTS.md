@@ -3,11 +3,6 @@
 * Verify changes with `flutter analyze`, `flutter test`, and `dart format --output=none --set-exit-if-changed lib test`.
 * For web-touching changes, also run `flutter test --platform chrome test/session_store_test.dart`.
 
-### UI
-
-* Keep glass surfaces on `GlassQuality.premium`; the `standard` renderer paints a hairline rim and ignores the subdued edge optics in `SpotifinGlass.settings`.
-* Reuse `SpotifinPlayButton` for play and pause; the global `iconButtonTheme` forces a muted foreground on `IconButton.filled`.
-
 ### Database
 
 * After a table change and a `schemaVersion` bump, run `dart run drift_dev schema dump lib/storage/database.dart drift_schemas/`, then `dart run drift_dev schema generate drift_schemas/ test/generated_migrations/`; never hand-edit generated files.
