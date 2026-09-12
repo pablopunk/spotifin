@@ -98,6 +98,14 @@ void main() {
 
     expect(find.byType(Tab), findsNothing);
     expect(find.text('First song'), findsOneWidget);
+    final scrollView = tester.widget<CustomScrollView>(
+      find.byType(CustomScrollView),
+    );
+    final bottomInset = scrollView.slivers.last as SliverToBoxAdapter;
+    expect(
+      (bottomInset.child! as SizedBox).height,
+      SpotifinChromeInsets.fallbackBottom,
+    );
     await _dispose(tester, tracks.database);
   });
 

@@ -437,7 +437,11 @@ class CollectionScreen extends ConsumerWidget {
                   itemBuilder: (context, index) =>
                       TrackTile(track: tracks[index], contextTracks: tracks),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 110)),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: SpotifinChromeInsets.bottomOf(context),
+                  ),
+                ),
               ],
             ),
     );
