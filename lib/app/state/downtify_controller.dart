@@ -68,6 +68,7 @@ class DowntifyController extends Notifier<DowntifyState> {
   Timer? _scanTimer;
   int _searchGeneration = 0;
   bool _polling = false;
+  int _pollFailures = 0;
   bool _refreshingJellyfin = false;
   DateTime? _lastJellyfinRefresh;
 
@@ -76,6 +77,7 @@ class DowntifyController extends Notifier<DowntifyState> {
     ref.onDispose(() {
       _searchTimer?.cancel();
       _pollTimer?.cancel();
+      _pollTimer = null;
       _scanTimer?.cancel();
     });
     Future.microtask(_initialize);
@@ -128,6 +130,7 @@ class DowntifyController extends Notifier<DowntifyState> {
   Future<void> removeConfiguration() async {
     _searchTimer?.cancel();
     _pollTimer?.cancel();
+    _pollTimer = null;
     _scanTimer?.cancel();
     await ref.read(downtifyStoreProvider).clearServerUrl();
     state = const DowntifyState(
@@ -231,12 +234,16 @@ class DowntifyController extends Notifier<DowntifyState> {
   }
 
   Future<void> poll() async {
-    if (_polling || !state.available || state.serverUrl == null) return;
+    if (_polling || state.serverUrl == null) return;
     _polling = true;
     try {
       final remote = await ref
           .read(downtifyClientProvider)
           .fetchQueue(state.serverUrl!);
+      _pollFailures = 0;
+      if (!state.available) {
+        state = state.copyWith(availability: DowntifyAvailability.available);
+      }
       final byId = {for (final job in remote) job.song.id: job};
       for (final item in [...state.imports]) {
         final job = byId[item.jobId ?? item.externalSongId];
@@ -271,8 +278,8 @@ class DowntifyController extends Notifier<DowntifyState> {
       }
       await _refreshWaitingImports();
     } catch (_) {
+      _pollFailures++;
       state = state.copyWith(availability: DowntifyAvailability.unavailable);
-      _pollTimer?.cancel();
     } finally {
       _polling = false;
     }
@@ -298,9 +305,23 @@ class DowntifyController extends Notifier<DowntifyState> {
     }
   }
 
+  static const _pollInterval = Duration(seconds: 2);
+
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => poll());
+    _pollFailures = 0;
+    _schedulePoll(_pollInterval);
+  }
+
+  void _schedulePoll(Duration delay) {
+    _pollTimer?.cancel();
+    _pollTimer = Timer(delay, () async {
+      await poll();
+      if (_pollTimer == null || state.serverUrl == null) return;
+      final failures = _pollFailures > 5 ? 5 : _pollFailures;
+      final seconds = failures == 0 ? 2 : 1 << failures;
+      _schedulePoll(Duration(seconds: seconds > 30 ? 30 : seconds));
+    });
   }
 
   void _scheduleLibraryScan() {

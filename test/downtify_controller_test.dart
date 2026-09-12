@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/state/app_controller.dart';
+import 'package:spotifin/app/state/downtify_controller.dart';
 import 'package:spotifin/services/downtify/downtify_client.dart';
 import 'package:spotifin/services/downtify/downtify_models.dart';
 import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
@@ -118,6 +119,62 @@ void main() {
     expect(state.imports.single.status, 'imported');
     expect(state.imports.single.matchedTrackId, 'jellyfin-track');
     expect(state.notices.single.message, contains('available'));
+  });
+
+  test('recovers polling after a transient queue failure', () async {
+    SharedPreferences.setMockInitialValues({});
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    var failing = true;
+    final downtifyClient = DowntifyClient(
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/api/version') {
+          return http.Response(jsonEncode('2.10.2'), 200);
+        }
+        if (request.url.path == '/api/queue' && failing) {
+          return http.Response('boom', 500);
+        }
+        return http.Response(jsonEncode(<Object>[]), 200);
+      }),
+    );
+    final jellyfinClient = JellyfinClient(
+      httpClient: MockClient((request) async => http.Response('', 204)),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+        downtifyClientProvider.overrideWithValue(downtifyClient),
+        jellyfinClientProvider.overrideWithValue(jellyfinClient),
+        appControllerProvider.overrideWith(_AuthenticatedAppController.new),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      downtifyClient.close();
+      jellyfinClient.close();
+      await database.close();
+    });
+    final subscription = container.listen(
+      downtifyControllerProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final controller = container.read(downtifyControllerProvider.notifier);
+
+    await controller.configure('https://downtify.example.com');
+    await controller.poll();
+    expect(
+      container.read(downtifyControllerProvider).availability,
+      DowntifyAvailability.unavailable,
+    );
+
+    failing = false;
+    await Future<void>.delayed(const Duration(seconds: 3));
+    expect(
+      container.read(downtifyControllerProvider).availability,
+      DowntifyAvailability.available,
+    );
   });
 }
 
