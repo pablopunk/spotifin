@@ -337,7 +337,10 @@ class AppController extends Notifier<AppState> {
     final exponent = _refreshRetryAttempt.clamp(0, 4);
     final delay = Duration(seconds: 15 * (1 << exponent));
     _refreshRetryAttempt++;
-    _refreshRetryTimer = Timer(delay, () => unawaited(refresh(silent: true)));
+    _refreshRetryTimer = Timer(
+      delay,
+      () => unawaited(refresh(silent: true, force: true)),
+    );
   }
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
