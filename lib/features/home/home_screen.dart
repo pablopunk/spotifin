@@ -517,6 +517,7 @@ class _CollectionResults extends StatelessWidget {
                 title: entry.key,
                 tracks: entry.value,
                 icon: artist ? Icons.person_rounded : Icons.album_rounded,
+                artist: artist,
               ),
             ),
           ),

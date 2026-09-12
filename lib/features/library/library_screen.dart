@@ -45,6 +45,7 @@ class LibraryScreen extends ConsumerWidget {
                   tracks: tracks,
                   groupName: _artistName,
                   icon: Icons.person_rounded,
+                  artist: true,
                 ),
                 _PlaylistsTab(tracks: tracks),
               ],
@@ -89,10 +90,13 @@ class _GroupedList extends StatelessWidget {
     required this.tracks,
     required this.groupName,
     required this.icon,
+    this.artist = false,
+    super.key,
   });
   final List<Track> tracks;
   final String Function(Track) groupName;
   final IconData icon;
+  final bool artist;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +134,7 @@ class _GroupedList extends StatelessWidget {
                 title: entry.key,
                 tracks: entry.value,
                 icon: icon,
+                artist: artist,
               ),
             ),
           ),
@@ -255,7 +260,105 @@ class CollectionScreen extends ConsumerWidget {
     required this.tracks,
     required this.icon,
     this.artwork,
+    this.artist = false,
     super.key,
+  });
+  final String title;
+  final List<Track> tracks;
+  final IconData icon;
+  final Widget? artwork;
+  final bool artist;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final header = _CollectionHeader(
+      title: title,
+      tracks: tracks,
+      icon: icon,
+      artwork: artwork,
+    );
+    return Scaffold(
+      appBar: AppBar(title: Text(title), backgroundColor: Colors.transparent),
+      body: artist
+          ? DefaultTabController(
+              length: 2,
+              child: NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  SliverToBoxAdapter(child: header),
+                  const SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _PinnedTabBar(
+                      SpotifinTabBar(labels: ['Songs', 'Albums']),
+                    ),
+                  ),
+                ],
+                body: TabBarView(
+                  children: [
+                    ListView.builder(
+                      key: const PageStorageKey('artist-songs'),
+                      padding: EdgeInsets.only(
+                        bottom: SpotifinChromeInsets.bottomOf(context),
+                      ),
+                      itemCount: tracks.length,
+                      itemBuilder: (context, index) => TrackTile(
+                        track: tracks[index],
+                        contextTracks: tracks,
+                      ),
+                    ),
+                    _GroupedList(
+                      key: const PageStorageKey('artist-albums'),
+                      tracks: tracks,
+                      groupName: _albumName,
+                      icon: Icons.album_rounded,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: header),
+                SliverList.builder(
+                  itemCount: tracks.length,
+                  itemBuilder: (context, index) =>
+                      TrackTile(track: tracks[index], contextTracks: tracks),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 110)),
+              ],
+            ),
+    );
+  }
+}
+
+class _PinnedTabBar extends SliverPersistentHeaderDelegate {
+  const _PinnedTabBar(this.tabBar);
+
+  final SpotifinTabBar tabBar;
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => ColoredBox(color: SpotifinColors.background, child: tabBar);
+
+  @override
+  bool shouldRebuild(_PinnedTabBar oldDelegate) =>
+      oldDelegate.tabBar.labels != tabBar.labels;
+}
+
+class _CollectionHeader extends ConsumerWidget {
+  const _CollectionHeader({
+    required this.title,
+    required this.tracks,
+    required this.icon,
+    this.artwork,
   });
   final String title;
   final List<Track> tracks;
@@ -263,86 +366,67 @@ class CollectionScreen extends ConsumerWidget {
   final Widget? artwork;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: Text(title), backgroundColor: Colors.transparent),
-    body: CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: DecoratedBox(
+  Widget build(BuildContext context, WidgetRef ref) => DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [SpotifinColors.raised, SpotifinColors.background],
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(SpotifinSpacing.xl),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.end,
+        spacing: SpotifinSpacing.lg,
+        runSpacing: SpotifinSpacing.lg,
+        children: [
+          Container(
+            width: 160,
+            height: 160,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [SpotifinColors.raised, SpotifinColors.background],
+              color: SpotifinColors.interactive,
+              borderRadius: BorderRadius.all(
+                Radius.circular(SpotifinRadii.card),
               ),
+              boxShadow: [SpotifinShadows.dialog],
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(SpotifinSpacing.xl),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.end,
-                spacing: SpotifinSpacing.lg,
-                runSpacing: SpotifinSpacing.lg,
-                children: [
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: const BoxDecoration(
-                      color: SpotifinColors.interactive,
-                      borderRadius: BorderRadius.all(
-                        Radius.circular(SpotifinRadii.card),
-                      ),
-                      boxShadow: [SpotifinShadows.dialog],
+            child:
+                artwork ??
+                Icon(icon, size: 72, color: SpotifinColors.textMuted),
+          ),
+          SizedBox(
+            width: 320,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'COLLECTION',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const SizedBox(height: SpotifinSpacing.xs),
+                Text(title, style: Theme.of(context).textTheme.headlineLarge),
+                const SizedBox(height: SpotifinSpacing.md),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: SpotifinSpacing.sm,
+                  runSpacing: SpotifinSpacing.sm,
+                  children: [
+                    SpotifinCountLabel(tracks.length),
+                    SpotifinPlayButton(
+                      onPressed: tracks.isEmpty
+                          ? null
+                          : () =>
+                                ref.read(playbackProvider).replaceQueue(tracks),
                     ),
-                    child:
-                        artwork ??
-                        Icon(icon, size: 72, color: SpotifinColors.textMuted),
-                  ),
-                  SizedBox(
-                    width: 320,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'COLLECTION',
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: SpotifinSpacing.xs),
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        const SizedBox(height: SpotifinSpacing.md),
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: SpotifinSpacing.sm,
-                          runSpacing: SpotifinSpacing.sm,
-                          children: [
-                            SpotifinCountLabel(tracks.length),
-                            SpotifinPlayButton(
-                              onPressed: tracks.isEmpty
-                                  ? null
-                                  : () => ref
-                                        .read(playbackProvider)
-                                        .replaceQueue(tracks),
-                            ),
-                            CollectionDownloadButton(tracks: tracks),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                    CollectionDownloadButton(tracks: tracks),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-        SliverList.builder(
-          itemCount: tracks.length,
-          itemBuilder: (context, index) =>
-              TrackTile(track: tracks[index], contextTracks: tracks),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 110)),
-      ],
+        ],
+      ),
     ),
   );
 }

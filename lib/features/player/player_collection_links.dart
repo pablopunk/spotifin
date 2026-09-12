@@ -52,6 +52,7 @@ class PlayerCollectionLinks extends ConsumerWidget {
       title: track.artist,
       tracks: tracks.where((item) => item.artist == track.artist).toList(),
       icon: Icons.person_rounded,
+      artist: true,
     );
   }
 
@@ -74,10 +75,15 @@ class PlayerCollectionLinks extends ConsumerWidget {
     required String title,
     required List<Track> tracks,
     required IconData icon,
+    bool artist = false,
   }) => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) =>
-          CollectionScreen(title: title, tracks: tracks, icon: icon),
+      builder: (_) => CollectionScreen(
+        title: title,
+        tracks: tracks,
+        icon: icon,
+        artist: artist,
+      ),
     ),
   );
 }
