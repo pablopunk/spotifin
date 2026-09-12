@@ -63,6 +63,28 @@ void main() {
     expect(await database.pendingOperations(), isEmpty);
   });
 
+  test('removing a playlist clears its pending writes', () async {
+    final now = DateTime(2026);
+    await database.replacePlaylists([
+      PlaylistsCompanion.insert(id: 'playlist', name: 'Playlist'),
+    ]);
+    await database
+        .into(database.pendingWrites)
+        .insert(
+          PendingWritesCompanion.insert(
+            id: 'w',
+            kind: 'playlistAdd',
+            targetId: 'playlist',
+            createdAt: now,
+          ),
+        );
+
+    await database.removePlaylist('playlist');
+
+    expect(await database.select(database.playlists).get(), isEmpty);
+    expect(await database.pendingOperations(), isEmpty);
+  });
+
   test('search filters in sqlite and limits results', () async {
     await database.upsertTracks([
       TracksCompanion.insert(

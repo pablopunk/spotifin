@@ -60,6 +60,7 @@ class SidebarPlaylists extends ConsumerWidget {
                         tracks: tracksInPlaylist(playlists[index], tracksById),
                         onTap: () => onSelected(playlists[index]),
                         onRename: () => _rename(context, ref, playlists[index]),
+                        onDelete: () => _delete(context, ref, playlists[index]),
                       ),
                     ),
                   ),
@@ -93,6 +94,40 @@ class SidebarPlaylists extends ConsumerWidget {
         .read(appControllerProvider.notifier)
         .renamePlaylist(playlist.id, name);
   }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    Playlist playlist,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove playlist?'),
+        content: Text('"${playlist.name}" will be deleted from Jellyfin.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref
+          .read(appControllerProvider.notifier)
+          .deletePlaylist(playlist.id);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
 }
 
 class _PlaylistTarget extends ConsumerWidget {
@@ -101,12 +136,14 @@ class _PlaylistTarget extends ConsumerWidget {
     required this.tracks,
     required this.onTap,
     required this.onRename,
+    required this.onDelete,
   });
 
   final Playlist playlist;
   final List<Track> tracks;
   final VoidCallback onTap;
   final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => DragTarget<Track>(
@@ -133,7 +170,7 @@ class _PlaylistTarget extends ConsumerWidget {
         onTap: onTap,
         trailing: PopupMenuButton<String>(
           tooltip: 'Playlist options',
-          onSelected: (_) => onRename(),
+          onSelected: (value) => value == 'rename' ? onRename() : onDelete(),
           itemBuilder: (_) => const [
             PopupMenuItem(
               value: 'rename',
@@ -141,6 +178,14 @@ class _PlaylistTarget extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.edit_rounded),
                 title: Text('Rename'),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.delete_outline_rounded),
+                title: Text('Remove'),
               ),
             ),
           ],

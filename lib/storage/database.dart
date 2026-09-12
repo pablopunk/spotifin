@@ -239,6 +239,13 @@ class AppDatabase extends _$AppDatabase {
     }
   });
 
+  Future<void> removePlaylist(String id) => transaction(() async {
+    await (delete(
+      pendingWrites,
+    )..where((write) => write.targetId.equals(id))).go();
+    await (delete(playlists)..where((row) => row.id.equals(id))).go();
+  });
+
   Future<void> setFavorite(String id, bool value) =>
       (update(tracks)..where((row) => row.id.equals(id))).write(
         TracksCompanion(favorite: Value(value)),

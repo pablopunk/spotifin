@@ -413,6 +413,15 @@ class AppController extends Notifier<AppState> {
     }
   }
 
+  Future<void> deletePlaylist(String playlistId) async {
+    final session = state.session;
+    if (session == null) {
+      throw const JellyfinException('Sign in before deleting a playlist.');
+    }
+    await ref.read(jellyfinClientProvider).deleteItem(session, playlistId);
+    await ref.read(databaseProvider).removePlaylist(playlistId);
+  }
+
   Future<void> signOut() async {
     _refreshRetryTimer?.cancel();
     _refreshRetryAttempt = 0;
