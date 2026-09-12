@@ -132,9 +132,12 @@ class MobilePlayerBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                subtitle: PlayerCollectionLinks(
-                  track: track,
-                  style: Theme.of(context).textTheme.bodySmall,
+                subtitle: Text(
+                  track.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: SpotifinColors.textMuted),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
