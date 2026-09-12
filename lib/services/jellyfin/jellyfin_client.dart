@@ -627,19 +627,32 @@ class _TimeoutClient extends http.BaseClient {
   final Duration _timeout;
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final response = await _inner.send(request).timeout(_timeout);
-    return http.StreamedResponse(
-      response.stream.timeout(_timeout),
-      response.statusCode,
-      contentLength: response.contentLength,
-      request: response.request,
-      headers: response.headers,
-      isRedirect: response.isRedirect,
-      persistentConnection: response.persistentConnection,
-      reasonPhrase: response.reasonPhrase,
-    );
-  }
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      _inner.send(request).timeout(_timeout);
+
+  @override
+  Future<http.Response> get(Uri url, {Map<String, String>? headers}) =>
+      super.get(url, headers: headers).timeout(_timeout);
+
+  @override
+  Future<http.Response> post(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Encoding? encoding,
+  }) => super
+      .post(url, headers: headers, body: body, encoding: encoding)
+      .timeout(_timeout);
+
+  @override
+  Future<http.Response> delete(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Encoding? encoding,
+  }) => super
+      .delete(url, headers: headers, body: body, encoding: encoding)
+      .timeout(_timeout);
 
   @override
   void close() => _inner.close();

@@ -436,6 +436,27 @@ void main() {
       throwsA(isA<TimeoutException>()),
     );
   });
+
+  testWidgets('completes a request inside the widget test zone', (
+    tester,
+  ) async {
+    final client = JellyfinClient(
+      httpClient: MockClient((_) async => http.Response('', 204)),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await client.deleteItem(session, 'track-id');
+
+    expect(tester.binding, isNotNull);
+  });
 }
 
 class _StallingClient extends http.BaseClient {
