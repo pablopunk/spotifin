@@ -17,20 +17,30 @@ class SpotifinApp extends ConsumerStatefulWidget {
   ConsumerState<SpotifinApp> createState() => _SpotifinAppState();
 }
 
-class _SpotifinAppState extends ConsumerState<SpotifinApp> {
+class _SpotifinAppState extends ConsumerState<SpotifinApp>
+    with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _shellController = ShellController();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _shellController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(appControllerProvider.notifier).refresh(silent: true);
+    }
   }
 
   @override

@@ -71,11 +71,16 @@ class AppState {
 
 class AppController extends Notifier<AppState> {
   Future<void>? _refreshFuture;
+  Timer? _refreshRetryTimer;
+  int _refreshRetryAttempt = 0;
   int _sessionGeneration = 0;
   String? _remoteAccountId;
 
   @override
-  AppState build() => const AppState();
+  AppState build() {
+    ref.onDispose(() => _refreshRetryTimer?.cancel());
+    return const AppState();
+  }
 
   Future<void> initialize() async {
     try {
@@ -125,14 +130,13 @@ class AppController extends Notifier<AppState> {
         glassOpacity: glassOpacity,
         lastSyncedAt: lastSyncedAt,
       );
-      await ref
-          .read(playbackProvider)
-          .configure(
-            savedSession,
-            smallStreaming: smallStreaming,
-            normalization: normalization,
-          );
-      unawaited(_restoreLocalPlayback());
+      unawaited(
+        _restoreLocalPlayback(
+          savedSession,
+          smallStreaming: smallStreaming,
+          normalization: normalization,
+        ),
+      );
       unawaited(refresh(silent: true));
     } catch (error) {
       state = state.copyWith(
@@ -143,8 +147,19 @@ class AppController extends Notifier<AppState> {
     }
   }
 
-  Future<void> _restoreLocalPlayback() async {
+  Future<void> _restoreLocalPlayback(
+    JellyfinSession session, {
+    required bool smallStreaming,
+    required bool normalization,
+  }) async {
     try {
+      await ref
+          .read(playbackProvider)
+          .configure(
+            session,
+            smallStreaming: smallStreaming,
+            normalization: normalization,
+          );
       final cached = await ref.read(databaseProvider).allTracks();
       if (cached.isEmpty) return;
       await ref.read(playbackProvider).restore(cached);
@@ -196,6 +211,7 @@ class AppController extends Notifier<AppState> {
   Future<void> refresh({bool silent = false}) {
     final running = _refreshFuture;
     if (running != null) return running;
+    _refreshRetryTimer?.cancel();
     final refresh = _refresh(silent: silent);
     _refreshFuture = refresh;
     return refresh.whenComplete(() {
@@ -253,6 +269,7 @@ class AppController extends Notifier<AppState> {
         unawaited(ref.read(remoteSessionProvider).configure(session));
       }
       final syncedAt = DateTime.now();
+      _refreshRetryAttempt = 0;
       final preferences = await SharedPreferences.getInstance();
       await preferences.setString(
         _lastSyncedKey(session),
@@ -273,6 +290,7 @@ class AppController extends Notifier<AppState> {
         return;
       }
       if (generation != _sessionGeneration) return;
+      _scheduleRefreshRetry();
       state = silent
           ? state.copyWith(
               syncing: false,
@@ -297,6 +315,14 @@ class AppController extends Notifier<AppState> {
 
   String _lastSyncedKey(JellyfinSession session) =>
       'lastSyncedAt.${session.serverId}.${session.userId}';
+
+  void _scheduleRefreshRetry() {
+    if (state.session == null || _refreshRetryTimer?.isActive == true) return;
+    final exponent = _refreshRetryAttempt.clamp(0, 4);
+    final delay = Duration(seconds: 15 * (1 << exponent));
+    _refreshRetryAttempt++;
+    _refreshRetryTimer = Timer(delay, () => unawaited(refresh(silent: true)));
+  }
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
     final session = state.session;
@@ -377,6 +403,8 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> signOut() async {
+    _refreshRetryTimer?.cancel();
+    _refreshRetryAttempt = 0;
     _sessionGeneration++;
     _remoteAccountId = null;
     final session = state.session;
@@ -418,6 +446,8 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> _expireSession() async {
+    _refreshRetryTimer?.cancel();
+    _refreshRetryAttempt = 0;
     _sessionGeneration++;
     _remoteAccountId = null;
     await ref.read(downloadProvider).suspend();
