@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 
-class Artwork extends ConsumerWidget {
+class Artwork extends ConsumerStatefulWidget {
   const Artwork({
     required this.itemId,
     this.size = 56,
@@ -17,10 +17,19 @@ class Artwork extends ConsumerWidget {
   final double borderRadius;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Artwork> createState() => _ArtworkState();
+}
+
+class _ArtworkState extends ConsumerState<Artwork> {
+  Future<ImageProvider?>? _resolved;
+  String? _cacheKey;
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(
       appControllerProvider.select((state) => state.session),
     );
+    final size = widget.size;
     final fallback = Container(
       width: size,
       height: size,
@@ -35,21 +44,37 @@ class Artwork extends ConsumerWidget {
     if (session == null) return fallback;
     final physicalWidth = (size * MediaQuery.devicePixelRatioOf(context))
         .round();
-    final image = Image.network(
-      ref
-          .read(jellyfinClientProvider)
-          .imageUri(session, itemId, width: physicalWidth)
-          .toString(),
-      width: size,
-      height: size,
-      cacheWidth: physicalWidth,
-      filterQuality: FilterQuality.low,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => fallback,
+    final accountId = '${session.serverId}.${session.userId}';
+    final cacheKey = '$accountId:${widget.itemId}:$physicalWidth';
+    if (_cacheKey != cacheKey) {
+      _cacheKey = cacheKey;
+      _resolved = ref
+          .read(artworkStoreProvider)
+          .resolve(
+            accountId,
+            widget.itemId,
+            physicalWidth,
+            ref
+                .read(jellyfinClientProvider)
+                .imageUri(session, widget.itemId, width: physicalWidth),
+          );
+    }
+    final image = FutureBuilder<ImageProvider?>(
+      future: _resolved,
+      builder: (context, snapshot) => snapshot.data == null
+          ? fallback
+          : Image(
+              image: snapshot.data!,
+              width: size,
+              height: size,
+              filterQuality: FilterQuality.low,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => fallback,
+            ),
     );
-    if (size <= 56 || borderRadius == 0) return image;
+    if (size <= 56 || widget.borderRadius == 0) return image;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
+      borderRadius: BorderRadius.circular(widget.borderRadius),
       clipBehavior: Clip.hardEdge,
       child: image,
     );

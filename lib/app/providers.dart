@@ -10,6 +10,7 @@ import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/remote_session_service.dart';
 import '../platform/download_store.dart';
+import '../platform/artwork_store.dart';
 import '../platform/carplay_service.dart';
 import '../storage/database.dart';
 import 'state/app_controller.dart';
@@ -64,6 +65,12 @@ final downloadProvider = Provider<DownloadService>((ref) {
   );
   ref.onDispose(service.dispose);
   return service;
+});
+
+final artworkStoreProvider = Provider<ArtworkStore>((ref) {
+  final store = ArtworkStore();
+  ref.onDispose(store.dispose);
+  return store;
 });
 
 final downloadStatusesProvider = StreamProvider<Map<String, String>>((ref) {
