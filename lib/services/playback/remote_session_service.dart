@@ -10,6 +10,7 @@ import '../../storage/database.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/remote_session.dart';
 import '../jellyfin/session.dart';
+import '../redaction.dart';
 import 'playback_handoff.dart';
 import 'playback_service.dart';
 import 'remote_command_handler.dart';
@@ -56,7 +57,7 @@ class RemoteSessionService extends ChangeNotifier {
       try {
         await _client.advertiseRemoteCapabilities(session);
       } catch (error) {
-        _error = error.toString();
+        _error = redactSecrets(error);
       }
       await refresh();
       if (generation != _generation) return;
@@ -67,7 +68,7 @@ class RemoteSessionService extends ChangeNotifier {
       );
     } catch (error) {
       if (generation != _generation) return;
-      _error = error.toString();
+      _error = redactSecrets(error);
     } finally {
       if (generation == _generation) {
         _loading = false;
@@ -84,7 +85,7 @@ class RemoteSessionService extends ChangeNotifier {
       _error = null;
       notifyListeners();
     } catch (error) {
-      _error = error.toString();
+      _error = redactSecrets(error);
       notifyListeners();
     }
   }
@@ -161,7 +162,7 @@ class RemoteSessionService extends ChangeNotifier {
     try {
       await action();
     } catch (error) {
-      _error = error.toString();
+      _error = redactSecrets(error);
       rethrow;
     } finally {
       _pendingSessionIds = {..._pendingSessionIds}..remove(sessionId);
@@ -192,7 +193,7 @@ class RemoteSessionService extends ChangeNotifier {
       notifyListeners();
     } catch (error) {
       if (generation != _generation) return;
-      _error = 'Live device updates are unavailable: $error';
+      _error = 'Live device updates are unavailable: ${redactSecrets(error)}';
       _socketClosed(generation);
     }
   }
@@ -222,7 +223,7 @@ class RemoteSessionService extends ChangeNotifier {
       _commandQueue = _commandQueue
           .then((_) => _commands.handle(type, data))
           .catchError((Object error) {
-            _error = 'A remote command failed: $error';
+            _error = 'A remote command failed: ${redactSecrets(error)}';
             notifyListeners();
           });
     } catch (_) {}
