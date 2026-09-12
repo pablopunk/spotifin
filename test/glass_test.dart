@@ -38,4 +38,15 @@ void main() {
     expect(settings.glassColor.a, closeTo(.35, .001));
     expect(settings.backerColor, isNull);
   });
+
+  test('glass edge optics stay subdued', () {
+    final settings = SpotifinGlass.settings(.8);
+
+    expect(settings.chromaticAberration, 0);
+    expect(settings.lightIntensity, lessThan(.1));
+    expect(settings.fresnelStrength, lessThan(.1));
+    expect(settings.refractiveIndex, 1.05);
+    expect(settings.glowIntensity, 0);
+    expect(settings.shadowElevation, 0);
+  });
 }

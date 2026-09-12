@@ -23,6 +23,12 @@ abstract final class SpotifinGlass {
     return LiquidGlassSettings(
       blur: 8,
       thickness: 28,
+      chromaticAberration: 0,
+      lightIntensity: .08,
+      fresnelStrength: .08,
+      refractiveIndex: 1.05,
+      glowIntensity: 0,
+      shadowElevation: 0,
       glassColor: SpotifinColors.voidBlack.withValues(
         alpha: fallbackRenderer ? alpha : 0,
       ),
