@@ -43,8 +43,16 @@ class DownloadStore {
     }
     final key =
         '/.spotifin/audio/${safePathSegment(accountId)}/${safePathSegment(trackId)}';
-    final cache = await web.window.caches.open(_cacheName).toDart;
-    await cache.put(key.toJS, response).toDart;
+    final transferTimeout = Timer(
+      const Duration(minutes: 5),
+      () => controller.abort(),
+    );
+    try {
+      final cache = await web.window.caches.open(_cacheName).toDart;
+      await cache.put(key.toJS, response).toDart;
+    } finally {
+      transferTimeout.cancel();
+    }
     return key;
   }
 
