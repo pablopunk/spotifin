@@ -5,7 +5,23 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 class ArtworkStore {
+  final Map<String, Future<ImageProvider?>> _pending = {};
+
   Future<ImageProvider?> resolve(
+    String accountId,
+    String itemId,
+    int width,
+    Uri source,
+  ) {
+    final key = '$accountId:$itemId:$width';
+    return _pending.putIfAbsent(key, () {
+      final future = _resolve(accountId, itemId, width, source);
+      future.whenComplete(() => _pending.remove(key));
+      return future;
+    });
+  }
+
+  Future<ImageProvider?> _resolve(
     String accountId,
     String itemId,
     int width,

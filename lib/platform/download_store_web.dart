@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
@@ -17,9 +18,22 @@ class DownloadStore {
   ) async {
     final headers = web.Headers();
     requestHeaders.forEach((name, value) => headers.append(name, value));
-    final response = await web.window
-        .fetch(source.toString().toJS, web.RequestInit(headers: headers))
-        .toDart;
+    final controller = web.AbortController();
+    final timeout = Timer(
+      const Duration(seconds: 30),
+      () => controller.abort(),
+    );
+    late final web.Response response;
+    try {
+      response = await web.window
+          .fetch(
+            source.toString().toJS,
+            web.RequestInit(headers: headers, signal: controller.signal),
+          )
+          .toDart;
+    } finally {
+      timeout.cancel();
+    }
     if (!response.ok) {
       throw DownloadStoreException(
         'Download failed (${response.status}).',

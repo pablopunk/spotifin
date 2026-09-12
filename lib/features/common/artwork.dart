@@ -42,8 +42,13 @@ class _ArtworkState extends ConsumerState<Artwork> {
       ),
     );
     if (session == null) return fallback;
-    final physicalWidth = (size * MediaQuery.devicePixelRatioOf(context))
+    final requestedWidth = (size * MediaQuery.devicePixelRatioOf(context))
         .round();
+    final physicalWidth = switch (requestedWidth) {
+      <= 128 => 128,
+      <= 512 => 512,
+      _ => 1024,
+    };
     final accountId = '${session.serverId}.${session.userId}';
     final cacheKey = '$accountId:${widget.itemId}:$physicalWidth';
     if (_cacheKey != cacheKey) {

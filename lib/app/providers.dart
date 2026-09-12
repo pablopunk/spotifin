@@ -62,6 +62,7 @@ final downloadProvider = Provider<DownloadService>((ref) {
     ref.watch(databaseProvider),
     ref.watch(jellyfinClientProvider),
     DownloadStore(),
+    ref.watch(artworkStoreProvider),
   );
   ref.onDispose(service.dispose);
   return service;

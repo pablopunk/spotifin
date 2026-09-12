@@ -5,12 +5,13 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../platform/download_store.dart';
+import '../../platform/artwork_store.dart';
 import '../../storage/database.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 
 class DownloadService extends ChangeNotifier {
-  DownloadService(this._database, this._client, this._store);
+  DownloadService(this._database, this._client, this._store, this._artwork);
 
   static const _parallelDownloads = 3;
   static const _maximumAttempts = 3;
@@ -18,6 +19,7 @@ class DownloadService extends ChangeNotifier {
   final AppDatabase _database;
   final JellyfinClient _client;
   final DownloadStore _store;
+  final ArtworkStore _artwork;
   final Set<String> _active = {};
   final Set<String> _pending = {};
   final Set<String> _cancelled = {};
@@ -218,6 +220,7 @@ class DownloadService extends ChangeNotifier {
           return;
         }
         _consecutiveFailures = 0;
+        unawaited(_cacheArtwork(task));
         return;
       } catch (error) {
         lastError = error;
@@ -260,6 +263,21 @@ class DownloadService extends ChangeNotifier {
     _client.downloadHeaders(_sessionFor(task)),
     task.small ? 'm4a' : task.track.container,
   );
+
+  Future<void> _cacheArtwork(_DownloadTask task) async {
+    final session = _sessionFor(task);
+    final accountId = '${session.serverId}.${session.userId}';
+    final itemId = task.track.albumId ?? task.track.id;
+    await Future.wait([
+      for (final width in [128, 512, 1024])
+        _artwork.resolve(
+          accountId,
+          itemId,
+          width,
+          _client.imageUri(session, itemId, width: width),
+        ),
+    ]);
+  }
 
   JellyfinSession _sessionFor(_DownloadTask task) {
     final latest = _latestSession;
