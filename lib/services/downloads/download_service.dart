@@ -239,6 +239,7 @@ class DownloadService extends ChangeNotifier {
     Object? error, {
     bool affectsQueue = true,
   }) async {
+    if (_isCancelled(task)) return;
     await _database.putDownload(
       DownloadsCompanion.insert(
         trackId: task.track.id,
