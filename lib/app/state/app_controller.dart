@@ -373,17 +373,9 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> addToPlaylist(String playlistId, String trackId) async {
-    final session = state.session;
-    if (session == null) return;
+    if (state.session == null) return;
     await ref.read(databaseProvider).savePlaylistAddition(playlistId, trackId);
-    if (await _flushPending()) {
-      try {
-        final playlists = await ref
-            .read(jellyfinClientProvider)
-            .fetchPlaylists(session);
-        await ref.read(databaseProvider).replacePlaylists(playlists);
-      } catch (_) {}
-    }
+    await _flushPending();
   }
 
   Future<void> createPlaylist(String name, List<String> trackIds) async {
