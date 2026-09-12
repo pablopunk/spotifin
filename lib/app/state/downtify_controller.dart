@@ -374,7 +374,9 @@ class DowntifyController extends Notifier<DowntifyState> {
     _lastJellyfinRefresh = now;
     _refreshingJellyfin = true;
     try {
-      await ref.read(appControllerProvider.notifier).refresh(silent: true);
+      await ref
+          .read(appControllerProvider.notifier)
+          .refresh(silent: true, force: true);
       final tracks = await ref.read(databaseProvider).allTracks();
       for (final item in waiting) {
         final song = _songFromImport(item);

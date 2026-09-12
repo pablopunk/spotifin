@@ -125,27 +125,39 @@ class JellyfinClient {
     );
     final summaries = (body['Items'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
-    final results = <PlaylistsCompanion>[];
-    for (final summary in summaries) {
-      final id = summary['Id'] as String;
-      final content = await _getJson(
-        session,
-        _uri(session, '/Playlists/$id/Items', {'userId': session.userId}),
-      );
-      final ids = (content['Items'] as List<dynamic>? ?? const [])
-          .cast<Map<String, dynamic>>()
-          .map((item) => item['Id'] as String)
-          .toList();
-      results.add(
-        PlaylistsCompanion.insert(
-          id: id,
-          name: summary['Name'] as String? ?? 'Untitled playlist',
-          trackIds: Value(jsonEncode(ids)),
-          imageTag: Value(_primaryImageTag(summary)),
-        ),
-      );
+    final results = List<PlaylistsCompanion?>.filled(summaries.length, null);
+    var next = 0;
+    Future<void> worker() async {
+      while (true) {
+        final index = next++;
+        if (index >= summaries.length) return;
+        results[index] = await _playlistFromSummary(session, summaries[index]);
+      }
     }
-    return results;
+
+    await Future.wait(List.generate(4, (_) => worker()));
+    return results.cast<PlaylistsCompanion>();
+  }
+
+  Future<PlaylistsCompanion> _playlistFromSummary(
+    JellyfinSession session,
+    Map<String, dynamic> summary,
+  ) async {
+    final id = summary['Id'] as String;
+    final content = await _getJson(
+      session,
+      _uri(session, '/Playlists/$id/Items', {'userId': session.userId}),
+    );
+    final ids = (content['Items'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map((item) => item['Id'] as String)
+        .toList();
+    return PlaylistsCompanion.insert(
+      id: id,
+      name: summary['Name'] as String? ?? 'Untitled playlist',
+      trackIds: Value(jsonEncode(ids)),
+      imageTag: Value(_primaryImageTag(summary)),
+    );
   }
 
   Future<List<AlbumDatesCompanion>> fetchAlbumDates(

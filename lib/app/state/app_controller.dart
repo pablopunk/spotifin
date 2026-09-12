@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -68,6 +69,11 @@ class AppState {
     glassOpacity: glassOpacity ?? this.glassOpacity,
   );
 }
+
+@visibleForTesting
+bool withinRefreshCooldown(DateTime? lastSyncedAt, DateTime now) =>
+    lastSyncedAt != null &&
+    now.difference(lastSyncedAt) < const Duration(minutes: 5);
 
 class AppController extends Notifier<AppState> {
   Future<void>? _refreshFuture;
@@ -137,7 +143,7 @@ class AppController extends Notifier<AppState> {
           normalization: normalization,
         ),
       );
-      unawaited(refresh(silent: true));
+      unawaited(refresh(silent: true, force: true));
     } catch (error) {
       state = state.copyWith(
         status: AppStatus.signedOut,
@@ -208,9 +214,14 @@ class AppController extends Notifier<AppState> {
     }
   }
 
-  Future<void> refresh({bool silent = false}) {
+  Future<void> refresh({bool silent = false, bool force = false}) {
     final running = _refreshFuture;
     if (running != null) return running;
+    if (silent &&
+        !force &&
+        withinRefreshCooldown(state.lastSyncedAt, DateTime.now())) {
+      return Future.value();
+    }
     _refreshRetryTimer?.cancel();
     final refresh = _refresh(silent: silent);
     _refreshFuture = refresh;
@@ -326,7 +337,10 @@ class AppController extends Notifier<AppState> {
     final exponent = _refreshRetryAttempt.clamp(0, 4);
     final delay = Duration(seconds: 15 * (1 << exponent));
     _refreshRetryAttempt++;
-    _refreshRetryTimer = Timer(delay, () => unawaited(refresh(silent: true)));
+    _refreshRetryTimer = Timer(
+      delay,
+      () => unawaited(refresh(silent: true, force: true)),
+    );
   }
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
@@ -362,17 +376,9 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> addToPlaylist(String playlistId, String trackId) async {
-    final session = state.session;
-    if (session == null) return;
+    if (state.session == null) return;
     await ref.read(databaseProvider).savePlaylistAddition(playlistId, trackId);
-    if (await _flushPending()) {
-      try {
-        final playlists = await ref
-            .read(jellyfinClientProvider)
-            .fetchPlaylists(session);
-        await ref.read(databaseProvider).replacePlaylists(playlists);
-      } catch (_) {}
-    }
+    await _flushPending();
   }
 
   Future<void> createPlaylist(String name, List<String> trackIds) async {

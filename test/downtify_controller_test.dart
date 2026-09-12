@@ -193,5 +193,5 @@ class _AuthenticatedAppController extends AppController {
   );
 
   @override
-  Future<void> refresh({bool silent = false}) async {}
+  Future<void> refresh({bool silent = false, bool force = false}) async {}
 }
