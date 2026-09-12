@@ -38,7 +38,7 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, 'Albums'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SpotifinCollectionCard), findsNWidgets(3));
+    expect(find.byType(SpotifinCollectionCard), findsNWidgets(4));
     expect(find.text('First album'), findsOneWidget);
     expect(find.text('Second album'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -71,7 +71,12 @@ void main() {
         )
         .map((card) => card.title)
         .toList();
-    expect(titles, ['Long player', 'First album', 'Second album']);
+    expect(titles, [
+      'Long player',
+      'Undated single',
+      'First album',
+      'Second album',
+    ]);
     expect(find.text('Singles & EPs', skipOffstage: false), findsNothing);
     await _dispose(tester, tracks.database);
   });
@@ -160,6 +165,13 @@ Future<({AppDatabase database, List<Track> list})> _tracks() async {
       albumId: const Value('album-two'),
       premiereDate: Value(DateTime(2019, 6, 1)),
     ),
+    TracksCompanion.insert(
+      id: 'four',
+      name: 'Fourth song',
+      artist: const Value('Artist'),
+      album: const Value('Undated single'),
+      albumId: const Value('album-four'),
+    ),
     for (var index = 0; index < 6; index++)
       TracksCompanion.insert(
         id: 'long-$index',
@@ -169,6 +181,12 @@ Future<({AppDatabase database, List<Track> list})> _tracks() async {
         albumId: const Value('album-three'),
         premiereDate: Value(DateTime(2016, 9, 1)),
       ),
+  ]);
+  await database.replaceAlbumDates([
+    AlbumDatesCompanion.insert(
+      albumId: 'album-four',
+      premiereDate: DateTime(2025, 2, 1),
+    ),
   ]);
   return (database: database, list: await database.allTracks());
 }

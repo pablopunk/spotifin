@@ -172,6 +172,47 @@ void main() {
     expect(tracks[2].premiereDate.value, isNull);
   });
 
+  test('maps album dates with a production year fallback', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'Items': [
+              {
+                'Id': 'album-dated',
+                'PremiereDate': '2017-07-21T00:00:00.0000000Z',
+              },
+              {
+                'Id': 'album-year',
+                'PremiereDate': '0001-01-01T00:00:00.0000000Z',
+                'ProductionYear': 2023,
+              },
+              {'Id': 'album-undated'},
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final dates = await client.fetchAlbumDates(session);
+
+    expect(dates, hasLength(2));
+    expect(dates.first.albumId.value, 'album-dated');
+    expect(dates.first.premiereDate.value, DateTime.utc(2017, 7, 21));
+    expect(dates.last.albumId.value, 'album-year');
+    expect(dates.last.premiereDate.value, DateTime(2023));
+  });
+
   test('refreshes saved identity from the authenticated user', () async {
     final client = JellyfinClient(
       httpClient: MockClient(

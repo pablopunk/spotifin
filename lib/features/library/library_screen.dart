@@ -169,38 +169,43 @@ class _CollectionCard extends StatelessWidget {
   }
 }
 
-class _ArtistAlbumsTab extends StatelessWidget {
+class _ArtistAlbumsTab extends ConsumerWidget {
   const _ArtistAlbumsTab({required this.tracks, super.key});
   final List<Track> tracks;
 
   @override
-  Widget build(BuildContext context) {
-    final albums = _sortedArtistAlbums(tracks);
-    if (albums.isEmpty) {
-      return const SpotifinEmptyState(
-        icon: Icons.library_music_outlined,
-        title: 'Nothing here yet',
+  Widget build(BuildContext context, WidgetRef ref) =>
+      StreamBuilder<Map<String, DateTime>>(
+        stream: ref.watch(databaseProvider).watchAlbumDates(),
+        builder: (context, snapshot) {
+          final albums = _sortedArtistAlbums(tracks, snapshot.data ?? const {});
+          if (albums.isEmpty) {
+            return const SpotifinEmptyState(
+              icon: Icons.library_music_outlined,
+              title: 'Nothing here yet',
+            );
+          }
+          return spotifinGrid(
+            itemCount: albums.length,
+            itemBuilder: (context, index) => _CollectionCard(
+              title: albums[index].name,
+              tracks: albums[index].tracks,
+              menu: true,
+            ),
+          );
+        },
       );
-    }
-    return spotifinGrid(
-      itemCount: albums.length,
-      itemBuilder: (context, index) => _CollectionCard(
-        title: albums[index].name,
-        tracks: albums[index].tracks,
-        menu: true,
-      ),
-    );
-  }
 }
 
 class _AlbumGroup {
-  const _AlbumGroup({required this.name, required this.tracks});
+  const _AlbumGroup({required this.name, this.albumId, required this.tracks});
   final String name;
+  final String? albumId;
   final List<Track> tracks;
 
   bool get isFullAlbum => tracks.length > 5;
 
-  DateTime? get releaseDate {
+  DateTime? get trackDate {
     DateTime? earliest;
     for (final track in tracks) {
       final date = track.premiereDate;
@@ -211,23 +216,46 @@ class _AlbumGroup {
   }
 }
 
-List<_AlbumGroup> _sortedArtistAlbums(List<Track> tracks) {
+DateTime? _releaseDate(_AlbumGroup album, Map<String, DateTime> albumDates) {
+  final albumDate = album.albumId == null ? null : albumDates[album.albumId!];
+  if (albumDate != null && !_isYearOnly(albumDate)) return albumDate;
+  return album.trackDate ?? albumDate;
+}
+
+bool _isYearOnly(DateTime date) => date.month == 1 && date.day == 1;
+
+List<_AlbumGroup> _sortedArtistAlbums(
+  List<Track> tracks,
+  Map<String, DateTime> albumDates,
+) {
   final grouped = <String, _AlbumGroup>{};
   for (final track in tracks) {
     if (track.album.isEmpty) continue;
     final key = track.albumId ?? track.album;
     grouped
-        .putIfAbsent(key, () => _AlbumGroup(name: track.album, tracks: []))
+        .putIfAbsent(
+          key,
+          () => _AlbumGroup(
+            name: track.album,
+            albumId: track.albumId,
+            tracks: [],
+          ),
+        )
         .tracks
         .add(track);
   }
-  return grouped.values.toList()..sort(_byFullAlbumThenDate);
+  return grouped.values.toList()
+    ..sort((a, b) => _byFullAlbumThenDate(a, b, albumDates));
 }
 
-int _byFullAlbumThenDate(_AlbumGroup a, _AlbumGroup b) {
+int _byFullAlbumThenDate(
+  _AlbumGroup a,
+  _AlbumGroup b,
+  Map<String, DateTime> albumDates,
+) {
   if (a.isFullAlbum != b.isFullAlbum) return a.isFullAlbum ? -1 : 1;
-  final aDate = a.releaseDate;
-  final bDate = b.releaseDate;
+  final aDate = _releaseDate(a, albumDates);
+  final bDate = _releaseDate(b, albumDates);
   if (aDate != null && bDate != null) {
     final byDate = bDate.compareTo(aDate);
     if (byDate != 0) return byDate;

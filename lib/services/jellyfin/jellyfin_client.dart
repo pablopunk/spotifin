@@ -146,6 +146,42 @@ class JellyfinClient {
     return results;
   }
 
+  Future<List<AlbumDatesCompanion>> fetchAlbumDates(
+    JellyfinSession session,
+  ) async {
+    final dates = <AlbumDatesCompanion>[];
+    var startIndex = 0;
+    const pageSize = 500;
+    while (true) {
+      final body = await _getJson(
+        session,
+        _uri(session, '/Users/${session.userId}/Items', {
+          'IncludeItemTypes': 'MusicAlbum',
+          'Recursive': 'true',
+          'StartIndex': '$startIndex',
+          'Limit': '$pageSize',
+          'SortBy': 'SortName',
+          'SortOrder': 'Ascending',
+        }),
+      );
+      final page = (body['Items'] as List<dynamic>? ?? const [])
+          .cast<Map<String, dynamic>>();
+      for (final item in page) {
+        final id = item['Id'] as String?;
+        final date = _premiereDate(item);
+        if (id != null && date != null) {
+          dates.add(
+            AlbumDatesCompanion.insert(albumId: id, premiereDate: date),
+          );
+        }
+      }
+      startIndex += page.length;
+      final total = body['TotalRecordCount'] as int? ?? startIndex;
+      if (page.isEmpty || startIndex >= total) break;
+    }
+    return dates;
+  }
+
   Future<void> setFavorite(
     JellyfinSession session,
     String itemId,

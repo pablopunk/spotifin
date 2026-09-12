@@ -2932,6 +2932,228 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
   }
 }
 
+class $AlbumDatesTable extends AlbumDates
+    with TableInfo<$AlbumDatesTable, AlbumDate> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AlbumDatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _albumIdMeta = const VerificationMeta(
+    'albumId',
+  );
+  @override
+  late final GeneratedColumn<String> albumId = GeneratedColumn<String>(
+    'album_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _premiereDateMeta = const VerificationMeta(
+    'premiereDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> premiereDate = GeneratedColumn<DateTime>(
+    'premiere_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [albumId, premiereDate];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'album_dates';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AlbumDate> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('album_id')) {
+      context.handle(
+        _albumIdMeta,
+        albumId.isAcceptableOrUnknown(data['album_id']!, _albumIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_albumIdMeta);
+    }
+    if (data.containsKey('premiere_date')) {
+      context.handle(
+        _premiereDateMeta,
+        premiereDate.isAcceptableOrUnknown(
+          data['premiere_date']!,
+          _premiereDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_premiereDateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {albumId};
+  @override
+  AlbumDate map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AlbumDate(
+      albumId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}album_id'],
+      )!,
+      premiereDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}premiere_date'],
+      )!,
+    );
+  }
+
+  @override
+  $AlbumDatesTable createAlias(String alias) {
+    return $AlbumDatesTable(attachedDatabase, alias);
+  }
+}
+
+class AlbumDate extends DataClass implements Insertable<AlbumDate> {
+  final String albumId;
+  final DateTime premiereDate;
+  const AlbumDate({required this.albumId, required this.premiereDate});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['album_id'] = Variable<String>(albumId);
+    map['premiere_date'] = Variable<DateTime>(premiereDate);
+    return map;
+  }
+
+  AlbumDatesCompanion toCompanion(bool nullToAbsent) {
+    return AlbumDatesCompanion(
+      albumId: Value(albumId),
+      premiereDate: Value(premiereDate),
+    );
+  }
+
+  factory AlbumDate.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AlbumDate(
+      albumId: serializer.fromJson<String>(json['albumId']),
+      premiereDate: serializer.fromJson<DateTime>(json['premiereDate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'albumId': serializer.toJson<String>(albumId),
+      'premiereDate': serializer.toJson<DateTime>(premiereDate),
+    };
+  }
+
+  AlbumDate copyWith({String? albumId, DateTime? premiereDate}) => AlbumDate(
+    albumId: albumId ?? this.albumId,
+    premiereDate: premiereDate ?? this.premiereDate,
+  );
+  AlbumDate copyWithCompanion(AlbumDatesCompanion data) {
+    return AlbumDate(
+      albumId: data.albumId.present ? data.albumId.value : this.albumId,
+      premiereDate: data.premiereDate.present
+          ? data.premiereDate.value
+          : this.premiereDate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AlbumDate(')
+          ..write('albumId: $albumId, ')
+          ..write('premiereDate: $premiereDate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(albumId, premiereDate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AlbumDate &&
+          other.albumId == this.albumId &&
+          other.premiereDate == this.premiereDate);
+}
+
+class AlbumDatesCompanion extends UpdateCompanion<AlbumDate> {
+  final Value<String> albumId;
+  final Value<DateTime> premiereDate;
+  final Value<int> rowid;
+  const AlbumDatesCompanion({
+    this.albumId = const Value.absent(),
+    this.premiereDate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AlbumDatesCompanion.insert({
+    required String albumId,
+    required DateTime premiereDate,
+    this.rowid = const Value.absent(),
+  }) : albumId = Value(albumId),
+       premiereDate = Value(premiereDate);
+  static Insertable<AlbumDate> custom({
+    Expression<String>? albumId,
+    Expression<DateTime>? premiereDate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (albumId != null) 'album_id': albumId,
+      if (premiereDate != null) 'premiere_date': premiereDate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AlbumDatesCompanion copyWith({
+    Value<String>? albumId,
+    Value<DateTime>? premiereDate,
+    Value<int>? rowid,
+  }) {
+    return AlbumDatesCompanion(
+      albumId: albumId ?? this.albumId,
+      premiereDate: premiereDate ?? this.premiereDate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (albumId.present) {
+      map['album_id'] = Variable<String>(albumId.value);
+    }
+    if (premiereDate.present) {
+      map['premiere_date'] = Variable<DateTime>(premiereDate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AlbumDatesCompanion(')
+          ..write('albumId: $albumId, ')
+          ..write('premiereDate: $premiereDate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2942,6 +3164,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DowntifyImportsTable downtifyImports = $DowntifyImportsTable(
     this,
   );
+  late final $AlbumDatesTable albumDates = $AlbumDatesTable(this);
   late final Index tracksName = Index(
     'tracks_name',
     'CREATE INDEX tracks_name ON tracks (name)',
@@ -2956,6 +3179,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     downloads,
     pendingWrites,
     downtifyImports,
+    albumDates,
     tracksName,
   ];
 }
@@ -4431,6 +4655,155 @@ typedef $$DowntifyImportsTableProcessedTableManager =
       DowntifyImport,
       PrefetchHooks Function()
     >;
+typedef $$AlbumDatesTableCreateCompanionBuilder = AlbumDatesCompanion Function({
+  required String albumId,
+  required DateTime premiereDate,
+  Value<int> rowid,
+});
+typedef $$AlbumDatesTableUpdateCompanionBuilder = AlbumDatesCompanion Function({
+  Value<String> albumId,
+  Value<DateTime> premiereDate,
+  Value<int> rowid,
+});
+
+class $$AlbumDatesTableFilterComposer
+    extends Composer<_$AppDatabase, $AlbumDatesTable> {
+  $$AlbumDatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get albumId => $composableBuilder(
+    column: $table.albumId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AlbumDatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $AlbumDatesTable> {
+  $$AlbumDatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get albumId => $composableBuilder(
+    column: $table.albumId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AlbumDatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AlbumDatesTable> {
+  $$AlbumDatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get albumId =>
+      $composableBuilder(column: $table.albumId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
+    builder: (column) => column,
+  );
+}
+
+class $$AlbumDatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AlbumDatesTable,
+          AlbumDate,
+          $$AlbumDatesTableFilterComposer,
+          $$AlbumDatesTableOrderingComposer,
+          $$AlbumDatesTableAnnotationComposer,
+          $$AlbumDatesTableCreateCompanionBuilder,
+          $$AlbumDatesTableUpdateCompanionBuilder,
+          (
+            AlbumDate,
+            BaseReferences<_$AppDatabase, $AlbumDatesTable, AlbumDate>,
+          ),
+          AlbumDate,
+          PrefetchHooks Function()
+        > {
+  $$AlbumDatesTableTableManager(_$AppDatabase db, $AlbumDatesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AlbumDatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AlbumDatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AlbumDatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> albumId = const Value.absent(),
+                Value<DateTime> premiereDate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AlbumDatesCompanion(
+                albumId: albumId,
+                premiereDate: premiereDate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String albumId,
+                required DateTime premiereDate,
+                Value<int> rowid = const Value.absent(),
+              }) => AlbumDatesCompanion.insert(
+                albumId: albumId,
+                premiereDate: premiereDate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AlbumDatesTable, AlbumDate>(table),
+                  BaseReferences<_$AppDatabase, $AlbumDatesTable, AlbumDate>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AlbumDatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AlbumDatesTable,
+      AlbumDate,
+      $$AlbumDatesTableFilterComposer,
+      $$AlbumDatesTableOrderingComposer,
+      $$AlbumDatesTableAnnotationComposer,
+      $$AlbumDatesTableCreateCompanionBuilder,
+      $$AlbumDatesTableUpdateCompanionBuilder,
+      (AlbumDate, BaseReferences<_$AppDatabase, $AlbumDatesTable, AlbumDate>),
+      AlbumDate,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4445,4 +4818,6 @@ class $AppDatabaseManager {
       $$PendingWritesTableTableManager(_db, _db.pendingWrites);
   $$DowntifyImportsTableTableManager get downtifyImports =>
       $$DowntifyImportsTableTableManager(_db, _db.downtifyImports);
+  $$AlbumDatesTableTableManager get albumDates =>
+      $$AlbumDatesTableTableManager(_db, _db.albumDates);
 }

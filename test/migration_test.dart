@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/storage/database.dart';
@@ -5,6 +6,15 @@ import 'package:spotifin/storage/database.dart';
 import 'generated_migrations/schema.dart';
 
 void main() {
+  test('a fresh database matches the generated schema', () async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.select(database.tracks).get();
+
+    await database.validateDatabaseSchema();
+
+    await database.close();
+  });
+
   test('a v5 library upgrades to the current schema and keeps data', () async {
     final verifier = SchemaVerifier(GeneratedHelper());
     final schema = await verifier.schemaAt(5);

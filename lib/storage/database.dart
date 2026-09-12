@@ -84,8 +84,23 @@ class DowntifyImports extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+class AlbumDates extends Table {
+  TextColumn get albumId => text()();
+  DateTimeColumn get premiereDate => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {albumId};
+}
+
 @DriftDatabase(
-  tables: [Tracks, Playlists, Downloads, PendingWrites, DowntifyImports],
+  tables: [
+    Tracks,
+    Playlists,
+    Downloads,
+    PendingWrites,
+    DowntifyImports,
+    AlbumDates,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase()
@@ -102,7 +117,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -112,6 +127,7 @@ class AppDatabase extends _$AppDatabase {
       await migrator.createTable(downloads);
       await migrator.createTable(pendingWrites);
       await migrator.createTable(downtifyImports);
+      await migrator.createTable(albumDates);
       await customStatement(
         'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
       );
@@ -138,6 +154,7 @@ class AppDatabase extends _$AppDatabase {
         );
         if (missing) await migrator.addColumn(tracks, tracks.premiereDate);
       }
+      if (from < 8) await migrator.createTable(albumDates);
     },
   );
 
@@ -257,6 +274,16 @@ class AppDatabase extends _$AppDatabase {
         await batch((batch) => batch.insertAll(playlists, rows));
       });
 
+  Stream<Map<String, DateTime>> watchAlbumDates() => select(albumDates)
+      .watch()
+      .map((rows) => {for (final row in rows) row.albumId: row.premiereDate});
+
+  Future<void> replaceAlbumDates(List<AlbumDatesCompanion> rows) =>
+      transaction(() async {
+        await delete(albumDates).go();
+        await batch((batch) => batch.insertAll(albumDates, rows));
+      });
+
   Future<void> savePlaylistAddition(String playlistId, String trackId) =>
       transaction(() async {
         final playlist = await (select(
@@ -359,6 +386,7 @@ class AppDatabase extends _$AppDatabase {
     await delete(pendingWrites).go();
     await delete(downloads).go();
     await delete(playlists).go();
+    await delete(albumDates).go();
     await delete(tracks).go();
   });
 }

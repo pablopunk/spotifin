@@ -235,12 +235,6 @@ class AppController extends Notifier<AppState> {
       if (generation != _sessionGeneration) return;
       state = state.copyWith(session: session);
       await _flushPending();
-      final tracks = await client.fetchTracks(session);
-      if (generation != _sessionGeneration) return;
-      await database.replaceTracks(tracks);
-      await ref
-          .read(downloadProvider)
-          .reconcile(tracks.map((track) => track.id.value));
       Object? playlistError;
       try {
         final playlists = await client.fetchPlaylists(session);
@@ -249,6 +243,17 @@ class AppController extends Notifier<AppState> {
       } catch (error) {
         playlistError = error;
       }
+      final tracks = await client.fetchTracks(session);
+      if (generation != _sessionGeneration) return;
+      await database.replaceTracks(tracks);
+      await ref
+          .read(downloadProvider)
+          .reconcile(tracks.map((track) => track.id.value));
+      try {
+        final albumDates = await client.fetchAlbumDates(session);
+        if (generation != _sessionGeneration) return;
+        await database.replaceAlbumDates(albumDates);
+      } catch (_) {}
       final catalog = await ref.read(databaseProvider).allTracks();
       await ref
           .read(carPlayProvider)
