@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/album_context_menu.dart';
@@ -451,7 +452,18 @@ class _CollectionHeader extends ConsumerWidget {
   final Widget? artwork;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => DecoratedBox(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playback = ref.watch(playbackProvider);
+    return ListenableBuilder(
+      listenable: playback,
+      builder: (context, _) => _content(context, playback),
+    );
+  }
+
+  Widget _content(
+    BuildContext context,
+    PlaybackService playback,
+  ) => DecoratedBox(
     decoration: const BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
@@ -501,8 +513,15 @@ class _CollectionHeader extends ConsumerWidget {
                     SpotifinPlayButton(
                       onPressed: tracks.isEmpty
                           ? null
-                          : () =>
-                                ref.read(playbackProvider).replaceQueue(tracks),
+                          : () => playback.replaceQueue(tracks),
+                    ),
+                    IconButton(
+                      tooltip: 'Shuffle',
+                      color: playback.shuffle
+                          ? SpotifinColors.accent
+                          : SpotifinColors.textMuted,
+                      onPressed: tracks.isEmpty ? null : playback.toggleShuffle,
+                      icon: const Icon(Icons.shuffle_rounded),
                     ),
                     CollectionDownloadButton(tracks: tracks),
                   ],

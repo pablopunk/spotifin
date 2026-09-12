@@ -95,6 +95,31 @@ void main() {
     expect(find.text('First song'), findsOneWidget);
     await _dispose(tester, tracks.database);
   });
+
+  testWidgets('collection header offers an enabled shuffle toggle', (
+    tester,
+  ) async {
+    final tracks = await _tracks();
+
+    await tester.pumpWidget(
+      _app(
+        CollectionScreen(
+          title: 'Album',
+          icon: Icons.album_rounded,
+          tracks: tracks.list,
+        ),
+        tracks.database,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Shuffle'), findsOneWidget);
+    final shuffle = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, Icons.shuffle_rounded),
+    );
+    expect(shuffle.onPressed, isNotNull);
+    await _dispose(tester, tracks.database);
+  });
 }
 
 Future<void> _dispose(WidgetTester tester, AppDatabase database) async {
