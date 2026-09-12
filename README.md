@@ -49,3 +49,7 @@ Select your Downtify server and search results will include Downtify songs you c
 | Downtify config | Downtify integration |
 | -------- | -------- |
 | ![Downtify config](assets/screenshots/downtify-config.jpg) | ![Downtify integration](assets/screenshots/downtify-search.jpg) |
+
+## License
+
+Spotifin is licensed under the [GNU Affero General Public License v3.0](LICENSE).

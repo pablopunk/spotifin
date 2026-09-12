@@ -176,7 +176,7 @@ class SettingsScreen extends ConsumerWidget {
                 applicationName: 'Spotifin',
                 applicationVersion: '1.0.0',
                 applicationLegalese:
-                    'Free and open-source Jellyfin music player',
+                    'Free, open-source Jellyfin music player (AGPL-3.0)',
               ),
             ],
           ),
