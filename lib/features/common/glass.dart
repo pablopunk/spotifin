@@ -16,7 +16,7 @@ abstract final class SpotifinGlass {
   static final theme = GlassThemeData.simple(
     blur: 8,
     thickness: 28,
-    quality: GlassQuality.standard,
+    quality: GlassQuality.premium,
     brightness: Brightness.dark,
   );
 

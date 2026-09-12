@@ -570,7 +570,7 @@ class _SheetSurface extends StatelessWidget {
 
 Widget _glassSheet(Widget child, double opacity) => GlassContainer(
   useOwnLayer: true,
-  quality: GlassQuality.standard,
+  quality: GlassQuality.premium,
   settings: SpotifinGlass.settings(opacity),
   shape: const LiquidRoundedSuperellipse(borderRadius: 24),
   clipBehavior: Clip.antiAlias,

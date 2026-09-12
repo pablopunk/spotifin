@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:spotifin/app/state/app_controller.dart';
 import 'package:spotifin/features/common/glass.dart';
 
@@ -44,6 +45,11 @@ void main() {
 
     expect(settings.glassColor.a, closeTo(.35, .001));
     expect(settings.backerColor, isNull);
+  });
+
+  test('glass theme defaults to the subtle premium renderer', () {
+    expect(SpotifinGlass.theme.dark.quality, GlassQuality.premium);
+    expect(SpotifinGlass.theme.light.quality, GlassQuality.premium);
   });
 
   test('glass edge optics stay subdued', () {
