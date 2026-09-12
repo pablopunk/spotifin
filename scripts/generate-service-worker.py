@@ -21,6 +21,8 @@ def shell_files() -> list[str]:
         if path.is_file()
         and path.relative_to(BUILD_DIRECTORY).as_posix() not in EXCLUDED
         and not path.name.endswith(".map")
+        and not path.name.endswith(".symbols")
+        and not path.name.startswith("skwasm")
     )
 
 
