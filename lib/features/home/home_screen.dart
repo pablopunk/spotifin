@@ -126,7 +126,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? _SearchFilter.all
         : _searchFilter;
     return StreamBuilder<List<Track>>(
-      stream: ref.watch(databaseProvider).watchTracks(),
+      stream: ref.watch(allTracksStreamProvider),
       builder: (context, snapshot) {
         final tracks = snapshot.data ?? const [];
         if (!snapshot.hasData) {
