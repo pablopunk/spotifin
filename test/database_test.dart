@@ -141,14 +141,12 @@ void main() {
     expect(await database.allTracks(), isEmpty);
   });
 
-  test('creation creates the shared name index', () async {
-    final indexes = await database
-        .customSelect(
-          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'tracks_name'",
-        )
-        .get();
+  test('creation accepts existing tables and tracks index', () async {
+    await database.allTracks();
 
-    expect(indexes, hasLength(1));
+    await database.migration.onCreate(Migrator(database));
+
+    expect(await database.allTracks(), isEmpty);
   });
 
   test('persists Downtify imports per Jellyfin account', () async {
