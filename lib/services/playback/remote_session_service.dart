@@ -170,7 +170,7 @@ class RemoteSessionService extends ChangeNotifier {
     if (session == null || generation != _generation) return;
     try {
       final channel = WebSocketChannel.connect(_client.webSocketUri(session));
-      await channel.ready;
+      await channel.ready.timeout(const Duration(seconds: 10));
       if (generation != _generation) {
         await channel.sink.close(socket_status.goingAway);
         return;

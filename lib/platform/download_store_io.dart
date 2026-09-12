@@ -25,7 +25,9 @@ class DownloadStore {
     try {
       if (await temporary.exists()) await temporary.delete();
       final request = http.Request('GET', source)..headers.addAll(headers);
-      final response = await client.send(request);
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw DownloadStoreException(
           'Download failed (${response.statusCode}).',

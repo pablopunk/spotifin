@@ -129,7 +129,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _rememberTracks(_queue);
     await _loadSources(initialIndex: safeIndex - start);
     unawaited(_player.play());
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   Future<void> playTrack(Track track, List<Track> context) async {
@@ -148,7 +148,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final sources = await _sources(session, [track]);
     await _player.addAudioSource(sources.single);
     await _saveQueue();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -166,7 +166,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _rememberTracks(tracks);
     await _player.insertAudioSources(insertAt, await _sources(session, tracks));
     await _saveQueue();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -177,7 +177,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _playlistItemIds.removeAt(index);
     await _player.removeAudioSourceAt(index);
     await _saveQueue();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -193,7 +193,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     }
     _tracksById.remove(trackId);
     await _saveQueue();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -205,7 +205,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _playlistItemIds.insert(newIndex, playlistItemId);
     await _player.moveAudioSource(oldIndex, newIndex);
     await _saveQueue();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -223,19 +223,19 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> pause() async {
     if (!_player.playing) return;
     await _player.pause();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   @override
   Future<void> play() async {
     if (_player.playing) return;
     unawaited(_player.play());
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   @override
   Future<void> stop() async {
-    await _reportStop();
+    unawaited(_reportStop());
     await _player.stop();
     notifyListeners();
   }
@@ -247,14 +247,14 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     if (index < 0 || index >= _queue.length) return;
     await _player.seek(Duration.zero, index: index);
     unawaited(_player.play());
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   @override
   Future<void> previous() async {
     if (_player.position > const Duration(seconds: 4)) {
       await _player.seek(Duration.zero);
-      await _reportProgress(force: true);
+      unawaited(_reportProgress(force: true));
     } else {
       await _player.seekToPrevious();
     }
@@ -264,7 +264,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> seek(Duration position) async {
     await _player.seek(position);
     await _savePosition(position);
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   @override
@@ -272,14 +272,14 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _userVolume = volume.clamp(0.0, 1.0);
     _volumeController.add(_userVolume);
     await _updateOutputVolume();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   Future<void> toggleShuffle() async {
     _shuffle = !_shuffle;
     await _player.setShuffleModeEnabled(_shuffle);
     if (_shuffle) await _player.shuffle();
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -290,7 +290,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       LoopMode.one => LoopMode.off,
     };
     await _player.setLoopMode(_loopMode);
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -305,7 +305,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     if (_loopMode == mode) return;
     _loopMode = mode;
     await _player.setLoopMode(mode);
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
@@ -328,7 +328,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final safePosition = position > duration ? duration : position;
     await _loadSources(initialIndex: safeIndex, initialPosition: safePosition);
     unawaited(_player.play());
-    await _reportProgress(force: true);
+    unawaited(_reportProgress(force: true));
   }
 
   Future<void> restore(List<Track> catalog) async {
@@ -357,7 +357,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   Future<void> clear() async {
-    await _reportStop();
+    unawaited(_reportStop());
     await _player.stop();
     _queue = [];
     _playlistItemIds = [];
@@ -443,30 +443,32 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     }
     unawaited(_extendQueueIfNeeded());
     await _applyGain(track);
-    await _reportStop();
+    unawaited(_reportStop());
     _reportedTrackId = track.id;
     _reportedPlaylistItemId = playlistItemId;
     final playSessionId =
         '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
     _playSessionId = playSessionId;
     _lastReportedSecond = -1;
-    try {
-      await _serializeReport(
-        () => _client.reportPlayback(
-          session,
-          '/Sessions/Playing',
-          track.id,
-          _player.position,
-          playSessionId: playSessionId,
-          paused: !_player.playing,
-          playlistItemId: playlistItemId,
-          queue: _reportedQueue,
-          volume: (_userVolume * 100).round(),
-          repeatMode: _reportedRepeatMode,
-          shuffle: _shuffle,
-        ),
-      );
-    } catch (_) {}
+    unawaited(
+      _serializeReport(() async {
+        try {
+          await _client.reportPlayback(
+            session,
+            '/Sessions/Playing',
+            track.id,
+            _player.position,
+            playSessionId: playSessionId,
+            paused: !_player.playing,
+            playlistItemId: playlistItemId,
+            queue: _reportedQueue,
+            volume: (_userVolume * 100).round(),
+            repeatMode: _reportedRepeatMode,
+            shuffle: _shuffle,
+          );
+        } catch (_) {}
+      }),
+    );
   }
 
   Future<void> _extendQueueIfNeeded() async {
@@ -584,30 +586,32 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   String _newPlaylistItemId() => _queueItemIdentity.next();
 
-  Future<void> _reportStop() => _serializeReport(_reportStopNow);
-
-  Future<void> _reportStopNow() async {
+  Future<void> _reportStop() {
     final session = _session;
     final trackId = _reportedTrackId;
     final playSessionId = _playSessionId;
-    if (session == null || trackId == null || playSessionId == null) return;
     _reportedTrackId = null;
     _reportedPlaylistItemId = null;
     _playSessionId = null;
-    try {
-      await _client.reportPlayback(
-        session,
-        '/Sessions/Playing/Stopped',
-        trackId,
-        _player.position,
-        playSessionId: playSessionId,
-      );
-    } catch (_) {}
+    if (session == null || trackId == null || playSessionId == null) {
+      return Future.value();
+    }
+    final position = _player.position;
+    return _serializeReport(() async {
+      try {
+        await _client.reportPlayback(
+          session,
+          '/Sessions/Playing/Stopped',
+          trackId,
+          position,
+          playSessionId: playSessionId,
+        );
+      } catch (_) {}
+    });
   }
 
   Future<void> _finishCompletedQueue() async {
-    await _reportStop();
-    if (_playSessionId != null) return;
+    unawaited(_reportStop());
     await _player.stop();
     notifyListeners();
   }

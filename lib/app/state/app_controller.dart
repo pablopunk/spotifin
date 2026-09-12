@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,77 +61,86 @@ class AppState {
 }
 
 class AppController extends Notifier<AppState> {
+  Future<void>? _refreshFuture;
+  int _sessionGeneration = 0;
+  String? _remoteAccountId;
+
   @override
   AppState build() => const AppState();
 
   Future<void> initialize() async {
-    final preferences = await SharedPreferences.getInstance();
-    final smallStreaming = preferences.getBool('smallStreaming') ?? false;
-    final smallDownloads = preferences.getBool('smallDownloads') ?? false;
-    final normalization = preferences.getBool('normalization') ?? false;
-    final glassEffects = preferences.getBool('glassEffects') ?? true;
-    final glassOpacity = preferences.getDouble('glassOpacity') ?? .8;
-    const developmentLogin = DevelopmentLogin.fromEnvironment();
-    if (developmentLogin.canSignIn) {
-      state = AppState(
-        smallStreaming: smallStreaming,
-        smallDownloads: smallDownloads,
-        normalization: normalization,
-        glassEffects: glassEffects,
-        glassOpacity: glassOpacity,
-      );
-      await signIn(
-        developmentLogin.server,
-        developmentLogin.username,
-        developmentLogin.password,
-      );
-      return;
-    }
-    final savedSession = await ref.read(sessionStoreProvider).load();
-    if (savedSession == null) {
-      state = AppState(
-        status: AppStatus.signedOut,
-        smallStreaming: smallStreaming,
-        smallDownloads: smallDownloads,
-        normalization: normalization,
-        glassEffects: glassEffects,
-        glassOpacity: glassOpacity,
-      );
-      return;
-    }
-    late final JellyfinSession session;
     try {
-      session = await _refreshSessionIdentity(savedSession);
-    } on JellyfinException catch (error) {
-      if (error.statusCode != 401) rethrow;
-      await _expireSession();
-      return;
-    }
-    state = AppState(
-      session: session,
-      smallStreaming: smallStreaming,
-      smallDownloads: smallDownloads,
-      normalization: normalization,
-      glassEffects: glassEffects,
-      glassOpacity: glassOpacity,
-    );
-    await ref
-        .read(playbackProvider)
-        .configure(
-          session,
+      final preferences = await SharedPreferences.getInstance();
+      final smallStreaming = preferences.getBool('smallStreaming') ?? false;
+      final smallDownloads = preferences.getBool('smallDownloads') ?? false;
+      final normalization = preferences.getBool('normalization') ?? false;
+      final glassEffects = preferences.getBool('glassEffects') ?? true;
+      final glassOpacity = preferences.getDouble('glassOpacity') ?? .8;
+      final savedSession = await ref.read(sessionStoreProvider).load();
+      if (savedSession == null) {
+        const developmentLogin = DevelopmentLogin.fromEnvironment();
+        if (developmentLogin.canSignIn) {
+          state = AppState(
+            smallStreaming: smallStreaming,
+            smallDownloads: smallDownloads,
+            normalization: normalization,
+            glassEffects: glassEffects,
+            glassOpacity: glassOpacity,
+          );
+          await signIn(
+            developmentLogin.server,
+            developmentLogin.username,
+            developmentLogin.password,
+          );
+          return;
+        }
+        state = AppState(
+          status: AppStatus.signedOut,
           smallStreaming: smallStreaming,
+          smallDownloads: smallDownloads,
           normalization: normalization,
+          glassEffects: glassEffects,
+          glassOpacity: glassOpacity,
         );
-    await ref.read(remoteSessionProvider).configure(session);
-    final cached = await ref.read(databaseProvider).allTracks();
-    if (cached.isNotEmpty) {
+        return;
+      }
+      _sessionGeneration++;
+      state = AppState(
+        status: AppStatus.ready,
+        session: savedSession,
+        smallStreaming: smallStreaming,
+        smallDownloads: smallDownloads,
+        normalization: normalization,
+        glassEffects: glassEffects,
+        glassOpacity: glassOpacity,
+      );
+      await ref
+          .read(playbackProvider)
+          .configure(
+            savedSession,
+            smallStreaming: smallStreaming,
+            normalization: normalization,
+          );
+      unawaited(_restoreLocalPlayback());
+      unawaited(refresh(silent: true));
+    } catch (error) {
+      state = state.copyWith(
+        status: AppStatus.signedOut,
+        syncing: false,
+        error: 'Could not open saved Spotifin data: $error',
+      );
+    }
+  }
+
+  Future<void> _restoreLocalPlayback() async {
+    try {
+      final cached = await ref.read(databaseProvider).allTracks();
+      if (cached.isEmpty) return;
       await ref.read(playbackProvider).restore(cached);
       await ref
-          .read(downloadProvider)
-          .resume(session, await _tracksByRecency(), small: smallDownloads);
-    }
-    state = state.copyWith(status: AppStatus.ready);
-    await refresh(silent: cached.isNotEmpty);
+          .read(carPlayProvider)
+          .configure(cached, ref.read(playbackProvider));
+    } catch (_) {}
   }
 
   Future<bool> signIn(String server, String username, String password) async {
@@ -152,7 +162,8 @@ class AppController extends Notifier<AppState> {
             smallStreaming: state.smallStreaming,
             normalization: state.normalization,
           );
-      await ref.read(remoteSessionProvider).configure(session);
+      _sessionGeneration++;
+      _remoteAccountId = null;
       state = state.copyWith(
         status: AppStatus.ready,
         session: session,
@@ -171,14 +182,26 @@ class AppController extends Notifier<AppState> {
     }
   }
 
-  Future<void> refresh({bool silent = false}) async {
+  Future<void> refresh({bool silent = false}) {
+    final running = _refreshFuture;
+    if (running != null) return running;
+    final refresh = _refresh(silent: silent);
+    _refreshFuture = refresh;
+    return refresh.whenComplete(() {
+      if (identical(_refreshFuture, refresh)) _refreshFuture = null;
+    });
+  }
+
+  Future<void> _refresh({required bool silent}) async {
     final savedSession = state.session;
-    if (savedSession == null || state.syncing && silent) return;
+    if (savedSession == null) return;
+    final generation = _sessionGeneration;
     state = state.copyWith(syncing: !silent, clearError: true);
     try {
       final client = ref.read(jellyfinClientProvider);
       final database = ref.read(databaseProvider);
       final session = await _refreshSessionIdentity(savedSession);
+      if (generation != _sessionGeneration) return;
       state = state.copyWith(session: session);
       await _flushPending();
       var firstPage = true;
@@ -223,12 +246,18 @@ class AppController extends Notifier<AppState> {
             await _tracksByRecency(),
             small: state.smallDownloads,
           );
+      final accountId = '${session.serverId}:${session.userId}';
+      if (_remoteAccountId != accountId) {
+        _remoteAccountId = accountId;
+        unawaited(ref.read(remoteSessionProvider).configure(session));
+      }
       state = state.copyWith(syncing: false, clearError: true);
     } catch (error) {
       if (error is JellyfinException && error.statusCode == 401) {
-        await _expireSession();
+        if (generation == _sessionGeneration) await _expireSession();
         return;
       }
+      if (generation != _sessionGeneration) return;
       state = silent
           ? state.copyWith(syncing: false, clearError: true)
           : state.copyWith(syncing: false, error: error.toString());
@@ -317,6 +346,8 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> signOut() async {
+    _sessionGeneration++;
+    _remoteAccountId = null;
     final session = state.session;
     await ref.read(remoteSessionProvider).clear();
     if (session != null) {
@@ -356,6 +387,8 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> _expireSession() async {
+    _sessionGeneration++;
+    _remoteAccountId = null;
     await ref.read(downloadProvider).suspend();
     await ref.read(remoteSessionProvider).clear();
     await ref.read(playbackProvider).clear();

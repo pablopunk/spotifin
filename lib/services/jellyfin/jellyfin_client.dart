@@ -20,7 +20,7 @@ class JellyfinException implements Exception {
 
 class JellyfinClient {
   JellyfinClient({http.Client? httpClient})
-    : _http = httpClient ?? http.Client();
+    : _http = _TimeoutClient(httpClient ?? http.Client());
 
   final http.Client _http;
   static const _clientName = 'Spotifin';
@@ -560,4 +560,18 @@ class JellyfinClient {
     final tags = json['ImageTags'] as Map<String, dynamic>?;
     return tags?['Primary'] as String?;
   }
+}
+
+class _TimeoutClient extends http.BaseClient {
+  _TimeoutClient(this._inner);
+
+  static const _timeout = Duration(seconds: 10);
+  final http.Client _inner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      _inner.send(request).timeout(_timeout);
+
+  @override
+  void close() => _inner.close();
 }
