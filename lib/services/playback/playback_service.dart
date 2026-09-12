@@ -13,6 +13,7 @@ import '../../storage/database.dart';
 import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
+import 'collection_queue.dart';
 import 'queue_item_identity.dart';
 import 'remote_playback.dart';
 
@@ -78,6 +79,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   List<Track> _context = const [];
   int _contextEnd = 0;
   bool _extendingQueue = false;
+  final math.Random _random = math.Random();
 
   static const _initialQueueSize = 100;
   static const _queueLookBehind = 20;
@@ -118,16 +120,21 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     if (track != null) await _applyGain(track);
   }
 
-  Future<void> replaceQueue(List<Track> tracks, {int startIndex = 0}) async {
+  Future<void> replaceQueue(List<Track> tracks, {int? startIndex}) async {
     if (tracks.isEmpty || _session == null) return;
-    final safeIndex = startIndex.clamp(0, tracks.length - 1);
-    final start = math.max(0, safeIndex - _queueLookBehind);
-    _context = List.of(tracks);
-    _contextEnd = math.min(tracks.length, start + _initialQueueSize);
+    final prepared = CollectionQueue.prepare(
+      tracks,
+      shuffle: _shuffle,
+      randomIndex: _random.nextInt,
+      startIndex: startIndex,
+    );
+    _context = prepared.context;
+    final start = math.max(0, prepared.index - _queueLookBehind);
+    _contextEnd = math.min(_context.length, start + _initialQueueSize);
     _queue = _context.sublist(start, _contextEnd);
     _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
-    await _loadSources(initialIndex: safeIndex - start);
+    await _loadSources(initialIndex: prepared.index - start);
     unawaited(_player.play());
     unawaited(_reportProgress(force: true));
   }
