@@ -359,6 +359,63 @@ void main() {
     expect(request.headers['X-Emby-Token'], 'token');
   });
 
+  test('fetches playlist contents with bounded concurrency', () async {
+    var inFlight = 0;
+    var maxInFlight = 0;
+    final client = JellyfinClient(
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/Users/user/Items') {
+          return http.Response(
+            jsonEncode({
+              'Items': [
+                {'Id': 'p1', 'Name': 'One'},
+                {'Id': 'p2', 'Name': 'Two'},
+                {'Id': 'p3', 'Name': 'Three'},
+                {'Id': 'p4', 'Name': 'Four'},
+                {'Id': 'p5', 'Name': 'Five'},
+              ],
+            }),
+            200,
+          );
+        }
+        inFlight++;
+        if (inFlight > maxInFlight) maxInFlight = inFlight;
+        final id = request.url.pathSegments[1];
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        inFlight--;
+        return http.Response(
+          jsonEncode({
+            'Items': [
+              {'Id': '$id-track'},
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final playlists = await client.fetchPlaylists(session);
+
+    expect(maxInFlight, lessThanOrEqualTo(4));
+    expect(playlists.map((playlist) => playlist.id.value).toList(), [
+      'p1',
+      'p2',
+      'p3',
+      'p4',
+      'p5',
+    ]);
+    expect(jsonDecode(playlists.first.trackIds.value), ['p1-track']);
+  });
+
   test('times out when the response body stalls', () async {
     final client = JellyfinClient(
       httpClient: _StallingClient(),
