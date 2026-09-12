@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class DevelopmentLogin {
   const DevelopmentLogin({
     required this.enabled,
@@ -19,6 +21,7 @@ class DevelopmentLogin {
 
   bool get canSignIn =>
       enabled &&
+      !kReleaseMode &&
       server.isNotEmpty &&
       username.isNotEmpty &&
       password.isNotEmpty;

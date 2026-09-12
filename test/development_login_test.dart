@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/state/development_login.dart';
 
@@ -24,6 +25,7 @@ void main() {
 
     expect(disabled.canSignIn, isFalse);
     expect(incomplete.canSignIn, isFalse);
+    expect(kReleaseMode, isFalse); // tests never run in release mode
     expect(ready.canSignIn, isTrue);
   });
 }
