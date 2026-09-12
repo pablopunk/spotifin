@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -68,6 +69,11 @@ class AppState {
     glassOpacity: glassOpacity ?? this.glassOpacity,
   );
 }
+
+@visibleForTesting
+bool withinRefreshCooldown(DateTime? lastSyncedAt, DateTime now) =>
+    lastSyncedAt != null &&
+    now.difference(lastSyncedAt) < const Duration(minutes: 5);
 
 class AppController extends Notifier<AppState> {
   Future<void>? _refreshFuture;
@@ -137,7 +143,7 @@ class AppController extends Notifier<AppState> {
           normalization: normalization,
         ),
       );
-      unawaited(refresh(silent: true));
+      unawaited(refresh(silent: true, force: true));
     } catch (error) {
       state = state.copyWith(
         status: AppStatus.signedOut,
@@ -208,9 +214,14 @@ class AppController extends Notifier<AppState> {
     }
   }
 
-  Future<void> refresh({bool silent = false}) {
+  Future<void> refresh({bool silent = false, bool force = false}) {
     final running = _refreshFuture;
     if (running != null) return running;
+    if (silent &&
+        !force &&
+        withinRefreshCooldown(state.lastSyncedAt, DateTime.now())) {
+      return Future.value();
+    }
     _refreshRetryTimer?.cancel();
     final refresh = _refresh(silent: silent);
     _refreshFuture = refresh;
