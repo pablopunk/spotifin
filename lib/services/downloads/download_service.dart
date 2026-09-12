@@ -9,6 +9,7 @@ import '../../platform/artwork_store.dart';
 import '../../storage/database.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
+import '../redaction.dart';
 
 class DownloadService extends ChangeNotifier {
   DownloadService(this._database, this._client, this._store, this._artwork);
@@ -238,11 +239,12 @@ class DownloadService extends ChangeNotifier {
     Object? error, {
     bool affectsQueue = true,
   }) async {
+    if (_isCancelled(task)) return;
     await _database.putDownload(
       DownloadsCompanion.insert(
         trackId: task.track.id,
         status: 'failed',
-        error: Value(error.toString()),
+        error: Value(redactSecrets(error)),
       ),
     );
     if (affectsQueue) _consecutiveFailures++;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -357,4 +358,32 @@ void main() {
     expect(request.url.path, '/Items/track-id');
     expect(request.headers['X-Emby-Token'], 'token');
   });
+
+  test('times out when the response body stalls', () async {
+    final client = JellyfinClient(
+      httpClient: _StallingClient(),
+      requestTimeout: const Duration(milliseconds: 100),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    await expectLater(
+      client.fetchSessions(session),
+      throwsA(isA<TimeoutException>()),
+    );
+  });
+}
+
+class _StallingClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    return http.StreamedResponse(StreamController<List<int>>().stream, 200);
+  }
 }

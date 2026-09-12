@@ -169,6 +169,27 @@ void main() {
     expect(await database.getDowntifyImports('server', 'other'), isEmpty);
   });
 
+  test('clearing account data removes Downtify imports', () async {
+    final now = DateTime(2026);
+    await database.putDowntifyImport(
+      DowntifyImportsCompanion.insert(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        downtifyUrl: 'https://downtify.example.com',
+        externalSongId: 'song',
+        songJson: '{}',
+        status: 'queued',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await database.clearAccountData();
+
+    expect(await database.getDowntifyImports('server', 'user'), isEmpty);
+  });
+
   test('version 5 migration creates Downtify imports', () async {
     await database.migration.onUpgrade(Migrator(database), 4, 5);
 

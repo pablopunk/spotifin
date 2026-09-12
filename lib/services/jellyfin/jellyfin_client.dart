@@ -19,8 +19,10 @@ class JellyfinException implements Exception {
 }
 
 class JellyfinClient {
-  JellyfinClient({http.Client? httpClient})
-    : _http = _TimeoutClient(httpClient ?? http.Client());
+  JellyfinClient({
+    http.Client? httpClient,
+    Duration requestTimeout = const Duration(seconds: 10),
+  }) : _http = _TimeoutClient(httpClient ?? http.Client(), requestTimeout);
 
   final http.Client _http;
   static const _clientName = 'Spotifin';
@@ -607,14 +609,25 @@ class JellyfinClient {
 }
 
 class _TimeoutClient extends http.BaseClient {
-  _TimeoutClient(this._inner);
+  _TimeoutClient(this._inner, this._timeout);
 
-  static const _timeout = Duration(seconds: 10);
   final http.Client _inner;
+  final Duration _timeout;
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) =>
-      _inner.send(request).timeout(_timeout);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final response = await _inner.send(request).timeout(_timeout);
+    return http.StreamedResponse(
+      response.stream.timeout(_timeout),
+      response.statusCode,
+      contentLength: response.contentLength,
+      request: response.request,
+      headers: response.headers,
+      isRedirect: response.isRedirect,
+      persistentConnection: response.persistentConnection,
+      reasonPhrase: response.reasonPhrase,
+    );
+  }
 
   @override
   void close() => _inner.close();

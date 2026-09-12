@@ -388,6 +388,7 @@ class AppDatabase extends _$AppDatabase {
     await delete(downloads).go();
     await delete(playlists).go();
     await delete(albumDates).go();
+    await delete(downtifyImports).go();
     await delete(tracks).go();
   });
 }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'download_store_exception.dart';
+import 'safe_path_segment.dart';
 
 class DownloadStore {
   Future<String> save(
@@ -14,11 +15,13 @@ class DownloadStore {
     String extension,
   ) async {
     final root = await getApplicationDocumentsDirectory();
-    final directory = Directory('${root.path}/downloads/$accountId');
+    final directory = Directory(
+      '${root.path}/downloads/${safePathSegment(accountId)}',
+    );
     await directory.create(recursive: true);
     final safeExtension = extension.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
     final target = File(
-      '${directory.path}/$trackId.${safeExtension.isEmpty ? 'mp3' : safeExtension}',
+      '${directory.path}/${safePathSegment(trackId)}.${safeExtension.isEmpty ? 'mp3' : safeExtension}',
     );
     final temporary = File('${target.path}.partial');
     final client = http.Client();

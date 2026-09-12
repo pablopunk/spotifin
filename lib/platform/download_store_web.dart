@@ -4,6 +4,7 @@ import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
 import 'download_store_exception.dart';
+import 'safe_path_segment.dart';
 
 class DownloadStore {
   static const _cacheName = 'spotifin-audio-v1';
@@ -40,9 +41,18 @@ class DownloadStore {
         statusCode: response.status,
       );
     }
-    final key = '/.spotifin/audio/$accountId/$trackId';
-    final cache = await web.window.caches.open(_cacheName).toDart;
-    await cache.put(key.toJS, response).toDart;
+    final key =
+        '/.spotifin/audio/${safePathSegment(accountId)}/${safePathSegment(trackId)}';
+    final transferTimeout = Timer(
+      const Duration(minutes: 5),
+      () => controller.abort(),
+    );
+    try {
+      final cache = await web.window.caches.open(_cacheName).toDart;
+      await cache.put(key.toJS, response).toDart;
+    } finally {
+      transferTimeout.cancel();
+    }
     return key;
   }
 
