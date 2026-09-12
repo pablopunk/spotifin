@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'safe_path_segment.dart';
+
 class ArtworkStore {
   final Map<String, Future<ImageProvider?>> _pending = {};
 
@@ -28,8 +30,12 @@ class ArtworkStore {
     Uri source,
   ) async {
     final root = await getApplicationSupportDirectory();
-    final directory = Directory('${root.path}/artwork/${_safe(accountId)}');
-    final target = File('${directory.path}/${_safe(itemId)}-$width.jpg');
+    final directory = Directory(
+      '${root.path}/artwork/${safePathSegment(accountId)}',
+    );
+    final target = File(
+      '${directory.path}/${safePathSegment(itemId)}-$width.jpg',
+    );
     if (await target.exists()) return FileImage(target);
     try {
       final response = await http
@@ -45,9 +51,6 @@ class ArtworkStore {
       return null;
     }
   }
-
-  String _safe(String value) =>
-      value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
 
   void dispose() {}
 }
