@@ -53,7 +53,11 @@ class RemoteSessionService extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      await _client.advertiseRemoteCapabilities(session);
+      try {
+        await _client.advertiseRemoteCapabilities(session);
+      } catch (error) {
+        _error = error.toString();
+      }
       await refresh();
       if (generation != _generation) return;
       unawaited(_connect(generation));
