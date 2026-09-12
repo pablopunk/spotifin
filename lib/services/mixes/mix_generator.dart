@@ -43,9 +43,7 @@ class MixGenerator {
     });
     if (groups.isEmpty) return const [];
     final minimumSize = math.max(3, (groups.first.tracks.length / 50).ceil());
-    final random = _SeededRandom(
-      _seedFor(day, seed ?? math.Random().nextInt(1 << 31)),
-    );
+    final random = _SeededRandom(_seedFor(day, seed ?? 0));
     final selectedGroups = _weightedSample(
       groups.where((group) => group.tracks.length >= minimumSize).toList(),
       random,

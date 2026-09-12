@@ -105,6 +105,26 @@ void main() {
     );
   });
 
+  test('keeps the same songs for the whole day', () {
+    final tracks = [
+      for (var song = 0; song < 100; song++)
+        _track('$song', 'Artist $song', ['rock'], song),
+    ];
+
+    List<String> songsFor(DateTime day) => const MixGenerator()
+        .generate(tracks, day)
+        .single
+        .tracks
+        .map((track) => track.id)
+        .toList();
+
+    final morning = songsFor(DateTime(2026, 9, 10, 8));
+    final evening = songsFor(DateTime(2026, 9, 10, 22));
+
+    expect(morning, evening);
+    expect(morning, isNot(songsFor(DateTime(2026, 9, 11, 8))));
+  });
+
   test('changes song selection when the variation seed changes', () {
     final tracks = [
       for (var song = 0; song < 100; song++)
