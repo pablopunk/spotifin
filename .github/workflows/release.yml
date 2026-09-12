@@ -19,8 +19,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.3
           channel: stable
@@ -37,8 +37,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.3
           channel: stable
@@ -68,7 +68,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           VERSION: ${{ env.RELEASE_VERSION }}
         run: ./scripts/build-macos-release.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: macos
           path: dist/Spotifin-*-mac-universal.zip
@@ -79,8 +79,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.3
           channel: stable
@@ -91,7 +91,7 @@ jobs:
         env:
           VERSION: ${{ env.RELEASE_VERSION }}
         run: ./scripts/build-ios-variants.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ios
           path: dist/Spotifin-*-ios-*.ipa
@@ -102,13 +102,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.3
           channel: stable
@@ -137,7 +137,7 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/Spotifin-$version-android.apk"
           cp build/app/outputs/bundle/release/app-release.aab "dist/Spotifin-$version-android.aab"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android
           path: dist/Spotifin-*-android.*
@@ -148,8 +148,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.3
           channel: stable
@@ -163,7 +163,7 @@ jobs:
           flutter build windows --release --build-name $version --build-number $env:BUILD_NUMBER --dart-define=SPOTIFIN_DOWNTIFY=true
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/Spotifin-$version-windows-x64.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows
           path: dist/Spotifin-*-windows-x64.zip
@@ -184,10 +184,10 @@ jobs:
             flutter_architecture: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install Linux build dependencies
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         if: matrix.flutter_architecture == 'x64'
         with:
           flutter-version: 3.47.3
@@ -207,7 +207,7 @@ jobs:
           ARCHITECTURE: ${{ matrix.architecture }}
           FLUTTER_ARCHITECTURE: ${{ matrix.flutter_architecture }}
         run: ./scripts/build-linux-appimage.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-${{ matrix.architecture }}
           path: dist/Spotifin-*-linux-${{ matrix.architecture }}.AppImage
@@ -219,14 +219,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
       - name: Generate checksums
         working-directory: dist
         run: sha256sum Spotifin-* > SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch'
         with:
           name: spotifin-${{ github.sha }}

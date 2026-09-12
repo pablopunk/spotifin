@@ -53,6 +53,14 @@ EOF
 curl --fail --location --retry 3 \
   "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$architecture.AppImage" \
   --output "$appimagetool"
+
+case "$architecture" in
+  x86_64) expected_sha256="a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0" ;;
+  aarch64) expected_sha256="1b00524ba8c6b678dc15ef88a5c25ec24def36cdfc7e3abb32ddcd068e8007fe" ;;
+  *) echo "Unsupported architecture: $architecture" >&2; exit 1 ;;
+esac
+echo "$expected_sha256  $appimagetool" | sha256sum -c - >/dev/null
+
 chmod +x "$appimagetool"
 ARCH="$architecture" "$appimagetool" --appimage-extract-and-run --no-appstream "$app_dir" "$output"
 chmod +x "$output"
