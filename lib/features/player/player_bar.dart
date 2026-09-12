@@ -166,28 +166,10 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                         constraints: const BoxConstraints(maxWidth: 420),
                         child: AspectRatio(
                           aspectRatio: 1,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            child: _showLyrics
-                                ? ClipRRect(
-                                    key: const ValueKey('lyrics'),
-                                    borderRadius: BorderRadius.circular(
-                                      SpotifinRadii.card,
-                                    ),
-                                    child: ColoredBox(
-                                      color: SpotifinColors.raised,
-                                      child: _LyricsContent(
-                                        track: track,
-                                        playback: playback,
-                                      ),
-                                    ),
-                                  )
-                                : Artwork(
-                                    key: const ValueKey('artwork'),
-                                    itemId: track.albumId ?? track.id,
-                                    size: 420,
-                                    borderRadius: SpotifinRadii.card,
-                                  ),
+                          child: Artwork(
+                            itemId: track.albumId ?? track.id,
+                            size: 420,
+                            borderRadius: SpotifinRadii.card,
                           ),
                         ),
                       ),
@@ -317,6 +299,27 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                         const RemoteDeviceButton(),
                       ],
                     ),
+                    if (_showLyrics) ...[
+                      const SizedBox(height: SpotifinSpacing.md),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              SpotifinRadii.card,
+                            ),
+                            child: ColoredBox(
+                              color: SpotifinColors.raised,
+                              child: _LyricsContent(
+                                track: track,
+                                playback: playback,
+                                embedded: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 30),
                     Text(
                       'Queue',
@@ -415,10 +418,15 @@ class _LyricsSheet extends ConsumerWidget {
 }
 
 class _LyricsContent extends ConsumerStatefulWidget {
-  const _LyricsContent({required this.track, required this.playback});
+  const _LyricsContent({
+    required this.track,
+    required this.playback,
+    this.embedded = false,
+  });
 
   final Track track;
   final PlaybackService playback;
+  final bool embedded;
 
   @override
   ConsumerState<_LyricsContent> createState() => _LyricsContentState();
@@ -461,7 +469,14 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
             final position = positionSnapshot.data ?? Duration.zero;
             final active = _activeLine(lines, position);
             return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(24, 30, 24, 50),
+              shrinkWrap: widget.embedded,
+              physics: widget.embedded
+                  ? const NeverScrollableScrollPhysics()
+                  : null,
+              primary: !widget.embedded,
+              padding: widget.embedded
+                  ? const EdgeInsets.symmetric(horizontal: 20, vertical: 18)
+                  : const EdgeInsets.fromLTRB(24, 30, 24, 50),
               itemCount: lines.length,
               itemBuilder: (context, index) {
                 final line = lines[index];
@@ -471,18 +486,23 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
                       : () => widget.playback.seek(line.start!),
                   borderRadius: BorderRadius.circular(SpotifinRadii.small),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                      vertical: widget.embedded ? 6 : 8,
+                    ),
                     child: Text(
                       line.text,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: index == active
-                                ? SpotifinColors.accent
-                                : SpotifinColors.textMuted,
-                            fontWeight: index == active
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
+                      style:
+                          (widget.embedded
+                                  ? Theme.of(context).textTheme.titleMedium
+                                  : Theme.of(context).textTheme.headlineSmall)
+                              ?.copyWith(
+                                color: index == active
+                                    ? SpotifinColors.accent
+                                    : SpotifinColors.textMuted,
+                                fontWeight: index == active
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
                     ),
                   ),
                 );
