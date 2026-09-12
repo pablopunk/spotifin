@@ -20,5 +20,5 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter test --platform chrome test/session_store_test.dart
-      - run: flutter build web --release
+      - run: bash scripts/build-web.sh
       - run: flutter build ios --release --no-codesign
