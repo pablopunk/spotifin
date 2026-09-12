@@ -2878,6 +2878,223 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
   }
 }
 
+class $AlbumReleaseKindsTable extends AlbumReleaseKinds
+    with TableInfo<$AlbumReleaseKindsTable, AlbumReleaseKind> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AlbumReleaseKindsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _albumIdMeta = const VerificationMeta(
+    'albumId',
+  );
+  @override
+  late final GeneratedColumn<String> albumId = GeneratedColumn<String>(
+    'album_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [albumId, kind];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'album_release_kinds';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AlbumReleaseKind> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('album_id')) {
+      context.handle(
+        _albumIdMeta,
+        albumId.isAcceptableOrUnknown(data['album_id']!, _albumIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_albumIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {albumId};
+  @override
+  AlbumReleaseKind map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AlbumReleaseKind(
+      albumId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}album_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+    );
+  }
+
+  @override
+  $AlbumReleaseKindsTable createAlias(String alias) {
+    return $AlbumReleaseKindsTable(attachedDatabase, alias);
+  }
+}
+
+class AlbumReleaseKind extends DataClass
+    implements Insertable<AlbumReleaseKind> {
+  final String albumId;
+  final String kind;
+  const AlbumReleaseKind({required this.albumId, required this.kind});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['album_id'] = Variable<String>(albumId);
+    map['kind'] = Variable<String>(kind);
+    return map;
+  }
+
+  AlbumReleaseKindsCompanion toCompanion(bool nullToAbsent) {
+    return AlbumReleaseKindsCompanion(
+      albumId: Value(albumId),
+      kind: Value(kind),
+    );
+  }
+
+  factory AlbumReleaseKind.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AlbumReleaseKind(
+      albumId: serializer.fromJson<String>(json['albumId']),
+      kind: serializer.fromJson<String>(json['kind']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'albumId': serializer.toJson<String>(albumId),
+      'kind': serializer.toJson<String>(kind),
+    };
+  }
+
+  AlbumReleaseKind copyWith({String? albumId, String? kind}) =>
+      AlbumReleaseKind(
+        albumId: albumId ?? this.albumId,
+        kind: kind ?? this.kind,
+      );
+  AlbumReleaseKind copyWithCompanion(AlbumReleaseKindsCompanion data) {
+    return AlbumReleaseKind(
+      albumId: data.albumId.present ? data.albumId.value : this.albumId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AlbumReleaseKind(')
+          ..write('albumId: $albumId, ')
+          ..write('kind: $kind')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(albumId, kind);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AlbumReleaseKind &&
+          other.albumId == this.albumId &&
+          other.kind == this.kind);
+}
+
+class AlbumReleaseKindsCompanion extends UpdateCompanion<AlbumReleaseKind> {
+  final Value<String> albumId;
+  final Value<String> kind;
+  final Value<int> rowid;
+  const AlbumReleaseKindsCompanion({
+    this.albumId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AlbumReleaseKindsCompanion.insert({
+    required String albumId,
+    required String kind,
+    this.rowid = const Value.absent(),
+  }) : albumId = Value(albumId),
+       kind = Value(kind);
+  static Insertable<AlbumReleaseKind> custom({
+    Expression<String>? albumId,
+    Expression<String>? kind,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (albumId != null) 'album_id': albumId,
+      if (kind != null) 'kind': kind,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AlbumReleaseKindsCompanion copyWith({
+    Value<String>? albumId,
+    Value<String>? kind,
+    Value<int>? rowid,
+  }) {
+    return AlbumReleaseKindsCompanion(
+      albumId: albumId ?? this.albumId,
+      kind: kind ?? this.kind,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (albumId.present) {
+      map['album_id'] = Variable<String>(albumId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AlbumReleaseKindsCompanion(')
+          ..write('albumId: $albumId, ')
+          ..write('kind: $kind, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2888,6 +3105,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DowntifyImportsTable downtifyImports = $DowntifyImportsTable(
     this,
   );
+  late final $AlbumReleaseKindsTable albumReleaseKinds =
+      $AlbumReleaseKindsTable(this);
   late final Index tracksName = Index(
     'tracks_name',
     'CREATE INDEX tracks_name ON tracks (name)',
@@ -2902,6 +3121,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     downloads,
     pendingWrites,
     downtifyImports,
+    albumReleaseKinds,
     tracksName,
   ];
 }
@@ -4356,6 +4576,171 @@ typedef $$DowntifyImportsTableProcessedTableManager =
       DowntifyImport,
       PrefetchHooks Function()
     >;
+typedef $$AlbumReleaseKindsTableCreateCompanionBuilder =
+    AlbumReleaseKindsCompanion Function({
+      required String albumId,
+      required String kind,
+      Value<int> rowid,
+    });
+typedef $$AlbumReleaseKindsTableUpdateCompanionBuilder =
+    AlbumReleaseKindsCompanion Function({
+      Value<String> albumId,
+      Value<String> kind,
+      Value<int> rowid,
+    });
+
+class $$AlbumReleaseKindsTableFilterComposer
+    extends Composer<_$AppDatabase, $AlbumReleaseKindsTable> {
+  $$AlbumReleaseKindsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get albumId => $composableBuilder(
+    column: $table.albumId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AlbumReleaseKindsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AlbumReleaseKindsTable> {
+  $$AlbumReleaseKindsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get albumId => $composableBuilder(
+    column: $table.albumId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AlbumReleaseKindsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AlbumReleaseKindsTable> {
+  $$AlbumReleaseKindsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get albumId =>
+      $composableBuilder(column: $table.albumId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+}
+
+class $$AlbumReleaseKindsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AlbumReleaseKindsTable,
+          AlbumReleaseKind,
+          $$AlbumReleaseKindsTableFilterComposer,
+          $$AlbumReleaseKindsTableOrderingComposer,
+          $$AlbumReleaseKindsTableAnnotationComposer,
+          $$AlbumReleaseKindsTableCreateCompanionBuilder,
+          $$AlbumReleaseKindsTableUpdateCompanionBuilder,
+          (
+            AlbumReleaseKind,
+            BaseReferences<
+              _$AppDatabase,
+              $AlbumReleaseKindsTable,
+              AlbumReleaseKind
+            >,
+          ),
+          AlbumReleaseKind,
+          PrefetchHooks Function()
+        > {
+  $$AlbumReleaseKindsTableTableManager(
+    _$AppDatabase db,
+    $AlbumReleaseKindsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AlbumReleaseKindsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AlbumReleaseKindsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AlbumReleaseKindsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> albumId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AlbumReleaseKindsCompanion(
+                albumId: albumId,
+                kind: kind,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String albumId,
+                required String kind,
+                Value<int> rowid = const Value.absent(),
+              }) => AlbumReleaseKindsCompanion.insert(
+                albumId: albumId,
+                kind: kind,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AlbumReleaseKindsTable, AlbumReleaseKind>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $AlbumReleaseKindsTable,
+                    AlbumReleaseKind
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AlbumReleaseKindsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AlbumReleaseKindsTable,
+      AlbumReleaseKind,
+      $$AlbumReleaseKindsTableFilterComposer,
+      $$AlbumReleaseKindsTableOrderingComposer,
+      $$AlbumReleaseKindsTableAnnotationComposer,
+      $$AlbumReleaseKindsTableCreateCompanionBuilder,
+      $$AlbumReleaseKindsTableUpdateCompanionBuilder,
+      (
+        AlbumReleaseKind,
+        BaseReferences<
+          _$AppDatabase,
+          $AlbumReleaseKindsTable,
+          AlbumReleaseKind
+        >,
+      ),
+      AlbumReleaseKind,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4370,4 +4755,6 @@ class $AppDatabaseManager {
       $$PendingWritesTableTableManager(_db, _db.pendingWrites);
   $$DowntifyImportsTableTableManager get downtifyImports =>
       $$DowntifyImportsTableTableManager(_db, _db.downtifyImports);
+  $$AlbumReleaseKindsTableTableManager get albumReleaseKinds =>
+      $$AlbumReleaseKindsTableTableManager(_db, _db.albumReleaseKinds);
 }

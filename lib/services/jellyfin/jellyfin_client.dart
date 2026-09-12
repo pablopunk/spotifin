@@ -146,6 +146,31 @@ class JellyfinClient {
     return results;
   }
 
+  Future<Map<String, String>> fetchAlbumReleaseGroups(
+    JellyfinSession session,
+    List<String> albumIds,
+  ) async {
+    if (albumIds.isEmpty) return const {};
+    final body = await _getJson(
+      session,
+      _uri(session, '/Users/${session.userId}/Items', {
+        'Ids': albumIds.join(','),
+        'IncludeItemTypes': 'MusicAlbum',
+        'Fields': 'ProviderIds',
+      }),
+    );
+    final items = (body['Items'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final groups = <String, String>{};
+    for (final item in items) {
+      final providerIds = item['ProviderIds'] as Map<String, dynamic>?;
+      final releaseGroup = providerIds?['MusicBrainzReleaseGroup'] as String?;
+      if (releaseGroup == null || releaseGroup.isEmpty) continue;
+      groups[item['Id'] as String] = releaseGroup;
+    }
+    return groups;
+  }
+
   Future<void> setFavorite(
     JellyfinSession session,
     String itemId,
