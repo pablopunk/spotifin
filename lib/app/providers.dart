@@ -1,13 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../services/albums/album_type_service.dart';
+import '../services/jellyfin/jellyfin_client.dart';
 import '../services/downtify/downtify_client.dart';
 import '../services/downtify/downtify_store.dart';
-import '../services/downloads/download_service.dart';
-import '../services/jellyfin/jellyfin_client.dart';
 import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
+import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/remote_session_service.dart';
 import '../platform/download_store.dart';
@@ -45,13 +44,6 @@ final downtifyControllerProvider =
 
 final lyricsProvider = Provider<LyricsService>(
   (ref) => LyricsService(ref.watch(jellyfinClientProvider)),
-);
-
-final albumTypeServiceProvider = Provider<AlbumTypeService>(
-  (ref) => AlbumTypeService(
-    ref.watch(jellyfinClientProvider),
-    ref.watch(databaseProvider),
-  ),
 );
 
 final sessionStoreProvider = Provider<SessionStore>(

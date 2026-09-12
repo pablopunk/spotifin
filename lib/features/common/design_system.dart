@@ -283,13 +283,6 @@ class SpotifinCollectionCard extends StatelessWidget {
   );
 }
 
-const spotifinGridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-  maxCrossAxisExtent: 220,
-  mainAxisExtent: 238,
-  crossAxisSpacing: 16,
-  mainAxisSpacing: 16,
-);
-
 Widget spotifinGrid({
   required int itemCount,
   required Widget Function(BuildContext, int) itemBuilder,
@@ -301,7 +294,12 @@ Widget spotifinGrid({
       16,
       SpotifinChromeInsets.bottomOf(context),
     ),
-    gridDelegate: spotifinGridDelegate,
+    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 220,
+      mainAxisExtent: 238,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+    ),
     itemCount: itemCount,
     itemBuilder: itemBuilder,
   ),

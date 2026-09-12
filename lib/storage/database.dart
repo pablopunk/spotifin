@@ -83,23 +83,8 @@ class DowntifyImports extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-class AlbumReleaseKinds extends Table {
-  TextColumn get albumId => text()();
-  TextColumn get kind => text()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {albumId};
-}
-
 @DriftDatabase(
-  tables: [
-    Tracks,
-    Playlists,
-    Downloads,
-    PendingWrites,
-    DowntifyImports,
-    AlbumReleaseKinds,
-  ],
+  tables: [Tracks, Playlists, Downloads, PendingWrites, DowntifyImports],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase()
@@ -116,7 +101,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -126,7 +111,6 @@ class AppDatabase extends _$AppDatabase {
       await migrator.createTable(downloads);
       await migrator.createTable(pendingWrites);
       await migrator.createTable(downtifyImports);
-      await migrator.createTable(albumReleaseKinds);
       await customStatement(
         'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
       );
@@ -145,7 +129,6 @@ class AppDatabase extends _$AppDatabase {
         );
       }
       if (from < 5) await migrator.createTable(downtifyImports);
-      if (from < 6) await migrator.createTable(albumReleaseKinds);
     },
   );
 
@@ -193,27 +176,6 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> upsertTracks(List<TracksCompanion> rows) =>
       batch((batch) => batch.insertAllOnConflictUpdate(tracks, rows));
-
-  Future<Map<String, String>> albumKindsFor(List<String> albumIds) async {
-    if (albumIds.isEmpty) return const {};
-    final rows = await (select(
-      albumReleaseKinds,
-    )..where((row) => row.albumId.isIn(albumIds))).get();
-    return {for (final row in rows) row.albumId: row.kind};
-  }
-
-  Future<void> saveAlbumKinds(Map<String, String> kinds) async {
-    if (kinds.isEmpty) return;
-    await batch(
-      (batch) => batch.insertAllOnConflictUpdate(albumReleaseKinds, [
-        for (final entry in kinds.entries)
-          AlbumReleaseKindsCompanion.insert(
-            albumId: entry.key,
-            kind: entry.value,
-          ),
-      ]),
-    );
-  }
 
   Future<void> replaceTracks(List<TracksCompanion> rows) =>
       transaction(() async {

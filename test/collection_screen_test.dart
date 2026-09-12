@@ -3,15 +3,10 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/library/library_screen.dart';
-import 'package:spotifin/services/albums/album_type_service.dart';
-import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
-import 'package:spotifin/services/jellyfin/session.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
@@ -31,9 +26,6 @@ void main() {
           tracks: tracks.list,
         ),
         tracks.database,
-        albumTypes: _FakeAlbumTypeService(tracks.database, const {
-          'album-two': AlbumKind.single,
-        }),
       ),
     );
     await tester.pumpAndSettle();
@@ -46,13 +38,9 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, 'Albums'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byType(SpotifinCollectionCard, skipOffstage: false),
-      findsNWidgets(2),
-    );
+    expect(find.byType(SpotifinCollectionCard), findsNWidgets(2));
     expect(find.text('First album'), findsOneWidget);
-    expect(find.text('Second album', skipOffstage: false), findsOneWidget);
-    expect(find.text('Singles & EPs', skipOffstage: false), findsOneWidget);
+    expect(find.text('Second album'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await _dispose(tester, tracks.database);
   });
@@ -78,40 +66,14 @@ void main() {
   });
 }
 
-class _FakeAlbumTypeService extends AlbumTypeService {
-  _FakeAlbumTypeService(AppDatabase database, this.kinds)
-    : super(
-        JellyfinClient(
-          httpClient: MockClient((_) async => http.Response('', 204)),
-        ),
-        database,
-      );
-
-  final Map<String, AlbumKind> kinds;
-
-  @override
-  Future<Map<String, AlbumKind>> resolve(
-    JellyfinSession? session,
-    Iterable<String> albumIds,
-  ) async => kinds;
-}
-
 Future<void> _dispose(WidgetTester tester, AppDatabase database) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump(const Duration(milliseconds: 1));
   await tester.runAsync(database.close);
 }
 
-Widget _app(
-  Widget home,
-  AppDatabase database, {
-  AlbumTypeService? albumTypes,
-}) => ProviderScope(
-  overrides: [
-    databaseProvider.overrideWithValue(database),
-    if (albumTypes != null)
-      albumTypeServiceProvider.overrideWithValue(albumTypes),
-  ],
+Widget _app(Widget home, AppDatabase database) => ProviderScope(
+  overrides: [databaseProvider.overrideWithValue(database)],
   child: MaterialApp(theme: buildTheme(), home: home),
 );
 
