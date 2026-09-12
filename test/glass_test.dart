@@ -29,6 +29,13 @@ void main() {
     expect(SpotifinGlass.effectiveOpacity(.8), .8);
   });
 
+  test('glass is not supported on Android', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    expect(SpotifinGlass.supported, isFalse);
+  });
+
   test('fallback renderers use shader tint so grouped glass is opaque', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);

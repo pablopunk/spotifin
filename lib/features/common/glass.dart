@@ -10,6 +10,9 @@ abstract final class SpotifinGlass {
   static const _fallbackMinimumOpacity = .35;
   static const maxOpacity = .8;
 
+  static bool get supported =>
+      kIsWeb || defaultTargetPlatform != TargetPlatform.android;
+
   static final theme = GlassThemeData.simple(
     blur: 8,
     thickness: 28,
@@ -61,6 +64,7 @@ abstract final class SpotifinGlass {
 
 final glassEffectsProvider = Provider<bool>(
   (ref) =>
+      SpotifinGlass.supported &&
       ref.watch(appControllerProvider.select((state) => state.glassEffects)),
 );
 

@@ -41,37 +41,38 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          SpotifinSettingsGroup(
-            title: 'Appearance',
-            children: [
-              SwitchListTile(
-                value: ref.watch(glassEffectsProvider),
-                onChanged: ref
-                    .read(appControllerProvider.notifier)
-                    .setGlassEffects,
-                title: const Text('Liquid glass effects'),
-                subtitle: const Text(
-                  'Refracting navigation, player, and sheet chrome',
-                ),
-              ),
-              ListTile(
-                title: const Text('Glass opacity'),
-                trailing: Text('${(glassOpacity * 100).round()}%'),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Slider(
-                  value: glassOpacity,
-                  max: SpotifinGlass.maxOpacity,
-                  divisions: 4,
-                  label: '${(glassOpacity * 100).round()}%',
+          if (SpotifinGlass.supported)
+            SpotifinSettingsGroup(
+              title: 'Appearance',
+              children: [
+                SwitchListTile(
+                  value: ref.watch(glassEffectsProvider),
                   onChanged: ref
                       .read(appControllerProvider.notifier)
-                      .setGlassOpacity,
+                      .setGlassEffects,
+                  title: const Text('Liquid glass effects'),
+                  subtitle: const Text(
+                    'Refracting navigation, player, and sheet chrome',
+                  ),
                 ),
-              ),
-            ],
-          ),
+                ListTile(
+                  title: const Text('Glass opacity'),
+                  trailing: Text('${(glassOpacity * 100).round()}%'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Slider(
+                    value: glassOpacity,
+                    max: SpotifinGlass.maxOpacity,
+                    divisions: 4,
+                    label: '${(glassOpacity * 100).round()}%',
+                    onChanged: ref
+                        .read(appControllerProvider.notifier)
+                        .setGlassOpacity,
+                  ),
+                ),
+              ],
+            ),
           SpotifinSettingsGroup(
             title: 'Playback',
             children: [
