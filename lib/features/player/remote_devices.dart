@@ -243,12 +243,8 @@ class _RemoteDeviceCard extends StatelessWidget {
                         : () => _run(context, service.previous(session)),
                     icon: const Icon(Icons.skip_previous_rounded),
                   ),
-                  IconButton.filled(
-                    tooltip: session.paused ? 'Play' : 'Pause',
-                    style: IconButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      disabledForegroundColor: SpotifinColors.textMuted,
-                    ),
+                  SpotifinPlayButton(
+                    playing: !session.paused,
                     onPressed: pending
                         ? null
                         : () => _run(
@@ -257,11 +253,6 @@ class _RemoteDeviceCard extends StatelessWidget {
                                 ? service.play(session)
                                 : service.pause(session),
                           ),
-                    icon: Icon(
-                      session.paused
-                          ? Icons.play_arrow_rounded
-                          : Icons.pause_rounded,
-                    ),
                   ),
                   IconButton(
                     tooltip: 'Next on ${session.deviceName}',
