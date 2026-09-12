@@ -12,7 +12,10 @@ void main() {
   });
 
   test('redacts header style secrets', () {
-    expect(redactSecrets(Exception('ApiKey=SECRET')), isNot(contains('SECRET')));
+    expect(
+      redactSecrets(Exception('ApiKey=SECRET')),
+      isNot(contains('SECRET')),
+    );
     expect(
       redactSecrets(Exception('Token="SECRET"')),
       isNot(contains('SECRET')),
