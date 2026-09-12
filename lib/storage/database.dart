@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 part 'database.g.dart';
 
@@ -106,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase()
     : super(
         driftDatabase(
-          name: 'spotifin',
+          name: kDebugMode ? 'spotifin-dev' : 'spotifin',
           web: DriftWebOptions(
             sqlite3Wasm: Uri.parse('sqlite3.wasm'),
             driftWorker: Uri.parse('drift_worker.js'),

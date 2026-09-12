@@ -30,4 +30,16 @@ void main() {
     expect(track.premiereDate, isNull);
     await database.close();
   });
+
+  for (final version in GeneratedHelper.versions) {
+    test('schema v$version upgrades to the current schema', () async {
+      final verifier = SchemaVerifier(GeneratedHelper());
+      final schema = await verifier.schemaAt(version);
+      final database = AppDatabase.forTesting(schema.newConnection());
+
+      await verifier.migrateAndValidate(database, database.schemaVersion);
+
+      await database.close();
+    });
+  }
 }
