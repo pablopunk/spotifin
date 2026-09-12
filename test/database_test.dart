@@ -141,6 +141,46 @@ void main() {
     expect(await database.allTracks(), isEmpty);
   });
 
+  test('version 7 migration adds premiere dates to existing tracks', () async {
+    final migrated = AppDatabase.forTesting(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('''
+            CREATE TABLE tracks (
+              id TEXT NOT NULL,
+              name TEXT NOT NULL,
+              album TEXT NOT NULL DEFAULT '',
+              album_id TEXT NULL,
+              artist TEXT NOT NULL DEFAULT 'Unknown artist',
+              artist_ids TEXT NOT NULL DEFAULT '[]',
+              labels TEXT NOT NULL DEFAULT '[]',
+              duration_ticks INTEGER NOT NULL DEFAULT 0,
+              image_tag TEXT NULL,
+              container TEXT NOT NULL DEFAULT 'mp3',
+              favorite INTEGER NOT NULL DEFAULT 0 CHECK ("favorite" IN (0, 1)),
+              play_count INTEGER NOT NULL DEFAULT 0,
+              normalization_gain REAL NULL,
+              album_normalization_gain REAL NULL,
+              last_played DATETIME NULL,
+              date_created DATETIME NULL,
+              PRIMARY KEY (id)
+            )
+          ''');
+          raw.execute(
+            "INSERT INTO tracks (id, name) VALUES ('old', 'Old song')",
+          );
+          raw.execute('PRAGMA user_version = 5');
+        },
+      ),
+    );
+
+    final tracks = await migrated.allTracks();
+
+    expect(tracks.single.name, 'Old song');
+    expect(tracks.single.premiereDate, isNull);
+    await migrated.close();
+  });
+
   test('creation accepts existing tables and tracks index', () async {
     await database.allTracks();
 

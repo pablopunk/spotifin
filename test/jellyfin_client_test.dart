@@ -131,6 +131,47 @@ void main() {
     expect(request.headers['X-Emby-Token'], 'token');
   });
 
+  test('reads premiere dates with a production year fallback', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'Items': [
+              {
+                'Id': 'dated',
+                'Name': 'Dated song',
+                'PremiereDate': '2017-07-21T00:00:00.0000000Z',
+              },
+              {
+                'Id': 'year',
+                'Name': 'Year song',
+                'PremiereDate': '0001-01-01T00:00:00.0000000Z',
+                'ProductionYear': 2023,
+              },
+              {'Id': 'undated', 'Name': 'Undated song'},
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final tracks = await client.fetchTracks(session);
+
+    expect(tracks[0].premiereDate.value, DateTime.utc(2017, 7, 21));
+    expect(tracks[1].premiereDate.value, DateTime(2023));
+    expect(tracks[2].premiereDate.value, isNull);
+  });
+
   test('refreshes saved identity from the authenticated user', () async {
     final client = JellyfinClient(
       httpClient: MockClient(

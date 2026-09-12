@@ -186,6 +186,17 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _premiereDateMeta = const VerificationMeta(
+    'premiereDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> premiereDate = GeneratedColumn<DateTime>(
+    'premiere_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -204,6 +215,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     albumNormalizationGain,
     lastPlayed,
     dateCreated,
+    premiereDate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -326,6 +338,15 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         ),
       );
     }
+    if (data.containsKey('premiere_date')) {
+      context.handle(
+        _premiereDateMeta,
+        premiereDate.isAcceptableOrUnknown(
+          data['premiere_date']!,
+          _premiereDateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -399,6 +420,10 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}date_created'],
       ),
+      premiereDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}premiere_date'],
+      ),
     );
   }
 
@@ -425,6 +450,7 @@ class Track extends DataClass implements Insertable<Track> {
   final double? albumNormalizationGain;
   final DateTime? lastPlayed;
   final DateTime? dateCreated;
+  final DateTime? premiereDate;
   const Track({
     required this.id,
     required this.name,
@@ -442,6 +468,7 @@ class Track extends DataClass implements Insertable<Track> {
     this.albumNormalizationGain,
     this.lastPlayed,
     this.dateCreated,
+    this.premiereDate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -476,6 +503,9 @@ class Track extends DataClass implements Insertable<Track> {
     if (!nullToAbsent || dateCreated != null) {
       map['date_created'] = Variable<DateTime>(dateCreated);
     }
+    if (!nullToAbsent || premiereDate != null) {
+      map['premiere_date'] = Variable<DateTime>(premiereDate);
+    }
     return map;
   }
 
@@ -509,6 +539,9 @@ class Track extends DataClass implements Insertable<Track> {
       dateCreated: dateCreated == null && nullToAbsent
           ? const Value.absent()
           : Value(dateCreated),
+      premiereDate: premiereDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(premiereDate),
     );
   }
 
@@ -538,6 +571,7 @@ class Track extends DataClass implements Insertable<Track> {
       ),
       lastPlayed: serializer.fromJson<DateTime?>(json['lastPlayed']),
       dateCreated: serializer.fromJson<DateTime?>(json['dateCreated']),
+      premiereDate: serializer.fromJson<DateTime?>(json['premiereDate']),
     );
   }
   @override
@@ -562,6 +596,7 @@ class Track extends DataClass implements Insertable<Track> {
       ),
       'lastPlayed': serializer.toJson<DateTime?>(lastPlayed),
       'dateCreated': serializer.toJson<DateTime?>(dateCreated),
+      'premiereDate': serializer.toJson<DateTime?>(premiereDate),
     };
   }
 
@@ -582,6 +617,7 @@ class Track extends DataClass implements Insertable<Track> {
     Value<double?> albumNormalizationGain = const Value.absent(),
     Value<DateTime?> lastPlayed = const Value.absent(),
     Value<DateTime?> dateCreated = const Value.absent(),
+    Value<DateTime?> premiereDate = const Value.absent(),
   }) => Track(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -603,6 +639,7 @@ class Track extends DataClass implements Insertable<Track> {
         : this.albumNormalizationGain,
     lastPlayed: lastPlayed.present ? lastPlayed.value : this.lastPlayed,
     dateCreated: dateCreated.present ? dateCreated.value : this.dateCreated,
+    premiereDate: premiereDate.present ? premiereDate.value : this.premiereDate,
   );
   Track copyWithCompanion(TracksCompanion data) {
     return Track(
@@ -632,6 +669,9 @@ class Track extends DataClass implements Insertable<Track> {
       dateCreated: data.dateCreated.present
           ? data.dateCreated.value
           : this.dateCreated,
+      premiereDate: data.premiereDate.present
+          ? data.premiereDate.value
+          : this.premiereDate,
     );
   }
 
@@ -653,7 +693,8 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('normalizationGain: $normalizationGain, ')
           ..write('albumNormalizationGain: $albumNormalizationGain, ')
           ..write('lastPlayed: $lastPlayed, ')
-          ..write('dateCreated: $dateCreated')
+          ..write('dateCreated: $dateCreated, ')
+          ..write('premiereDate: $premiereDate')
           ..write(')'))
         .toString();
   }
@@ -676,6 +717,7 @@ class Track extends DataClass implements Insertable<Track> {
     albumNormalizationGain,
     lastPlayed,
     dateCreated,
+    premiereDate,
   );
   @override
   bool operator ==(Object other) =>
@@ -696,7 +738,8 @@ class Track extends DataClass implements Insertable<Track> {
           other.normalizationGain == this.normalizationGain &&
           other.albumNormalizationGain == this.albumNormalizationGain &&
           other.lastPlayed == this.lastPlayed &&
-          other.dateCreated == this.dateCreated);
+          other.dateCreated == this.dateCreated &&
+          other.premiereDate == this.premiereDate);
 }
 
 class TracksCompanion extends UpdateCompanion<Track> {
@@ -716,6 +759,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<double?> albumNormalizationGain;
   final Value<DateTime?> lastPlayed;
   final Value<DateTime?> dateCreated;
+  final Value<DateTime?> premiereDate;
   final Value<int> rowid;
   const TracksCompanion({
     this.id = const Value.absent(),
@@ -734,6 +778,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.albumNormalizationGain = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.dateCreated = const Value.absent(),
+    this.premiereDate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TracksCompanion.insert({
@@ -753,6 +798,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.albumNormalizationGain = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.dateCreated = const Value.absent(),
+    this.premiereDate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -773,6 +819,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<double>? albumNormalizationGain,
     Expression<DateTime>? lastPlayed,
     Expression<DateTime>? dateCreated,
+    Expression<DateTime>? premiereDate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -793,6 +840,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
         'album_normalization_gain': albumNormalizationGain,
       if (lastPlayed != null) 'last_played': lastPlayed,
       if (dateCreated != null) 'date_created': dateCreated,
+      if (premiereDate != null) 'premiere_date': premiereDate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -814,6 +862,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<double?>? albumNormalizationGain,
     Value<DateTime?>? lastPlayed,
     Value<DateTime?>? dateCreated,
+    Value<DateTime?>? premiereDate,
     Value<int>? rowid,
   }) {
     return TracksCompanion(
@@ -834,6 +883,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           albumNormalizationGain ?? this.albumNormalizationGain,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       dateCreated: dateCreated ?? this.dateCreated,
+      premiereDate: premiereDate ?? this.premiereDate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -891,6 +941,9 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (dateCreated.present) {
       map['date_created'] = Variable<DateTime>(dateCreated.value);
     }
+    if (premiereDate.present) {
+      map['premiere_date'] = Variable<DateTime>(premiereDate.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -916,6 +969,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('albumNormalizationGain: $albumNormalizationGain, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('dateCreated: $dateCreated, ')
+          ..write('premiereDate: $premiereDate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2923,6 +2977,7 @@ typedef $$TracksTableCreateCompanionBuilder = TracksCompanion Function({
   Value<double?> albumNormalizationGain,
   Value<DateTime?> lastPlayed,
   Value<DateTime?> dateCreated,
+  Value<DateTime?> premiereDate,
   Value<int> rowid,
 });
 typedef $$TracksTableUpdateCompanionBuilder = TracksCompanion Function({
@@ -2942,6 +2997,7 @@ typedef $$TracksTableUpdateCompanionBuilder = TracksCompanion Function({
   Value<double?> albumNormalizationGain,
   Value<DateTime?> lastPlayed,
   Value<DateTime?> dateCreated,
+  Value<DateTime?> premiereDate,
   Value<int> rowid,
 });
 
@@ -3031,6 +3087,11 @@ class $$TracksTableFilterComposer
 
   ColumnFilters<DateTime> get dateCreated => $composableBuilder(
     column: $table.dateCreated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3123,6 +3184,11 @@ class $$TracksTableOrderingComposer
     column: $table.dateCreated,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TracksTableAnnotationComposer
@@ -3191,6 +3257,11 @@ class $$TracksTableAnnotationComposer
     column: $table.dateCreated,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get premiereDate => $composableBuilder(
+    column: $table.premiereDate,
+    builder: (column) => column,
+  );
 }
 
 class $$TracksTableTableManager
@@ -3237,6 +3308,7 @@ class $$TracksTableTableManager
                 Value<double?> albumNormalizationGain = const Value.absent(),
                 Value<DateTime?> lastPlayed = const Value.absent(),
                 Value<DateTime?> dateCreated = const Value.absent(),
+                Value<DateTime?> premiereDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TracksCompanion(
                 id: id,
@@ -3255,6 +3327,7 @@ class $$TracksTableTableManager
                 albumNormalizationGain: albumNormalizationGain,
                 lastPlayed: lastPlayed,
                 dateCreated: dateCreated,
+                premiereDate: premiereDate,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3275,6 +3348,7 @@ class $$TracksTableTableManager
                 Value<double?> albumNormalizationGain = const Value.absent(),
                 Value<DateTime?> lastPlayed = const Value.absent(),
                 Value<DateTime?> dateCreated = const Value.absent(),
+                Value<DateTime?> premiereDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TracksCompanion.insert(
                 id: id,
@@ -3293,6 +3367,7 @@ class $$TracksTableTableManager
                 albumNormalizationGain: albumNormalizationGain,
                 lastPlayed: lastPlayed,
                 dateCreated: dateCreated,
+                premiereDate: premiereDate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

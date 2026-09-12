@@ -91,7 +91,6 @@ class _GroupedList extends StatelessWidget {
     required this.groupName,
     required this.icon,
     this.artist = false,
-    super.key,
   });
   final List<Track> tracks;
   final String Function(Track) groupName;
@@ -115,40 +114,128 @@ class _GroupedList extends StatelessWidget {
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
-        final first = entry.value.first;
-        final card = SpotifinCollectionCard(
-          artwork: LayoutBuilder(
-            builder: (context, constraints) => Artwork(
-              itemId: first.albumId ?? first.id,
-              size: constraints.biggest.shortestSide,
-              borderRadius: icon == Icons.person_rounded
-                  ? constraints.biggest.shortestSide / 2
-                  : SpotifinRadii.small,
-            ),
-          ),
+        return _CollectionCard(
           title: entry.key,
-          subtitle: '${entry.value.length} songs',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => CollectionScreen(
-                title: entry.key,
-                tracks: entry.value,
-                icon: icon,
-                artist: artist,
-              ),
-            ),
-          ),
+          tracks: entry.value,
+          artist: artist,
+          menu: !artist,
         );
-        return icon == Icons.album_rounded
-            ? AlbumContextMenu(
-                title: entry.key,
-                tracks: entry.value,
-                child: card,
-              )
-            : card;
       },
     );
   }
+}
+
+class _CollectionCard extends StatelessWidget {
+  const _CollectionCard({
+    required this.title,
+    required this.tracks,
+    this.artist = false,
+    this.menu = false,
+  });
+  final String title;
+  final List<Track> tracks;
+  final bool artist;
+  final bool menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final first = tracks.first;
+    final card = SpotifinCollectionCard(
+      artwork: LayoutBuilder(
+        builder: (context, constraints) => Artwork(
+          itemId: first.albumId ?? first.id,
+          size: constraints.biggest.shortestSide,
+          borderRadius: artist
+              ? constraints.biggest.shortestSide / 2
+              : SpotifinRadii.small,
+        ),
+      ),
+      title: title,
+      subtitle: '${tracks.length} songs',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CollectionScreen(
+            title: title,
+            tracks: tracks,
+            icon: artist ? Icons.person_rounded : Icons.album_rounded,
+            artist: artist,
+          ),
+        ),
+      ),
+    );
+    if (!menu) return card;
+    return AlbumContextMenu(title: title, tracks: tracks, child: card);
+  }
+}
+
+class _ArtistAlbumsTab extends StatelessWidget {
+  const _ArtistAlbumsTab({required this.tracks, super.key});
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    final albums = _sortedArtistAlbums(tracks);
+    if (albums.isEmpty) {
+      return const SpotifinEmptyState(
+        icon: Icons.library_music_outlined,
+        title: 'Nothing here yet',
+      );
+    }
+    return spotifinGrid(
+      itemCount: albums.length,
+      itemBuilder: (context, index) => _CollectionCard(
+        title: albums[index].name,
+        tracks: albums[index].tracks,
+        menu: true,
+      ),
+    );
+  }
+}
+
+class _AlbumGroup {
+  const _AlbumGroup({required this.name, required this.tracks});
+  final String name;
+  final List<Track> tracks;
+
+  bool get isFullAlbum => tracks.length > 5;
+
+  DateTime? get releaseDate {
+    DateTime? earliest;
+    for (final track in tracks) {
+      final date = track.premiereDate;
+      if (date == null) continue;
+      if (earliest == null || date.isBefore(earliest)) earliest = date;
+    }
+    return earliest;
+  }
+}
+
+List<_AlbumGroup> _sortedArtistAlbums(List<Track> tracks) {
+  final grouped = <String, _AlbumGroup>{};
+  for (final track in tracks) {
+    if (track.album.isEmpty) continue;
+    final key = track.albumId ?? track.album;
+    grouped
+        .putIfAbsent(key, () => _AlbumGroup(name: track.album, tracks: []))
+        .tracks
+        .add(track);
+  }
+  return grouped.values.toList()..sort(_byFullAlbumThenDate);
+}
+
+int _byFullAlbumThenDate(_AlbumGroup a, _AlbumGroup b) {
+  if (a.isFullAlbum != b.isFullAlbum) return a.isFullAlbum ? -1 : 1;
+  final aDate = a.releaseDate;
+  final bDate = b.releaseDate;
+  if (aDate != null && bDate != null) {
+    final byDate = bDate.compareTo(aDate);
+    if (byDate != 0) return byDate;
+  } else if (aDate != null) {
+    return -1;
+  } else if (bDate != null) {
+    return 1;
+  }
+  return a.name.toLowerCase().compareTo(b.name.toLowerCase());
 }
 
 String _albumName(Track track) => track.album;
@@ -305,11 +392,9 @@ class CollectionScreen extends ConsumerWidget {
                         contextTracks: tracks,
                       ),
                     ),
-                    _GroupedList(
+                    _ArtistAlbumsTab(
                       key: const PageStorageKey('artist-albums'),
                       tracks: tracks,
-                      groupName: _albumName,
-                      icon: Icons.album_rounded,
                     ),
                   ],
                 ),

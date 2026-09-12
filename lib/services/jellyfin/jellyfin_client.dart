@@ -553,7 +553,15 @@ class JellyfinClient {
       dateCreated: Value(
         DateTime.tryParse(json['DateCreated'] as String? ?? ''),
       ),
+      premiereDate: Value(_premiereDate(json)),
     );
+  }
+
+  DateTime? _premiereDate(Map<String, dynamic> json) {
+    final premiere = DateTime.tryParse(json['PremiereDate'] as String? ?? '');
+    if (premiere != null && premiere.year > 1) return premiere;
+    final year = json['ProductionYear'] as int?;
+    return year == null || year <= 0 ? null : DateTime(year);
   }
 
   String? _primaryImageTag(Map<String, dynamic> json) {

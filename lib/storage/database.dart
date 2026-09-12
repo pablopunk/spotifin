@@ -24,6 +24,7 @@ class Tracks extends Table {
   RealColumn get albumNormalizationGain => real().nullable()();
   DateTimeColumn get lastPlayed => dateTime().nullable()();
   DateTimeColumn get dateCreated => dateTime().nullable()();
+  DateTimeColumn get premiereDate => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -101,7 +102,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -129,6 +130,14 @@ class AppDatabase extends _$AppDatabase {
         );
       }
       if (from < 5) await migrator.createTable(downtifyImports);
+      if (from < 7) {
+        await customStatement('DROP TABLE IF EXISTS album_release_kinds');
+        final columns = await customSelect('PRAGMA table_info(tracks)').get();
+        final missing = !columns.any(
+          (row) => row.read<String>('name') == 'premiere_date',
+        );
+        if (missing) await migrator.addColumn(tracks, tracks.premiereDate);
+      }
     },
   );
 
