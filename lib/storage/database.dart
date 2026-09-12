@@ -106,16 +106,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (migrator) async {
-      await migrator.createTable(tracks);
-      await migrator.createTable(playlists);
-      await migrator.createTable(downloads);
-      await migrator.createTable(pendingWrites);
-      await migrator.createTable(downtifyImports);
-      await customStatement(
-        'CREATE INDEX IF NOT EXISTS tracks_name ON tracks (name)',
-      );
-    },
+    onCreate: (migrator) => migrator.createAll(),
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.addColumn(tracks, tracks.normalizationGain);
