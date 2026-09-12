@@ -245,6 +245,10 @@ class _RemoteDeviceCard extends StatelessWidget {
                   ),
                   IconButton.filled(
                     tooltip: session.paused ? 'Play' : 'Pause',
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      disabledForegroundColor: SpotifinColors.textMuted,
+                    ),
                     onPressed: pending
                         ? null
                         : () => _run(
