@@ -18,6 +18,8 @@ class AppState {
     this.session,
     this.syncing = false,
     this.error,
+    this.syncError,
+    this.lastSyncedAt,
     this.smallStreaming = false,
     this.smallDownloads = false,
     this.normalization = false,
@@ -29,6 +31,8 @@ class AppState {
   final JellyfinSession? session;
   final bool syncing;
   final String? error;
+  final String? syncError;
+  final DateTime? lastSyncedAt;
   final bool smallStreaming;
   final bool smallDownloads;
   final bool normalization;
@@ -40,7 +44,10 @@ class AppState {
     JellyfinSession? session,
     bool? syncing,
     String? error,
+    String? syncError,
     bool clearError = false,
+    bool clearSyncError = false,
+    DateTime? lastSyncedAt,
     bool clearSession = false,
     bool? smallStreaming,
     bool? smallDownloads,
@@ -52,6 +59,8 @@ class AppState {
     session: clearSession ? null : session ?? this.session,
     syncing: syncing ?? this.syncing,
     error: clearError ? null : error ?? this.error,
+    syncError: clearSyncError ? null : syncError ?? this.syncError,
+    lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     smallStreaming: smallStreaming ?? this.smallStreaming,
     smallDownloads: smallDownloads ?? this.smallDownloads,
     normalization: normalization ?? this.normalization,
@@ -105,6 +114,7 @@ class AppController extends Notifier<AppState> {
         return;
       }
       _sessionGeneration++;
+      final lastSyncedAt = _readLastSyncedAt(preferences, savedSession);
       state = AppState(
         status: AppStatus.ready,
         session: savedSession,
@@ -113,6 +123,7 @@ class AppController extends Notifier<AppState> {
         normalization: normalization,
         glassEffects: glassEffects,
         glassOpacity: glassOpacity,
+        lastSyncedAt: lastSyncedAt,
       );
       await ref
           .read(playbackProvider)
@@ -196,7 +207,11 @@ class AppController extends Notifier<AppState> {
     final savedSession = state.session;
     if (savedSession == null) return;
     final generation = _sessionGeneration;
-    state = state.copyWith(syncing: !silent, clearError: true);
+    state = state.copyWith(
+      syncing: !silent,
+      clearError: true,
+      clearSyncError: true,
+    );
     try {
       final client = ref.read(jellyfinClientProvider);
       final database = ref.read(databaseProvider);
@@ -204,34 +219,20 @@ class AppController extends Notifier<AppState> {
       if (generation != _sessionGeneration) return;
       state = state.copyWith(session: session);
       await _flushPending();
-      var firstPage = true;
-      final bufferedTracks = <TracksCompanion>[];
-      final tracks = await client.fetchTracks(
-        session,
-        onPage: (page) async {
-          if (firstPage) {
-            firstPage = false;
-            await database.upsertTracks(page);
-            return;
-          }
-          bufferedTracks.addAll(page);
-          if (bufferedTracks.length >= 2000) {
-            await database.upsertTracks(bufferedTracks);
-            bufferedTracks.clear();
-          }
-        },
-      );
-      if (bufferedTracks.isNotEmpty) {
-        await database.upsertTracks(bufferedTracks);
-      }
-      await database.removeTracksExcept(
-        tracks.map((track) => track.id.value).toList(growable: false),
-      );
+      final tracks = await client.fetchTracks(session);
+      if (generation != _sessionGeneration) return;
+      await database.replaceTracks(tracks);
       await ref
           .read(downloadProvider)
           .reconcile(tracks.map((track) => track.id.value));
-      final playlists = await client.fetchPlaylists(session);
-      await ref.read(databaseProvider).replacePlaylists(playlists);
+      Object? playlistError;
+      try {
+        final playlists = await client.fetchPlaylists(session);
+        if (generation != _sessionGeneration) return;
+        await database.replacePlaylists(playlists);
+      } catch (error) {
+        playlistError = error;
+      }
       final catalog = await ref.read(databaseProvider).allTracks();
       await ref
           .read(carPlayProvider)
@@ -251,7 +252,21 @@ class AppController extends Notifier<AppState> {
         _remoteAccountId = accountId;
         unawaited(ref.read(remoteSessionProvider).configure(session));
       }
-      state = state.copyWith(syncing: false, clearError: true);
+      final syncedAt = DateTime.now();
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        _lastSyncedKey(session),
+        syncedAt.toIso8601String(),
+      );
+      state = state.copyWith(
+        syncing: false,
+        clearError: true,
+        syncError: playlistError == null
+            ? null
+            : 'Songs updated, but saved playlists could not be refreshed.',
+        clearSyncError: playlistError == null,
+        lastSyncedAt: syncedAt,
+      );
     } catch (error) {
       if (error is JellyfinException && error.statusCode == 401) {
         if (generation == _sessionGeneration) await _expireSession();
@@ -259,13 +274,29 @@ class AppController extends Notifier<AppState> {
       }
       if (generation != _sessionGeneration) return;
       state = silent
-          ? state.copyWith(syncing: false, clearError: true)
-          : state.copyWith(syncing: false, error: error.toString());
+          ? state.copyWith(
+              syncing: false,
+              clearError: true,
+              syncError: 'Could not reach Jellyfin. Using your saved library.',
+            )
+          : state.copyWith(
+              syncing: false,
+              error: error.toString(),
+              syncError: 'Could not reach Jellyfin. Using your saved library.',
+            );
     }
   }
 
   Future<List<Track>> _tracksByRecency() =>
       ref.read(databaseProvider).allTracksByDateAdded();
+
+  DateTime? _readLastSyncedAt(
+    SharedPreferences preferences,
+    JellyfinSession session,
+  ) => DateTime.tryParse(preferences.getString(_lastSyncedKey(session)) ?? '');
+
+  String _lastSyncedKey(JellyfinSession session) =>
+      'lastSyncedAt.${session.serverId}.${session.userId}';
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
     final session = state.session;

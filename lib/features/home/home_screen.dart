@@ -169,6 +169,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 8),
                 ],
               ),
+              if (ref.watch(appControllerProvider).syncError
+                  case final message?)
+                SliverToBoxAdapter(
+                  child: _SavedLibraryNotice(message: message),
+                ),
               if (_query.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _SearchFilters(
@@ -255,6 +260,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     );
   }
+}
+
+class _SavedLibraryNotice extends StatelessWidget {
+  const _SavedLibraryNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      SpotifinSpacing.lg,
+      SpotifinSpacing.sm,
+      SpotifinSpacing.lg,
+      0,
+    ),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: SpotifinColors.raised,
+        borderRadius: BorderRadius.circular(SpotifinRadii.small),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpotifinSpacing.md,
+          vertical: SpotifinSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 18),
+            const SizedBox(width: SpotifinSpacing.sm),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _SearchResults extends StatelessWidget {

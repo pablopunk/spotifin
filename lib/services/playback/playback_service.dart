@@ -334,7 +334,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> restore(List<Track> catalog) async {
     final session = _session;
     if (session == null || catalog.isEmpty) return;
-    final encoded = await _stateStore.read();
+    final encoded = await _stateStore.read(_accountId(session));
     if (encoded == null) return;
     final snapshot = jsonDecode(encoded) as Map<String, dynamic>;
     final ids = (snapshot['queue'] as List<dynamic>? ?? const [])
@@ -357,6 +357,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   Future<void> clear() async {
+    final session = _session;
     unawaited(_reportStop());
     await _player.stop();
     _queue = [];
@@ -365,7 +366,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _context = const [];
     _contextEnd = 0;
     _session = null;
-    await _stateStore.clear();
+    if (session != null) await _stateStore.clear(_accountId(session));
     notifyListeners();
   }
 
@@ -422,7 +423,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   Future<void> _savePosition(Duration position) async {
     if (_queue.isEmpty) return;
+    final session = _session;
+    if (session == null) return;
     await _stateStore.write(
+      _accountId(session),
       jsonEncode({
         'queue': _queue.map((track) => track.id).toList(),
         'index': currentIndex ?? 0,
@@ -430,6 +434,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       }),
     );
   }
+
+  String _accountId(JellyfinSession session) =>
+      '${session.serverId}.${session.userId}';
 
   Future<void> _handleTrackChange() async {
     final track = currentTrack;

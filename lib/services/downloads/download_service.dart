@@ -254,7 +254,7 @@ class DownloadService extends ChangeNotifier {
       error.statusCode != 401;
 
   Future<String> _save(_DownloadTask task) => _store.save(
-    _sessionFor(task).serverId,
+    '${_sessionFor(task).serverId}.${_sessionFor(task).userId}',
     task.track.id,
     _client.downloadUri(_sessionFor(task), task.track.id, small: task.small),
     _client.downloadHeaders(_sessionFor(task)),
