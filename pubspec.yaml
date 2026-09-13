@@ -54,6 +54,9 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_svg: ^2.3.0
   web_socket_channel: ^3.0.3
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
+  media_kit_libs_windows_audio: ^1.0.9
 
 dev_dependencies:
   flutter_test:
