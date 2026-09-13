@@ -17,5 +17,12 @@
       ]
     }
   ],
-  "rewrites": [{ "source": "/((?!.*\\.).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/count.js", "destination": "https://gc.zgo.at/count.js" },
+    {
+      "source": "/goat",
+      "destination": "https://spotifin.goatcounter.com/count"
+    },
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
+  ]
 }
