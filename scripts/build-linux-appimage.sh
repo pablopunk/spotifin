@@ -12,6 +12,8 @@ output="$root/dist/Spotifin-$version-linux-$architecture.AppImage"
 workspace="$(mktemp -d)"
 app_dir="$workspace/Spotifin.AppDir"
 appimagetool="$workspace/appimagetool.AppImage"
+libmpv_release="20260810"
+libmpv_archive="$workspace/libmpv_$architecture.zip"
 
 cleanup() {
   rm -rf "$workspace"
@@ -27,6 +29,19 @@ flutter build linux \
 
 mkdir -p "$app_dir/usr/bin" "$app_dir/usr/share/icons/hicolor/512x512/apps" "$root/dist"
 cp -a "$bundle/." "$app_dir/usr/bin/"
+# media_kit loads libmpv at runtime. Flutter's runtime searches $ORIGIN/lib
+# before the system library cache, so shipping libmpv.so.2 here lets the
+# AppImage play audio on systems without mpv installed.
+curl --fail --location --retry 3 \
+  "https://github.com/Predidit/libmpv-linux-build/releases/download/$libmpv_release/libmpv_$architecture.zip" \
+  --output "$libmpv_archive"
+case "$architecture" in
+  x86_64) libmpv_sha256="45922100e5240bf69a72fa2ae140d5b54e1ed03993a8a3746dc798e3ae8ad6e4" ;;
+  aarch64) libmpv_sha256="da0609556e2864dbe828102972edea96173a4be1ad1427a7493942dccb039b9f" ;;
+  *) echo "Unsupported architecture: $architecture" >&2; exit 1 ;;
+esac
+echo "$libmpv_sha256  $libmpv_archive" | sha256sum -c - >/dev/null
+unzip -o -q "$libmpv_archive" -d "$app_dir/usr/bin/lib"
 cp "$root/assets/branding/app_icon.png" "$app_dir/usr/share/icons/hicolor/512x512/apps/spotifin.png"
 ln -s usr/share/icons/hicolor/512x512/apps/spotifin.png "$app_dir/spotifin.png"
 
