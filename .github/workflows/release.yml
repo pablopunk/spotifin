@@ -68,7 +68,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           VERSION: ${{ env.RELEASE_VERSION }}
         run: ./scripts/build-macos-release.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos
           path: dist/Spotifin-*-mac-universal.zip
@@ -91,7 +91,7 @@ jobs:
         env:
           VERSION: ${{ env.RELEASE_VERSION }}
         run: ./scripts/build-ios-variants.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ios
           path: dist/Spotifin-*-ios-*.ipa
@@ -137,7 +137,7 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/Spotifin-$version-android.apk"
           cp build/app/outputs/bundle/release/app-release.aab "dist/Spotifin-$version-android.aab"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android
           path: dist/Spotifin-*-android.*
@@ -163,7 +163,7 @@ jobs:
           flutter build windows --release --build-name $version --build-number $env:BUILD_NUMBER --dart-define=SPOTIFIN_DOWNTIFY=true
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/Spotifin-$version-windows-x64.zip"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows
           path: dist/Spotifin-*-windows-x64.zip
@@ -207,7 +207,7 @@ jobs:
           ARCHITECTURE: ${{ matrix.architecture }}
           FLUTTER_ARCHITECTURE: ${{ matrix.flutter_architecture }}
         run: ./scripts/build-linux-appimage.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-${{ matrix.architecture }}
           path: dist/Spotifin-*-linux-${{ matrix.architecture }}.AppImage
@@ -226,7 +226,7 @@ jobs:
       - name: Generate checksums
         working-directory: dist
         run: sha256sum Spotifin-* > SHA256SUMS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'workflow_dispatch'
         with:
           name: spotifin-${{ github.sha }}
