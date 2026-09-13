@@ -11,6 +11,7 @@ import '../common/album_context_menu.dart';
 import '../common/collection_download_button.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
+import '../common/playlist_context_menu.dart';
 import '../common/track_tile.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -294,26 +295,30 @@ class _PlaylistsTab extends ConsumerWidget {
             itemBuilder: (context, index) {
               final playlist = playlists[index];
               final playlistTracks = tracksInPlaylist(playlist, byId);
-              return SpotifinCollectionCard(
-                artwork: LayoutBuilder(
-                  builder: (context, constraints) => PlaylistArtwork(
-                    tracks: playlistTracks,
-                    size: constraints.biggest.shortestSide,
-                    borderRadius: SpotifinRadii.small,
-                  ),
-                ),
-                title: playlist.name,
-                subtitle: '${playlistTracks.length} songs',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => CollectionScreen(
-                      title: playlist.name,
+              return PlaylistContextMenu(
+                playlist: playlist,
+                tracks: playlistTracks,
+                child: SpotifinCollectionCard(
+                  artwork: LayoutBuilder(
+                    builder: (context, constraints) => PlaylistArtwork(
                       tracks: playlistTracks,
-                      icon: Icons.queue_music_rounded,
-                      artwork: PlaylistArtwork(
+                      size: constraints.biggest.shortestSide,
+                      borderRadius: SpotifinRadii.small,
+                    ),
+                  ),
+                  title: playlist.name,
+                  subtitle: '${playlistTracks.length} songs',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => CollectionScreen(
+                        title: playlist.name,
                         tracks: playlistTracks,
-                        size: 160,
-                        borderRadius: SpotifinRadii.card,
+                        icon: Icons.queue_music_rounded,
+                        artwork: PlaylistArtwork(
+                          tracks: playlistTracks,
+                          size: 160,
+                          borderRadius: SpotifinRadii.card,
+                        ),
                       ),
                     ),
                   ),

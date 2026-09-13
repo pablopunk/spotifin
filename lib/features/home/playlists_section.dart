@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
+import '../common/playlist_context_menu.dart';
 import '../library/library_screen.dart';
 
 class PlaylistsSection extends ConsumerWidget {
@@ -68,37 +69,41 @@ class _PlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tracks = tracksInPlaylist(playlist, tracksById);
-    return SizedBox(
-      width: 164,
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(SpotifinRadii.card),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => PlaylistScreen(playlistId: playlist.id),
+    return PlaylistContextMenu(
+      playlist: playlist,
+      tracks: tracks,
+      child: SizedBox(
+        width: 164,
+        child: Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(SpotifinRadii.card),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PlaylistScreen(playlistId: playlist.id),
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(SpotifinSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                PlaylistArtwork(tracks: tracks, size: 140),
-                const SizedBox(height: SpotifinSpacing.sm),
-                Text(
-                  playlist.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${tracks.length} songs',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(SpotifinSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PlaylistArtwork(tracks: tracks, size: 140),
+                  const SizedBox(height: SpotifinSpacing.sm),
+                  Text(
+                    playlist.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${tracks.length} songs',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

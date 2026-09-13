@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
+import '../common/playlist_actions.dart';
 import '../common/playlist_artwork.dart';
 
 class SidebarPlaylists extends ConsumerWidget {
@@ -59,8 +60,10 @@ class SidebarPlaylists extends ConsumerWidget {
                         playlist: playlists[index],
                         tracks: tracksInPlaylist(playlists[index], tracksById),
                         onTap: () => onSelected(playlists[index]),
-                        onRename: () => _rename(context, ref, playlists[index]),
-                        onDelete: () => _delete(context, ref, playlists[index]),
+                        onRename: () =>
+                            renamePlaylist(context, ref, playlists[index]),
+                        onDelete: () =>
+                            removePlaylist(context, ref, playlists[index]),
                       ),
                     ),
                   ),
@@ -72,61 +75,11 @@ class SidebarPlaylists extends ConsumerWidget {
       );
 
   Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final name = await _requestName(context, title: 'Create playlist');
+    final name = await requestPlaylistName(context, title: 'Create playlist');
     if (name == null) return;
     await ref
         .read(appControllerProvider.notifier)
         .createPlaylist(name, const []);
-  }
-
-  Future<void> _rename(
-    BuildContext context,
-    WidgetRef ref,
-    Playlist playlist,
-  ) async {
-    final name = await _requestName(
-      context,
-      title: 'Rename playlist',
-      initialValue: playlist.name,
-    );
-    if (name == null || name == playlist.name) return;
-    await ref
-        .read(appControllerProvider.notifier)
-        .renamePlaylist(playlist.id, name);
-  }
-
-  Future<void> _delete(
-    BuildContext context,
-    WidgetRef ref,
-    Playlist playlist,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove playlist?'),
-        content: Text('"${playlist.name}" will be deleted from Jellyfin.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref
-          .read(appControllerProvider.notifier)
-          .deletePlaylist(playlist.id);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
-    }
   }
 }
 
@@ -193,36 +146,4 @@ class _PlaylistTarget extends ConsumerWidget {
       ),
     ),
   );
-}
-
-Future<String?> _requestName(
-  BuildContext context, {
-  required String title,
-  String initialValue = '',
-}) async {
-  var value = initialValue;
-  final result = await showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextFormField(
-        initialValue: initialValue,
-        autofocus: true,
-        onChanged: (next) => value = next,
-        decoration: const InputDecoration(labelText: 'Name'),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, value),
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
-  final name = result?.trim();
-  return name == null || name.isEmpty ? null : name;
 }
