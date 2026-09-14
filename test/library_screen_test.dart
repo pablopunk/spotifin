@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/design_system.dart';
+import 'package:spotifin/features/common/playlist_artwork.dart';
 import 'package:spotifin/features/library/library_screen.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -34,6 +35,7 @@ void main() {
     expect(find.text('COLLECTION'), findsOneWidget);
     expect(find.text('Your library'), findsWidgets);
     expect(find.byType(SpotifinCountLabel), findsOneWidget);
+    expect(find.byType(PlaylistArtwork), findsOneWidget);
 
     final play = tester.widget<SpotifinPlayButton>(
       find.byType(SpotifinPlayButton),

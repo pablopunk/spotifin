@@ -39,6 +39,11 @@ class LibraryScreen extends ConsumerWidget {
                     title: 'Your library',
                     tracks: tracks,
                     icon: Icons.library_music_rounded,
+                    artwork: PlaylistArtwork(
+                      tracks: tracks,
+                      size: 160,
+                      borderRadius: SpotifinRadii.card,
+                    ),
                   ),
                 ),
                 const SliverPersistentHeader(
