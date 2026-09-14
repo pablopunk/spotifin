@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/providers.dart';
 import 'release_info.dart';
+import 'sparkle_updater.dart';
 import 'update_service.dart';
 import 'version_comparison.dart';
 
@@ -45,7 +46,7 @@ class UpdateController extends Notifier<UpdateState> {
 
   Future<void> checkOnStartup() async {
     try {
-      if (kIsWeb || await _storeManaged()) return;
+      if (kIsWeb || SparkleUpdater.supported || await _storeManaged()) return;
       final preferences = await SharedPreferences.getInstance();
       final checkedAt = DateTime.tryParse(
         preferences.getString(_checkedAtKey) ?? '',

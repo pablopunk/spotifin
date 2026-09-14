@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +10,11 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'app/app.dart';
 import 'features/common/glass.dart';
+import 'services/updates/sparkle_updater.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(SparkleUpdater.initialize());
   // just_audio has no native Linux/Windows implementation; register the
   // media_kit backend before JustAudioBackground wraps the platform instance.
   JustAudioMediaKit.title = 'Spotifin';

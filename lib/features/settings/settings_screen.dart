@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
+import '../../services/updates/sparkle_updater.dart';
 import '../../services/updates/update_controller.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
@@ -241,6 +242,10 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _checkForUpdates(BuildContext context, WidgetRef ref) async {
+    if (SparkleUpdater.supported) {
+      await SparkleUpdater.checkForUpdates();
+      return;
+    }
     final check = await ref.read(updateControllerProvider.notifier).checkNow();
     if (!context.mounted) return;
     switch (check.status) {
