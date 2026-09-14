@@ -58,7 +58,7 @@ List<Track> _tracks(int count) => [
       name: 'Song $index',
       album: 'Album',
       artist: 'Artist',
-      artistIds: '[]',
+      artistItems: '[]',
       labels: '[]',
       durationTicks: 10000000,
       favorite: false,

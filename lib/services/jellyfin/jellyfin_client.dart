@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../storage/database.dart';
+import '../../storage/track_artists.dart';
 import '../lyrics/lyric_line.dart';
 import 'remote_session.dart';
 import 'session.dart';
@@ -584,8 +585,15 @@ class JellyfinClient {
       album: Value(json['Album'] as String? ?? ''),
       albumId: Value(json['AlbumId'] as String?),
       artist: Value(artists.isEmpty ? 'Unknown artist' : artists.join(', ')),
-      artistIds: Value(
-        jsonEncode(artistItems.map((artist) => artist['Id']).toList()),
+      artistItems: Value(
+        encodeArtistItems([
+          for (final artist in artistItems)
+            if ((artist['Name'] as String?)?.trim().isNotEmpty ?? false)
+              TrackArtist(
+                id: artist['Id'] as String?,
+                name: (artist['Name'] as String).trim(),
+              ),
+        ]),
       ),
       labels: Value(jsonEncode(labels.toList())),
       durationTicks: Value(json['RunTimeTicks'] as int? ?? 0),

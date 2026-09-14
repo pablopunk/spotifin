@@ -200,7 +200,7 @@ Track _track(String id, String albumId) => Track(
   album: 'Album $albumId',
   albumId: albumId,
   artist: 'Artist',
-  artistIds: '[]',
+  artistItems: '[]',
   labels: '[]',
   durationTicks: 1,
   container: 'mp3',

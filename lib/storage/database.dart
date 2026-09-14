@@ -14,7 +14,7 @@ class Tracks extends Table {
   TextColumn get albumId => text().nullable()();
   TextColumn get artist =>
       text().withDefault(const Constant('Unknown artist'))();
-  TextColumn get artistIds => text().withDefault(const Constant('[]'))();
+  TextColumn get artistItems => text().withDefault(const Constant('[]'))();
   TextColumn get labels => text().withDefault(const Constant('[]'))();
   IntColumn get durationTicks => integer().withDefault(const Constant(0))();
   TextColumn get imageTag => text().nullable()();
@@ -118,7 +118,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,6 +156,17 @@ class AppDatabase extends _$AppDatabase {
         if (missing) await migrator.addColumn(tracks, tracks.premiereDate);
       }
       if (from < 8) await migrator.createTable(albumDates);
+      if (from < 9) {
+        final columns = await customSelect('PRAGMA table_info(tracks)').get();
+        final legacy = columns.any(
+          (row) => row.read<String>('name') == 'artist_ids',
+        );
+        if (legacy) {
+          await customStatement(
+            'ALTER TABLE tracks RENAME COLUMN artist_ids TO artist_items',
+          );
+        }
+      }
     },
   );
 

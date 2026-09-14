@@ -50,7 +50,7 @@ Track _track() => const Track(
   album: 'Album',
   albumId: 'album',
   artist: 'Artist',
-  artistIds: '[]',
+  artistItems: '[]',
   labels: '[]',
   durationTicks: 1,
   container: 'mp3',

@@ -156,7 +156,7 @@ Track _track(String id, String artist, List<String> labels, int plays) => Track(
   name: 'Song $id',
   album: 'Album',
   artist: artist,
-  artistIds: '[]',
+  artistItems: '[]',
   labels: jsonEncode(labels),
   durationTicks: 10000000,
   favorite: false,

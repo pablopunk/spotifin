@@ -57,12 +57,12 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     requiredDuringInsert: false,
     defaultValue: const Constant('Unknown artist'),
   );
-  static const VerificationMeta _artistIdsMeta = const VerificationMeta(
-    'artistIds',
+  static const VerificationMeta _artistItemsMeta = const VerificationMeta(
+    'artistItems',
   );
   @override
-  late final GeneratedColumn<String> artistIds = GeneratedColumn<String>(
-    'artist_ids',
+  late final GeneratedColumn<String> artistItems = GeneratedColumn<String>(
+    'artist_items',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -204,7 +204,7 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
     album,
     albumId,
     artist,
-    artistIds,
+    artistItems,
     labels,
     durationTicks,
     imageTag,
@@ -260,10 +260,13 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         artist.isAcceptableOrUnknown(data['artist']!, _artistMeta),
       );
     }
-    if (data.containsKey('artist_ids')) {
+    if (data.containsKey('artist_items')) {
       context.handle(
-        _artistIdsMeta,
-        artistIds.isAcceptableOrUnknown(data['artist_ids']!, _artistIdsMeta),
+        _artistItemsMeta,
+        artistItems.isAcceptableOrUnknown(
+          data['artist_items']!,
+          _artistItemsMeta,
+        ),
       );
     }
     if (data.containsKey('labels')) {
@@ -376,9 +379,9 @@ class $TracksTable extends Tracks with TableInfo<$TracksTable, Track> {
         DriftSqlType.string,
         data['${effectivePrefix}artist'],
       )!,
-      artistIds: attachedDatabase.typeMapping.read(
+      artistItems: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}artist_ids'],
+        data['${effectivePrefix}artist_items'],
       )!,
       labels: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -439,7 +442,7 @@ class Track extends DataClass implements Insertable<Track> {
   final String album;
   final String? albumId;
   final String artist;
-  final String artistIds;
+  final String artistItems;
   final String labels;
   final int durationTicks;
   final String? imageTag;
@@ -457,7 +460,7 @@ class Track extends DataClass implements Insertable<Track> {
     required this.album,
     this.albumId,
     required this.artist,
-    required this.artistIds,
+    required this.artistItems,
     required this.labels,
     required this.durationTicks,
     this.imageTag,
@@ -480,7 +483,7 @@ class Track extends DataClass implements Insertable<Track> {
       map['album_id'] = Variable<String>(albumId);
     }
     map['artist'] = Variable<String>(artist);
-    map['artist_ids'] = Variable<String>(artistIds);
+    map['artist_items'] = Variable<String>(artistItems);
     map['labels'] = Variable<String>(labels);
     map['duration_ticks'] = Variable<int>(durationTicks);
     if (!nullToAbsent || imageTag != null) {
@@ -518,7 +521,7 @@ class Track extends DataClass implements Insertable<Track> {
           ? const Value.absent()
           : Value(albumId),
       artist: Value(artist),
-      artistIds: Value(artistIds),
+      artistItems: Value(artistItems),
       labels: Value(labels),
       durationTicks: Value(durationTicks),
       imageTag: imageTag == null && nullToAbsent
@@ -556,7 +559,7 @@ class Track extends DataClass implements Insertable<Track> {
       album: serializer.fromJson<String>(json['album']),
       albumId: serializer.fromJson<String?>(json['albumId']),
       artist: serializer.fromJson<String>(json['artist']),
-      artistIds: serializer.fromJson<String>(json['artistIds']),
+      artistItems: serializer.fromJson<String>(json['artistItems']),
       labels: serializer.fromJson<String>(json['labels']),
       durationTicks: serializer.fromJson<int>(json['durationTicks']),
       imageTag: serializer.fromJson<String?>(json['imageTag']),
@@ -583,7 +586,7 @@ class Track extends DataClass implements Insertable<Track> {
       'album': serializer.toJson<String>(album),
       'albumId': serializer.toJson<String?>(albumId),
       'artist': serializer.toJson<String>(artist),
-      'artistIds': serializer.toJson<String>(artistIds),
+      'artistItems': serializer.toJson<String>(artistItems),
       'labels': serializer.toJson<String>(labels),
       'durationTicks': serializer.toJson<int>(durationTicks),
       'imageTag': serializer.toJson<String?>(imageTag),
@@ -606,7 +609,7 @@ class Track extends DataClass implements Insertable<Track> {
     String? album,
     Value<String?> albumId = const Value.absent(),
     String? artist,
-    String? artistIds,
+    String? artistItems,
     String? labels,
     int? durationTicks,
     Value<String?> imageTag = const Value.absent(),
@@ -624,7 +627,7 @@ class Track extends DataClass implements Insertable<Track> {
     album: album ?? this.album,
     albumId: albumId.present ? albumId.value : this.albumId,
     artist: artist ?? this.artist,
-    artistIds: artistIds ?? this.artistIds,
+    artistItems: artistItems ?? this.artistItems,
     labels: labels ?? this.labels,
     durationTicks: durationTicks ?? this.durationTicks,
     imageTag: imageTag.present ? imageTag.value : this.imageTag,
@@ -648,7 +651,9 @@ class Track extends DataClass implements Insertable<Track> {
       album: data.album.present ? data.album.value : this.album,
       albumId: data.albumId.present ? data.albumId.value : this.albumId,
       artist: data.artist.present ? data.artist.value : this.artist,
-      artistIds: data.artistIds.present ? data.artistIds.value : this.artistIds,
+      artistItems: data.artistItems.present
+          ? data.artistItems.value
+          : this.artistItems,
       labels: data.labels.present ? data.labels.value : this.labels,
       durationTicks: data.durationTicks.present
           ? data.durationTicks.value
@@ -683,7 +688,7 @@ class Track extends DataClass implements Insertable<Track> {
           ..write('album: $album, ')
           ..write('albumId: $albumId, ')
           ..write('artist: $artist, ')
-          ..write('artistIds: $artistIds, ')
+          ..write('artistItems: $artistItems, ')
           ..write('labels: $labels, ')
           ..write('durationTicks: $durationTicks, ')
           ..write('imageTag: $imageTag, ')
@@ -706,7 +711,7 @@ class Track extends DataClass implements Insertable<Track> {
     album,
     albumId,
     artist,
-    artistIds,
+    artistItems,
     labels,
     durationTicks,
     imageTag,
@@ -728,7 +733,7 @@ class Track extends DataClass implements Insertable<Track> {
           other.album == this.album &&
           other.albumId == this.albumId &&
           other.artist == this.artist &&
-          other.artistIds == this.artistIds &&
+          other.artistItems == this.artistItems &&
           other.labels == this.labels &&
           other.durationTicks == this.durationTicks &&
           other.imageTag == this.imageTag &&
@@ -748,7 +753,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
   final Value<String> album;
   final Value<String?> albumId;
   final Value<String> artist;
-  final Value<String> artistIds;
+  final Value<String> artistItems;
   final Value<String> labels;
   final Value<int> durationTicks;
   final Value<String?> imageTag;
@@ -767,7 +772,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.album = const Value.absent(),
     this.albumId = const Value.absent(),
     this.artist = const Value.absent(),
-    this.artistIds = const Value.absent(),
+    this.artistItems = const Value.absent(),
     this.labels = const Value.absent(),
     this.durationTicks = const Value.absent(),
     this.imageTag = const Value.absent(),
@@ -787,7 +792,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     this.album = const Value.absent(),
     this.albumId = const Value.absent(),
     this.artist = const Value.absent(),
-    this.artistIds = const Value.absent(),
+    this.artistItems = const Value.absent(),
     this.labels = const Value.absent(),
     this.durationTicks = const Value.absent(),
     this.imageTag = const Value.absent(),
@@ -808,7 +813,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Expression<String>? album,
     Expression<String>? albumId,
     Expression<String>? artist,
-    Expression<String>? artistIds,
+    Expression<String>? artistItems,
     Expression<String>? labels,
     Expression<int>? durationTicks,
     Expression<String>? imageTag,
@@ -828,7 +833,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       if (album != null) 'album': album,
       if (albumId != null) 'album_id': albumId,
       if (artist != null) 'artist': artist,
-      if (artistIds != null) 'artist_ids': artistIds,
+      if (artistItems != null) 'artist_items': artistItems,
       if (labels != null) 'labels': labels,
       if (durationTicks != null) 'duration_ticks': durationTicks,
       if (imageTag != null) 'image_tag': imageTag,
@@ -851,7 +856,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
     Value<String>? album,
     Value<String?>? albumId,
     Value<String>? artist,
-    Value<String>? artistIds,
+    Value<String>? artistItems,
     Value<String>? labels,
     Value<int>? durationTicks,
     Value<String?>? imageTag,
@@ -871,7 +876,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
       album: album ?? this.album,
       albumId: albumId ?? this.albumId,
       artist: artist ?? this.artist,
-      artistIds: artistIds ?? this.artistIds,
+      artistItems: artistItems ?? this.artistItems,
       labels: labels ?? this.labels,
       durationTicks: durationTicks ?? this.durationTicks,
       imageTag: imageTag ?? this.imageTag,
@@ -906,8 +911,8 @@ class TracksCompanion extends UpdateCompanion<Track> {
     if (artist.present) {
       map['artist'] = Variable<String>(artist.value);
     }
-    if (artistIds.present) {
-      map['artist_ids'] = Variable<String>(artistIds.value);
+    if (artistItems.present) {
+      map['artist_items'] = Variable<String>(artistItems.value);
     }
     if (labels.present) {
       map['labels'] = Variable<String>(labels.value);
@@ -958,7 +963,7 @@ class TracksCompanion extends UpdateCompanion<Track> {
           ..write('album: $album, ')
           ..write('albumId: $albumId, ')
           ..write('artist: $artist, ')
-          ..write('artistIds: $artistIds, ')
+          ..write('artistItems: $artistItems, ')
           ..write('labels: $labels, ')
           ..write('durationTicks: $durationTicks, ')
           ..write('imageTag: $imageTag, ')
@@ -3190,7 +3195,7 @@ typedef $$TracksTableCreateCompanionBuilder = TracksCompanion Function({
   Value<String> album,
   Value<String?> albumId,
   Value<String> artist,
-  Value<String> artistIds,
+  Value<String> artistItems,
   Value<String> labels,
   Value<int> durationTicks,
   Value<String?> imageTag,
@@ -3210,7 +3215,7 @@ typedef $$TracksTableUpdateCompanionBuilder = TracksCompanion Function({
   Value<String> album,
   Value<String?> albumId,
   Value<String> artist,
-  Value<String> artistIds,
+  Value<String> artistItems,
   Value<String> labels,
   Value<int> durationTicks,
   Value<String?> imageTag,
@@ -3259,8 +3264,8 @@ class $$TracksTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get artistIds => $composableBuilder(
-    column: $table.artistIds,
+  ColumnFilters<String> get artistItems => $composableBuilder(
+    column: $table.artistItems,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3354,8 +3359,8 @@ class $$TracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get artistIds => $composableBuilder(
-    column: $table.artistIds,
+  ColumnOrderings<String> get artistItems => $composableBuilder(
+    column: $table.artistItems,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3439,8 +3444,10 @@ class $$TracksTableAnnotationComposer
   GeneratedColumn<String> get artist =>
       $composableBuilder(column: $table.artist, builder: (column) => column);
 
-  GeneratedColumn<String> get artistIds =>
-      $composableBuilder(column: $table.artistIds, builder: (column) => column);
+  GeneratedColumn<String> get artistItems => $composableBuilder(
+    column: $table.artistItems,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get labels =>
       $composableBuilder(column: $table.labels, builder: (column) => column);
@@ -3521,7 +3528,7 @@ class $$TracksTableTableManager
                 Value<String> album = const Value.absent(),
                 Value<String?> albumId = const Value.absent(),
                 Value<String> artist = const Value.absent(),
-                Value<String> artistIds = const Value.absent(),
+                Value<String> artistItems = const Value.absent(),
                 Value<String> labels = const Value.absent(),
                 Value<int> durationTicks = const Value.absent(),
                 Value<String?> imageTag = const Value.absent(),
@@ -3540,7 +3547,7 @@ class $$TracksTableTableManager
                 album: album,
                 albumId: albumId,
                 artist: artist,
-                artistIds: artistIds,
+                artistItems: artistItems,
                 labels: labels,
                 durationTicks: durationTicks,
                 imageTag: imageTag,
@@ -3561,7 +3568,7 @@ class $$TracksTableTableManager
                 Value<String> album = const Value.absent(),
                 Value<String?> albumId = const Value.absent(),
                 Value<String> artist = const Value.absent(),
-                Value<String> artistIds = const Value.absent(),
+                Value<String> artistItems = const Value.absent(),
                 Value<String> labels = const Value.absent(),
                 Value<int> durationTicks = const Value.absent(),
                 Value<String?> imageTag = const Value.absent(),
@@ -3580,7 +3587,7 @@ class $$TracksTableTableManager
                 album: album,
                 albumId: albumId,
                 artist: artist,
-                artistIds: artistIds,
+                artistItems: artistItems,
                 labels: labels,
                 durationTicks: durationTicks,
                 imageTag: imageTag,

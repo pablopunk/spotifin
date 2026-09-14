@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../storage/database.dart';
+import '../../storage/track_artists.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 import 'lyric_line.dart';
@@ -26,7 +27,7 @@ class LyricsService {
   Future<List<LyricLine>> _findLrcLib(Track track) async {
     final exact = await _record('/api/get', {
       'track_name': track.name,
-      'artist_name': track.artist,
+      'artist_name': _primaryArtist(track),
       if (track.album.isNotEmpty) 'album_name': track.album,
       if (track.durationTicks > 0)
         'duration': '${track.durationTicks ~/ 10000000}',
@@ -45,7 +46,7 @@ class LyricsService {
   }
 
   Iterable<Map<String, String>> _searchQueries(Track track) sync* {
-    final artist = _primaryArtist(track.artist);
+    final artist = _primaryArtist(track);
     final title = track.name.trim();
     yield {'track_name': title, 'artist_name': artist};
     final rewritten = _rewriteTitle(title);
@@ -98,7 +99,7 @@ class LyricsService {
   }
 
   bool _artistMatches(Map<String, dynamic> record, Track track) {
-    final wanted = _normalize(_primaryArtist(track.artist));
+    final wanted = _normalize(_primaryArtist(track));
     if (wanted.isEmpty) return true;
     final candidate = _normalize('${record['artistName'] ?? ''}');
     return candidate.isNotEmpty &&
@@ -144,7 +145,10 @@ class LyricsService {
         const [];
   }
 
-  String _primaryArtist(String artist) => artist.split(';').first.trim();
+  String _primaryArtist(Track track) {
+    final artists = track.artistCredits;
+    return artists.isEmpty ? '' : artists.first.name;
+  }
 
   String _rewriteTitle(String title) => title.replaceAllMapped(
     RegExp(r'\byou\b', caseSensitive: false),

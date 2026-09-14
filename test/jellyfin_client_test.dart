@@ -173,6 +173,46 @@ void main() {
     expect(tracks[2].premiereDate.value, isNull);
   });
 
+  test('stores artist identities alongside the display name', () async {
+    final client = JellyfinClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'Items': [
+              {
+                'Id': 'cantare',
+                'Name': 'Cantaré',
+                'Artists': ['Lia Kali', 'Toni Anzis'],
+                'ArtistItems': [
+                  {'Name': 'Lia Kali', 'Id': 'lia'},
+                  {'Name': 'Toni Anzis', 'Id': 'toni'},
+                ],
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+    const session = JellyfinSession(
+      serverUrl: 'https://example.com',
+      serverId: 'server',
+      deviceId: 'spotifin-device',
+      userId: 'user',
+      userName: 'Pablo',
+      accessToken: 'token',
+    );
+
+    final tracks = await client.fetchTracks(session);
+
+    expect(tracks.single.artist.value, 'Lia Kali, Toni Anzis');
+    expect(
+      tracks.single.artistItems.value,
+      '[{"id":"lia","name":"Lia Kali"},{"id":"toni","name":"Toni Anzis"}]',
+    );
+  });
+
   test('maps album dates with a production year fallback', () async {
     final client = JellyfinClient(
       httpClient: MockClient(

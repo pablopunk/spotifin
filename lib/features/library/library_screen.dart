@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
+import '../../storage/track_artists.dart';
 import '../common/artwork.dart';
 import '../common/album_context_menu.dart';
 import '../common/collection_download_button.dart';
@@ -58,17 +59,8 @@ class LibraryScreen extends ConsumerWidget {
               body: TabBarView(
                 children: [
                   _TrackList(tracks: tracks),
-                  _GroupedList(
-                    tracks: tracks,
-                    groupName: _albumName,
-                    icon: Icons.album_rounded,
-                  ),
-                  _GroupedList(
-                    tracks: tracks,
-                    groupName: _artistName,
-                    icon: Icons.person_rounded,
-                    artist: true,
-                  ),
+                  _AlbumList(tracks: tracks),
+                  _ArtistList(tracks: tracks),
                   _PlaylistsTab(tracks: tracks),
                 ],
               ),
@@ -94,25 +86,59 @@ class _TrackList extends StatelessWidget {
   );
 }
 
-class _GroupedList extends StatelessWidget {
-  const _GroupedList({
-    required this.tracks,
-    required this.groupName,
-    required this.icon,
-    this.artist = false,
-  });
+class _AlbumList extends StatelessWidget {
+  const _AlbumList({required this.tracks});
   final List<Track> tracks;
-  final String Function(Track) groupName;
-  final IconData icon;
-  final bool artist;
 
   @override
   Widget build(BuildContext context) {
     final groups = groupBy(
-      tracks.where((track) => groupName(track).isNotEmpty),
-      groupName,
+      tracks.where((track) => track.album.isNotEmpty),
+      _albumName,
     );
     final entries = groups.entries.sortedBy((entry) => entry.key.toLowerCase());
+    return _CollectionGrid(entries: entries);
+  }
+}
+
+class _ArtistList extends StatelessWidget {
+  const _ArtistList({required this.tracks});
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <String, _ArtistGroup>{};
+    for (final track in tracks) {
+      for (final artist in track.artistCredits) {
+        final key = artist.id ?? 'name:${artist.name}';
+        (groups[key] ??= _ArtistGroup(artist.name)).tracks.add(track);
+      }
+    }
+    final entries = groups.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return _CollectionGrid(
+      entries: [
+        for (final group in entries) MapEntry(group.name, group.tracks),
+      ],
+      artist: true,
+    );
+  }
+}
+
+class _ArtistGroup {
+  _ArtistGroup(this.name);
+
+  final String name;
+  final List<Track> tracks = [];
+}
+
+class _CollectionGrid extends StatelessWidget {
+  const _CollectionGrid({required this.entries, this.artist = false});
+  final List<MapEntry<String, List<Track>>> entries;
+  final bool artist;
+
+  @override
+  Widget build(BuildContext context) {
     if (entries.isEmpty) {
       return const SpotifinEmptyState(
         icon: Icons.library_music_outlined,
@@ -121,15 +147,12 @@ class _GroupedList extends StatelessWidget {
     }
     return spotifinGrid(
       itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        return _CollectionCard(
-          title: entry.key,
-          tracks: entry.value,
-          artist: artist,
-          menu: !artist,
-        );
-      },
+      itemBuilder: (context, index) => _CollectionCard(
+        title: entries[index].key,
+        tracks: entries[index].value,
+        artist: artist,
+        menu: !artist,
+      ),
     );
   }
 }
@@ -276,8 +299,6 @@ int _byFullAlbumThenDate(
 }
 
 String _albumName(Track track) => track.album;
-
-String _artistName(Track track) => track.artist;
 
 class _PlaylistsTab extends ConsumerWidget {
   const _PlaylistsTab({required this.tracks});

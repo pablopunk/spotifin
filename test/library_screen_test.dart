@@ -55,4 +55,50 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
+
+  testWidgets('artist cards keep multi-artist songs apart', (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'cantare',
+        name: 'Cantaré',
+        artist: const Value('Lia Kali, Toni Anzis'),
+        artistItems: const Value(
+          '[{"id":"lia","name":"Lia Kali"},{"id":"toni","name":"Toni Anzis"}]',
+        ),
+        album: const Value('Kaelis'),
+      ),
+      TracksCompanion.insert(
+        id: 'otra',
+        name: 'Otra',
+        artist: const Value('Lia Kali'),
+        artistItems: const Value('[{"id":"lia","name":"Lia Kali"}]'),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: MaterialApp(theme: buildTheme(), home: const LibraryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Artists'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lia Kali'), findsOneWidget);
+    expect(find.text('Toni Anzis'), findsOneWidget);
+    expect(find.text('2 songs'), findsNWidgets(2));
+    expect(find.text('1 songs'), findsOneWidget);
+
+    await tester.tap(find.text('Toni Anzis'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cantaré'), findsOneWidget);
+    expect(find.text('Otra'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
 }

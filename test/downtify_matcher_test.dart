@@ -43,7 +43,7 @@ Track _track(String id, String name, String artist, int seconds) => Track(
   album: '',
   albumId: null,
   artist: artist,
-  artistIds: '[]',
+  artistItems: '[]',
   labels: '[]',
   durationTicks: seconds * 10000000,
   imageTag: null,

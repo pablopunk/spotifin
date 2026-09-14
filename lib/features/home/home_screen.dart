@@ -8,6 +8,7 @@ import '../../app/features.dart';
 import '../../app/state/downtify_controller.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
+import '../../storage/track_artists.dart';
 import '../../services/mixes/mix_generator.dart';
 import '../../services/downtify/downtify_matcher.dart';
 import '../../services/downtify/downtify_models.dart';
@@ -322,7 +323,7 @@ class _SearchResults extends StatelessWidget {
       final artists = _matchingGroups(
         tracks,
         query,
-        (track) => track.artist.split(';'),
+        (track) => track.artistCredits.map((artist) => artist.name),
       );
       final albums = _matchingGroups(tracks, query, (track) => [track.album]);
       final visibleExternal = filter == _SearchFilter.all
