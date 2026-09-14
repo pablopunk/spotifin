@@ -33,6 +33,6 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/pablopunk/spotifin/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY</string>
+	<string>36LJpGS8rTs3zPSj/ak2mIQhGEMVBSMzlXj7eJGSdSk=</string>
 </dict>
 </plist>
