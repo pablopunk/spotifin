@@ -19,7 +19,7 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
-static gboolean desktop_is_hyprland(void) {
+static gboolean desktop_uses_frameless_windows(void) {
   const gchar* candidates[] = {
       g_getenv("XDG_CURRENT_DESKTOP"),
       g_getenv("XDG_SESSION_DESKTOP"),
@@ -28,7 +28,11 @@ static gboolean desktop_is_hyprland(void) {
   for (gsize i = 0; i < G_N_ELEMENTS(candidates); i++) {
     if (candidates[i] == nullptr) continue;
     g_autofree gchar* desktop = g_ascii_strdown(candidates[i], -1);
-    if (g_strstr_len(desktop, -1, "hyprland") != nullptr) return TRUE;
+    if (g_strstr_len(desktop, -1, "hyprland") != nullptr ||
+        g_strstr_len(desktop, -1, "umbriel") != nullptr ||
+        g_strstr_len(desktop, -1, "niri") != nullptr) {
+      return TRUE;
+    }
   }
   return FALSE;
 }
@@ -56,7 +60,7 @@ static void my_application_activate(GApplication* application) {
     }
   }
 #endif
-  gboolean frameless = desktop_is_hyprland();
+  gboolean frameless = desktop_uses_frameless_windows();
   if (frameless) {
     use_header_bar = FALSE;
     gtk_window_set_decorated(window, FALSE);
