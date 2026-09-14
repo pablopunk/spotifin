@@ -1,0 +1,25 @@
+name: Notary log
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission:
+        description: Notarization submission id
+        required: true
+
+jobs:
+  log:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Fetch notary log
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SUBMISSION: ${{ inputs.submission }}
+        run: |
+          xcrun notarytool log "$SUBMISSION" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" 2>&1 || true
