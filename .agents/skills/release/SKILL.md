@@ -40,3 +40,14 @@ description: Cut a Spotifin release from a bump word (patch/minor/major) and wri
    ```
 
    `gh release edit` fails until CI creates the release, so start this only after the notes are final.
+
+## macOS auto-update
+
+CI signs `dist/appcast.xml` with Sparkle on every tag release when the `SPARKLE_PRIVATE_KEY` secret exists; the publish job uploads it next to the zip. Nothing is manual per release.
+
+One-time setup:
+
+1. Run a macOS build once (`flutter build macos --debug` is enough), so `macos/Pods/Sparkle/bin/generate_keys` exists.
+2. `dart run auto_updater:generate_keys` and replace the `SUPublicEDKey` placeholder in `macos/Runner/Info.plist` with the printed public key.
+3. `security find-generic-password -a ed25519 -s "https://sparkle-project.org" -w` prints the private key. Store it as the `SPARKLE_PRIVATE_KEY` repository secret and keep an offline backup: losing it breaks auto-update for every install that ships with the current public key.
+4. `scripts/generate-appcast.sh` exits with an error while `SUPublicEDKey` is still the placeholder, so a tag release fails instead of publishing an unsigned feed.

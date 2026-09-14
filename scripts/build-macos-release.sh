@@ -36,7 +36,7 @@ if codesign -d --entitlements :- "$app" 2>/dev/null | grep -Fq 'com.apple.securi
 fi
 
 mkdir -p "$output"
-rm -f "$archive" "$notarization_archive" "$output/SHA256SUMS"
+rm -f "$archive" "$notarization_archive" "$output/SHA256SUMS" "$output/appcast.xml"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$notarization_archive"
 xcrun notarytool submit "$notarization_archive" \
   --apple-id "$APPLE_ID" \
@@ -48,6 +48,9 @@ xcrun stapler validate "$app"
 spctl --assess --type execute --verbose=2 "$app"
 
 ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
+  VERSION="$version" "$root/scripts/generate-appcast.sh"
+fi
 cd "$output"
 shasum -a 256 "$(basename "$archive")" > SHA256SUMS
 rm -f "$notarization_archive"
