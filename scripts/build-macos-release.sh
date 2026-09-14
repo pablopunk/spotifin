@@ -19,6 +19,30 @@ cd "$root"
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 flutter build macos --release --build-name "$version" --build-number "$build_number"
+# Sparkle's nested helpers ship ad-hoc signed; re-sign them inside-out or notarization rejects the app.
+sparkle="$app/Contents/Frameworks/Sparkle.framework"
+if [[ -d "$sparkle" ]]; then
+  for component in \
+    "$sparkle/Versions/B/XPCServices/Installer.xpc" \
+    "$sparkle/Versions/B/XPCServices/Downloader.xpc" \
+    "$sparkle/Versions/B/Autoupdate" \
+    "$sparkle/Versions/B/Updater.app"; do
+    codesign \
+      --force \
+      --options runtime \
+      --timestamp \
+      --preserve-metadata=entitlements \
+      --sign "$signing_identity" \
+      "$component"
+  done
+  codesign \
+    --force \
+    --options runtime \
+    --timestamp \
+    --preserve-metadata=entitlements \
+    --sign "$signing_identity" \
+    "$sparkle"
+fi
 codesign \
   --force \
   --options runtime \
