@@ -5,6 +5,8 @@ import '../features/auth/login_screen.dart';
 import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
+import '../features/updates/update_prompt.dart';
+import '../services/updates/release_info.dart';
 import 'app_shortcuts.dart';
 import 'providers.dart';
 import 'state/app_controller.dart';
@@ -27,6 +29,9 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
+    Future.microtask(
+      ref.read(updateControllerProvider.notifier).checkOnStartup,
+    );
   }
 
   @override
@@ -48,6 +53,14 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     final status = ref.watch(
       appControllerProvider.select((state) => state.status),
     );
+    ref.listen(updateControllerProvider.select((state) => state.release), (
+      previous,
+      release,
+    ) {
+      if (release != null && previous?.version != release.version) {
+        _showUpdatePrompt(release);
+      }
+    });
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'Spotifin',
@@ -73,6 +86,12 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   void _togglePlayback() {
     final playback = ref.read(playbackProvider);
     if (playback.currentTrack != null) playback.toggle();
+  }
+
+  Future<void> _showUpdatePrompt(ReleaseInfo release) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    await promptUpdateAvailable(context, ref, release);
   }
 
   void _openSearch() {

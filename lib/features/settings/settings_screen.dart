@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,9 +7,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
+import '../../services/updates/update_controller.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import '../downtify/downtify_settings_screen.dart';
+import '../updates/update_prompt.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -19,6 +22,7 @@ class SettingsScreen extends ConsumerWidget {
     final session = state.session;
     final glassOpacity = ref.watch(glassOpacityProvider);
     final packageInfo = ref.watch(packageInfoProvider).value;
+    final updateState = ref.watch(updateControllerProvider);
     final desktop =
         MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
     return Scaffold(
@@ -157,6 +161,19 @@ class SettingsScreen extends ConsumerWidget {
           SpotifinSettingsGroup(
             title: 'About',
             children: [
+              if (!kIsWeb) ...[
+                ListTile(
+                  leading: const Icon(Icons.system_update_rounded),
+                  title: const Text('Check for updates'),
+                  subtitle: updateState.checking
+                      ? const Text('Checking…')
+                      : null,
+                  onTap: updateState.checking
+                      ? null
+                      : () => _checkForUpdates(context, ref),
+                ),
+                const Divider(indent: 16, endIndent: 16),
+              ],
               ListTile(
                 leading: SvgPicture.asset(
                   'assets/branding/github.svg',
@@ -221,6 +238,21 @@ class SettingsScreen extends ConsumerWidget {
     if (opened || !context.mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Could not open GitHub.')));
+  }
+
+  Future<void> _checkForUpdates(BuildContext context, WidgetRef ref) async {
+    final check = await ref.read(updateControllerProvider.notifier).checkNow();
+    if (!context.mounted) return;
+    switch (check.status) {
+      case UpdateCheckStatus.upToDate:
+        await showUpToDateDialog(context, check.currentVersion);
+      case UpdateCheckStatus.available:
+        await promptUpdateAvailable(context, ref, check.release!);
+      case UpdateCheckStatus.failed:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not check for updates.')),
+        );
+    }
   }
 
   Future<void> _chooseQuality(

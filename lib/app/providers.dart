@@ -10,6 +10,8 @@ import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/remote_session_service.dart';
+import '../services/updates/update_controller.dart';
+import '../services/updates/update_service.dart';
 import '../platform/download_store.dart';
 import '../platform/artwork_store.dart';
 import '../platform/carplay_service.dart';
@@ -131,6 +133,15 @@ final playerPanelProvider =
     );
 
 final carPlayProvider = Provider<CarPlayService>((ref) => CarPlayService());
+
+final updateServiceProvider = Provider<UpdateService>((ref) {
+  final service = UpdateService();
+  ref.onDispose(service.close);
+  return service;
+});
+
+final updateControllerProvider =
+    NotifierProvider<UpdateController, UpdateState>(UpdateController.new);
 
 final packageInfoProvider = FutureProvider<PackageInfo>(
   (ref) => PackageInfo.fromPlatform(),
