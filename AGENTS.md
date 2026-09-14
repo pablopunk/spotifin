@@ -19,3 +19,7 @@
 ### Security
 
 * Route server- and user-supplied path segments through `safePathSegment`; add new secret shapes only to `redactSecrets`.
+
+### Skills
+
+* Store project skills in `.agents/skills/<id>/SKILL.md` with `name` and `description` frontmatter.
