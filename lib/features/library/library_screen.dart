@@ -27,30 +27,46 @@ class LibraryScreen extends ConsumerWidget {
         appBar: AppBar(
           title: desktop ? null : const Text('Your library'),
           toolbarHeight: desktop ? 0 : kToolbarHeight,
-          bottom: const SpotifinTabBar(
-            labels: ['Songs', 'Albums', 'Artists', 'Playlists'],
-          ),
         ),
         body: StreamBuilder<List<Track>>(
           stream: ref.watch(tracksByDateAddedStreamProvider),
           builder: (context, trackSnapshot) {
             final tracks = trackSnapshot.data ?? const [];
-            return TabBarView(
-              children: [
-                _TrackList(tracks: tracks),
-                _GroupedList(
-                  tracks: tracks,
-                  groupName: _albumName,
-                  icon: Icons.album_rounded,
+            return NestedScrollView(
+              headerSliverBuilder: (context, _) => [
+                SliverToBoxAdapter(
+                  child: _CollectionHeader(
+                    title: 'Your library',
+                    tracks: tracks,
+                    icon: Icons.library_music_rounded,
+                  ),
                 ),
-                _GroupedList(
-                  tracks: tracks,
-                  groupName: _artistName,
-                  icon: Icons.person_rounded,
-                  artist: true,
+                const SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedTabBar(
+                    SpotifinTabBar(
+                      labels: ['Songs', 'Albums', 'Artists', 'Playlists'],
+                    ),
+                  ),
                 ),
-                _PlaylistsTab(tracks: tracks),
               ],
+              body: TabBarView(
+                children: [
+                  _TrackList(tracks: tracks),
+                  _GroupedList(
+                    tracks: tracks,
+                    groupName: _albumName,
+                    icon: Icons.album_rounded,
+                  ),
+                  _GroupedList(
+                    tracks: tracks,
+                    groupName: _artistName,
+                    icon: Icons.person_rounded,
+                    artist: true,
+                  ),
+                  _PlaylistsTab(tracks: tracks),
+                ],
+              ),
             );
           },
         ),
@@ -65,25 +81,11 @@ class _TrackList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView.builder(
+    key: const PageStorageKey('library-songs'),
     padding: EdgeInsets.only(bottom: SpotifinChromeInsets.bottomOf(context)),
-    itemCount: tracks.length + 1,
-    itemBuilder: (context, index) {
-      if (index == 0) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            SpotifinSpacing.md,
-            SpotifinSpacing.md,
-            SpotifinSpacing.md,
-            SpotifinSpacing.sm,
-          ),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: CollectionDownloadButton(tracks: tracks),
-          ),
-        );
-      }
-      return TrackTile(track: tracks[index - 1], contextTracks: tracks);
-    },
+    itemCount: tracks.length,
+    itemBuilder: (context, index) =>
+        TrackTile(track: tracks[index], contextTracks: tracks),
   );
 }
 
