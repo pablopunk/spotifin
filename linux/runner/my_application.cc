@@ -19,6 +19,20 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+static gboolean desktop_is_hyprland(void) {
+  const gchar* candidates[] = {
+      g_getenv("XDG_CURRENT_DESKTOP"),
+      g_getenv("XDG_SESSION_DESKTOP"),
+      g_getenv("DESKTOP_SESSION"),
+  };
+  for (gsize i = 0; i < G_N_ELEMENTS(candidates); i++) {
+    if (candidates[i] == nullptr) continue;
+    g_autofree gchar* desktop = g_ascii_strdown(candidates[i], -1);
+    if (g_strstr_len(desktop, -1, "hyprland") != nullptr) return TRUE;
+  }
+  return FALSE;
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -42,6 +56,11 @@ static void my_application_activate(GApplication* application) {
     }
   }
 #endif
+  gboolean frameless = desktop_is_hyprland();
+  if (frameless) {
+    use_header_bar = FALSE;
+    gtk_window_set_decorated(window, FALSE);
+  }
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
