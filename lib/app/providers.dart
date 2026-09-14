@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/jellyfin/jellyfin_client.dart';
 import '../services/downtify/downtify_client.dart';
@@ -130,3 +131,7 @@ final playerPanelProvider =
     );
 
 final carPlayProvider = Provider<CarPlayService>((ref) => CarPlayService());
+
+final packageInfoProvider = FutureProvider<PackageInfo>(
+  (ref) => PackageInfo.fromPlatform(),
+);

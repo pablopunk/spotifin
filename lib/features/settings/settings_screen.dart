@@ -18,6 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     final state = ref.watch(appControllerProvider);
     final session = state.session;
     final glassOpacity = ref.watch(glassOpacityProvider);
+    final packageInfo = ref.watch(packageInfoProvider).value;
     final desktop =
         MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
     return Scaffold(
@@ -171,10 +172,12 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => _openGitHub(context),
               ),
               const Divider(indent: 16, endIndent: 16),
-              const AboutListTile(
-                icon: Icon(Icons.info_outline_rounded),
+              AboutListTile(
+                icon: const Icon(Icons.info_outline_rounded),
                 applicationName: 'Spotifin',
-                applicationVersion: '1.0.0',
+                applicationVersion: packageInfo == null
+                    ? null
+                    : '${packageInfo.version} (${packageInfo.buildNumber})',
                 applicationLegalese:
                     'Free, open-source Jellyfin music player (AGPL-3.0)',
               ),
