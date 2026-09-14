@@ -14,7 +14,16 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-git rev-parse "$tag" >/dev/null 2>&1 || git tag "$tag"
+if ! git rev-parse "$tag" >/dev/null 2>&1; then
+  sed "s/^version: .*/version: $version+1/" pubspec.yaml > pubspec.yaml.tmp
+  mv pubspec.yaml.tmp pubspec.yaml
+  if ! git diff --quiet -- pubspec.yaml; then
+    git add pubspec.yaml
+    git commit -m "Release $version"
+  fi
+  git tag "$tag"
+fi
+
 git push origin "$(git branch --show-current)"
 git push origin "$tag"
 

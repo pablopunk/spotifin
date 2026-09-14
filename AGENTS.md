@@ -15,6 +15,7 @@
 ### Builds
 
 * Build web only through `bash scripts/build-web.sh`; do not call `flutter build web` directly.
+* Release through `./scripts/release.sh x.y.z`; it owns the `pubspec.yaml` version — do not bump it by hand.
 
 ### Security
 
