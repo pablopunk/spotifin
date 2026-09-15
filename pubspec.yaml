@@ -51,7 +51,7 @@ dependencies:
   web: ^1.1.1
   just_audio_background: ^0.0.1-beta.17
   flutter_carplay: ^1.6.5
-  liquid_glass_widgets: ^1.4.3
+  liquid_glass_widgets: ^1.6.0
   url_launcher: ^6.3.2
   flutter_svg: ^2.3.0
   web_socket_channel: ^3.0.3
