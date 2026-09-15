@@ -578,14 +578,16 @@ class _CollectionHeader extends ConsumerWidget {
                     SpotifinPlayButton(
                       onPressed: tracks.isEmpty
                           ? null
-                          : () => playback.replaceQueue(tracks),
+                          : () => playback.replaceQueue(tracks, shuffle: false),
                     ),
                     IconButton(
                       tooltip: 'Shuffle',
                       color: playback.shuffle
                           ? SpotifinColors.accent
                           : SpotifinColors.textMuted,
-                      onPressed: tracks.isEmpty ? null : playback.toggleShuffle,
+                      onPressed: tracks.isEmpty
+                          ? null
+                          : () => playback.replaceQueue(tracks, shuffle: true),
                       icon: const Icon(Icons.shuffle_rounded),
                     ),
                     CollectionDownloadButton(tracks: tracks),

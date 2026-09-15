@@ -49,6 +49,11 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         }
       }),
     );
+    _subscriptions.add(
+      _player.shuffleModeEnabledStream.listen((enabled) {
+        if (enabled) unawaited(_player.setShuffleModeEnabled(false));
+      }),
+    );
   }
 
   final JellyfinClient _client;
@@ -77,6 +82,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   int _lastReportedSecond = -1;
   int _lastSavedSecond = -1;
   List<Track> _context = const [];
+  int _contextStart = 0;
   int _contextEnd = 0;
   bool _extendingQueue = false;
   final math.Random _random = math.Random();
@@ -120,16 +126,22 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     if (track != null) await _applyGain(track);
   }
 
-  Future<void> replaceQueue(List<Track> tracks, {int? startIndex}) async {
+  Future<void> replaceQueue(
+    List<Track> tracks, {
+    int? startIndex,
+    bool? shuffle,
+  }) async {
     if (tracks.isEmpty || _session == null) return;
+    if (shuffle != null) _shuffle = shuffle;
     final prepared = CollectionQueue.prepare(
       tracks,
       shuffle: _shuffle,
-      randomIndex: _random.nextInt,
+      random: _random,
       startIndex: startIndex,
     );
     _context = prepared.context;
     final start = math.max(0, prepared.index - _queueLookBehind);
+    _contextStart = start;
     _contextEnd = math.min(_context.length, start + _initialQueueSize);
     _queue = _context.sublist(start, _contextEnd);
     _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
@@ -205,6 +217,12 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 ||
+        oldIndex >= _queue.length ||
+        newIndex < 0 ||
+        newIndex >= _queue.length) {
+      return;
+    }
     _stopAutomaticQueueExpansion();
     final track = _queue.removeAt(oldIndex);
     final playlistItemId = _playlistItemIds.removeAt(oldIndex);
@@ -283,11 +301,66 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   Future<void> toggleShuffle() async {
-    _shuffle = !_shuffle;
-    await _player.setShuffleModeEnabled(_shuffle);
-    if (_shuffle) await _player.shuffle();
+    if (_shuffle) {
+      _shuffle = false;
+      await _player.setShuffleModeEnabled(false);
+      await _saveQueue();
+      unawaited(_reportProgress(force: true));
+      notifyListeners();
+      return;
+    }
+    _shuffle = true;
+    await _player.setShuffleModeEnabled(false);
+    final index = currentIndex;
+    if (index == null || _queue.isEmpty) {
+      await _saveQueue();
+      unawaited(_reportProgress(force: true));
+      notifyListeners();
+      return;
+    }
+    while (_extendingQueue) {
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+    _extendingQueue = true;
+    try {
+      final position = _player.position;
+      final wasPlaying = _player.playing;
+      _shuffleRemainder(index);
+      await _loadSources(initialIndex: index, initialPosition: position);
+      if (wasPlaying) unawaited(_player.play());
+    } finally {
+      _extendingQueue = false;
+    }
     unawaited(_reportProgress(force: true));
     notifyListeners();
+  }
+
+  void _shuffleRemainder(int currentIndex) {
+    final queueSuffix = _queue.sublist(currentIndex + 1);
+    final idSuffix = _playlistItemIds.sublist(currentIndex + 1);
+    final tail = _contextEnd < _context.length
+        ? _context.sublist(_contextEnd)
+        : <Track>[];
+    final shuffled = CollectionQueue.shuffleRemainder(
+      queueSuffix: queueSuffix,
+      idSuffix: idSuffix,
+      tail: tail,
+      random: _random,
+      newId: _newPlaylistItemId,
+    );
+    _queue = [..._queue.sublist(0, currentIndex + 1), ...shuffled.queueTracks];
+    _playlistItemIds = [
+      ..._playlistItemIds.sublist(0, currentIndex + 1),
+      ...shuffled.queueIds,
+    ];
+    final prefixLength = _contextStart + currentIndex + 1;
+    _context = [
+      ..._context.sublist(0, prefixLength),
+      ...shuffled.queueTracks,
+      ...shuffled.tail,
+    ];
+    _rememberTracks(shuffled.queueTracks);
+    _rememberTracks(shuffled.tail);
   }
 
   Future<void> cycleRepeat() async {
@@ -325,6 +398,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     if (tracks.isEmpty || _session == null) return;
     final safeIndex = startIndex.clamp(0, tracks.length - 1);
     _context = List.of(tracks);
+    _contextStart = 0;
     _contextEnd = tracks.length;
     _queue = List.of(tracks);
     _playlistItemIds = tracks.map((_) => _newPlaylistItemId()).toList();
@@ -349,9 +423,11 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
+    _shuffle = snapshot['shuffle'] as bool? ?? false;
     _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
     _context = List.of(_queue);
+    _contextStart = 0;
     _contextEnd = _context.length;
     final index = snapshot['index'] as int? ?? 0;
     final milliseconds = snapshot['positionMilliseconds'] as int? ?? 0;
@@ -371,7 +447,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _playlistItemIds = [];
     _tracksById.clear();
     _context = const [];
+    _contextStart = 0;
     _contextEnd = 0;
+    _shuffle = false;
+    _loopMode = LoopMode.off;
     _session = null;
     if (session != null) await _stateStore.clear(_accountId(session));
     notifyListeners();
@@ -391,6 +470,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         initialIndex: initialIndex,
         initialPosition: initialPosition,
       );
+      await _player.setShuffleModeEnabled(false);
       await _player.seek(initialPosition, index: initialIndex);
     } finally {
       _loadingSources = false;
@@ -438,6 +518,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         'queue': _queue.map((track) => track.id).toList(),
         'index': currentIndex ?? 0,
         'positionMilliseconds': position.inMilliseconds,
+        'shuffle': _shuffle,
       }),
     );
   }
@@ -513,6 +594,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   void _stopAutomaticQueueExpansion() {
     _context = const [];
+    _contextStart = 0;
     _contextEnd = 0;
   }
 

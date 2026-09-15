@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../storage/database.dart';
 
 class CollectionQueue {
@@ -9,19 +11,65 @@ class CollectionQueue {
   factory CollectionQueue.prepare(
     List<Track> tracks, {
     required bool shuffle,
-    required int Function(int max) randomIndex,
+    math.Random? random,
     int? startIndex,
   }) {
-    final requested = startIndex ?? (shuffle ? randomIndex(tracks.length) : 0);
-    final index = requested.clamp(0, tracks.length - 1);
+    if (tracks.isEmpty) {
+      return const CollectionQueue(context: [], index: 0);
+    }
     if (!shuffle) {
+      final index = (startIndex ?? 0).clamp(0, tracks.length - 1);
       return CollectionQueue(context: List.of(tracks), index: index);
     }
-    return CollectionQueue(context: _rotated(tracks, index), index: 0);
+    final rng = random ?? math.Random();
+    final remaining = List.of(tracks);
+    final requested = startIndex ?? rng.nextInt(remaining.length);
+    final clamped = requested.clamp(0, remaining.length - 1);
+    final first = remaining.removeAt(clamped);
+    remaining.shuffle(rng);
+    return CollectionQueue(context: [first, ...remaining], index: 0);
+  }
+
+  static RemainderShuffle shuffleRemainder({
+    required List<Track> queueSuffix,
+    required List<String> idSuffix,
+    required List<Track> tail,
+    required math.Random random,
+    required String Function() newId,
+  }) {
+    assert(queueSuffix.length == idSuffix.length);
+    final entries = <_RemainderEntry>[
+      for (var index = 0; index < queueSuffix.length; index++)
+        _RemainderEntry(queueSuffix[index], idSuffix[index]),
+      for (final track in tail) _RemainderEntry(track, null),
+    ];
+    entries.shuffle(random);
+    final queueLength = queueSuffix.length;
+    final shuffledQueue = entries.sublist(0, queueLength);
+    final shuffledTail = entries.sublist(queueLength);
+    return RemainderShuffle(
+      queueTracks: [for (final entry in shuffledQueue) entry.track],
+      queueIds: [for (final entry in shuffledQueue) entry.id ?? newId()],
+      tail: [for (final entry in shuffledTail) entry.track],
+    );
   }
 }
 
-List<Track> _rotated(List<Track> tracks, int start) => [
-  ...tracks.skip(start),
-  ...tracks.take(start),
-];
+class RemainderShuffle {
+  const RemainderShuffle({
+    required this.queueTracks,
+    required this.queueIds,
+    required this.tail,
+  });
+
+  final List<Track> queueTracks;
+  final List<String> queueIds;
+  final List<Track> tail;
+}
+
+class _RemainderEntry {
+  _RemainderEntry(this.track, this.id);
+
+  final Track track;
+  final String? id;
+}
