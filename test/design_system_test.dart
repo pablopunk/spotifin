@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/theme.dart';
@@ -85,5 +86,110 @@ void main() {
       tester.widget<TabBar>(find.byType(TabBar)).tabAlignment,
       TabAlignment.start,
     );
+  });
+
+  testWidgets('collection card reveals play on hover only', (tester) async {
+    var taps = 0;
+    var plays = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 200,
+            height: 238,
+            child: SpotifinCollectionCard(
+              artwork: const ColoredBox(color: SpotifinColors.raised),
+              title: 'Collection',
+              subtitle: '12 songs',
+              onTap: () => taps++,
+              onPlay: () => plays++,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(SpotifinPlayButton), findsNothing);
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(tester.getCenter(find.byType(SpotifinCollectionCard)));
+    await tester.pump();
+
+    expect(find.byType(SpotifinPlayButton), findsOneWidget);
+    final container = tester.widget<AnimatedContainer>(
+      find.byType(AnimatedContainer),
+    );
+    expect(
+      (container.decoration! as BoxDecoration).color,
+      SpotifinColors.hover,
+    );
+
+    await tester.tap(find.byType(SpotifinPlayButton));
+    await tester.pump();
+    expect(plays, 1);
+    expect(taps, 0);
+
+    await gesture.moveTo(const Offset(700, 500));
+    await tester.pump();
+    expect(find.byType(SpotifinPlayButton), findsNothing);
+    await gesture.removePointer();
+  });
+
+  testWidgets('active card keeps pause visible after pointer exit', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 200,
+            height: 238,
+            child: SpotifinCollectionCard(
+              artwork: const ColoredBox(color: SpotifinColors.raised),
+              title: 'Collection',
+              subtitle: '12 songs',
+              onTap: () {},
+              onPlay: () {},
+              active: true,
+              playing: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(SpotifinPlayButton), findsOneWidget);
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+  });
+
+  testWidgets('card without onPlay never shows the overlay', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 200,
+            height: 238,
+            child: SpotifinCollectionCard(
+              artwork: const ColoredBox(color: SpotifinColors.raised),
+              title: 'Collection',
+              subtitle: '12 songs',
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(tester.getCenter(find.byType(SpotifinCollectionCard)));
+    await tester.pump();
+
+    expect(find.byType(SpotifinPlayButton), findsNothing);
+    await gesture.removePointer();
   });
 }

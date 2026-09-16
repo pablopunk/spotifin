@@ -39,7 +39,7 @@ class LibraryScreen extends ConsumerWidget {
                   child: _CollectionHeader(
                     title: 'Your library',
                     tracks: tracks,
-                    icon: Icons.library_music_rounded,
+                    kind: CollectionKind.library,
                     artwork: PlaylistArtwork(
                       tracks: tracks,
                       size: 160,
@@ -157,7 +157,7 @@ class _CollectionGrid extends StatelessWidget {
   }
 }
 
-class _CollectionCard extends StatelessWidget {
+class _CollectionCard extends ConsumerWidget {
   const _CollectionCard({
     required this.title,
     required this.tracks,
@@ -170,7 +170,7 @@ class _CollectionCard extends StatelessWidget {
   final bool menu;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final first = tracks.first;
     final card = SpotifinCollectionCard(
       artwork: LayoutBuilder(
@@ -189,11 +189,13 @@ class _CollectionCard extends StatelessWidget {
           builder: (_) => CollectionScreen(
             title: title,
             tracks: tracks,
-            icon: artist ? Icons.person_rounded : Icons.album_rounded,
-            artist: artist,
+            kind: artist ? CollectionKind.artist : CollectionKind.album,
           ),
         ),
       ),
+      onPlay: tracks.isEmpty
+          ? null
+          : () => ref.read(playbackProvider).replaceQueue(tracks),
     );
     if (!menu) return card;
     return AlbumContextMenu(title: title, tracks: tracks, child: card);
@@ -341,7 +343,7 @@ class _PlaylistsTab extends ConsumerWidget {
                       builder: (_) => CollectionScreen(
                         title: playlist.name,
                         tracks: playlistTracks,
-                        icon: Icons.queue_music_rounded,
+                        kind: CollectionKind.playlist,
                         artwork: PlaylistArtwork(
                           tracks: playlistTracks,
                           size: 160,
@@ -350,12 +352,104 @@ class _PlaylistsTab extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  onPlay: playlistTracks.isEmpty
+                      ? null
+                      : () => ref
+                            .read(playbackProvider)
+                            .replaceQueue(playlistTracks),
                 ),
               );
             },
           );
         },
       );
+}
+
+enum CollectionKind { library, album, artist, playlist }
+
+extension CollectionKindX on CollectionKind {
+  String get label => switch (this) {
+    CollectionKind.library => 'LIBRARY',
+    CollectionKind.album => 'ALBUM',
+    CollectionKind.artist => 'ARTIST',
+    CollectionKind.playlist => 'PLAYLIST',
+  };
+
+  IconData get fallbackIcon => switch (this) {
+    CollectionKind.library => Icons.library_music_rounded,
+    CollectionKind.album => Icons.album_rounded,
+    CollectionKind.artist => Icons.person_rounded,
+    CollectionKind.playlist => Icons.queue_music_rounded,
+  };
+
+  bool get hasArtistTabs => this == CollectionKind.artist;
+}
+
+Duration? _collectionDuration(List<Track> tracks) {
+  var microseconds = 0;
+  for (final track in tracks) {
+    if (track.durationTicks > 0) microseconds += track.durationTicks ~/ 10;
+  }
+  if (microseconds <= 0) return null;
+  return Duration(microseconds: microseconds);
+}
+
+String _formatCollectionDuration(Duration duration) {
+  final totalMinutes = duration.inMinutes;
+  if (totalMinutes < 60) return '$totalMinutes min';
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  if (minutes == 0) return '$hours hr';
+  return '$hours hr $minutes min';
+}
+
+String? _albumArtist(List<Track> tracks) {
+  final artists = {
+    for (final track in tracks)
+      if (track.artist.trim().isNotEmpty) track.artist.trim(),
+  };
+  if (artists.isEmpty || artists.contains('Unknown artist')) {
+    artists.remove('Unknown artist');
+    if (artists.isEmpty) return null;
+  }
+  if (artists.length == 1) return artists.single;
+  return 'Various artists';
+}
+
+DateTime? _albumReleaseDate(
+  List<Track> tracks,
+  Map<String, DateTime> albumDates,
+) {
+  if (tracks.isEmpty) return null;
+  final albumId = tracks.first.albumId;
+  if (albumId != null && albumDates[albumId] != null) {
+    return albumDates[albumId];
+  }
+  DateTime? earliest;
+  for (final track in tracks) {
+    final date = track.premiereDate;
+    if (date == null) continue;
+    if (earliest == null || date.isBefore(earliest)) earliest = date;
+  }
+  return earliest;
+}
+
+String _collectionMetadata(
+  CollectionKind kind,
+  List<Track> tracks,
+  Map<String, DateTime> albumDates,
+) {
+  final segments = <String>[];
+  if (kind == CollectionKind.album) {
+    final artist = _albumArtist(tracks);
+    if (artist != null) segments.add(artist);
+    final date = _albumReleaseDate(tracks, albumDates);
+    if (date != null) segments.add('${date.year}');
+  }
+  segments.add('${tracks.length} ${tracks.length == 1 ? 'song' : 'songs'}');
+  final duration = _collectionDuration(tracks);
+  if (duration != null) segments.add(_formatCollectionDuration(duration));
+  return segments.join(' • ');
 }
 
 class PlaylistScreen extends ConsumerWidget {
@@ -390,7 +484,7 @@ class PlaylistScreen extends ConsumerWidget {
               return CollectionScreen(
                 title: playlist.name,
                 tracks: tracks,
-                icon: Icons.queue_music_rounded,
+                kind: CollectionKind.playlist,
                 artwork: PlaylistArtwork(
                   tracks: tracks,
                   size: 160,
@@ -407,28 +501,26 @@ class CollectionScreen extends ConsumerWidget {
   const CollectionScreen({
     required this.title,
     required this.tracks,
-    required this.icon,
+    required this.kind,
     this.artwork,
-    this.artist = false,
     super.key,
   });
   final String title;
   final List<Track> tracks;
-  final IconData icon;
+  final CollectionKind kind;
   final Widget? artwork;
-  final bool artist;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final header = _CollectionHeader(
       title: title,
       tracks: tracks,
-      icon: icon,
+      kind: kind,
       artwork: artwork,
     );
     return Scaffold(
       appBar: AppBar(title: Text(title), backgroundColor: Colors.transparent),
-      body: artist
+      body: kind.hasArtistTabs
           ? DefaultTabController(
               length: 2,
               child: NestedScrollView(
@@ -508,96 +600,134 @@ class _CollectionHeader extends ConsumerWidget {
   const _CollectionHeader({
     required this.title,
     required this.tracks,
-    required this.icon,
+    required this.kind,
     this.artwork,
   });
   final String title;
   final List<Track> tracks;
-  final IconData icon;
+  final CollectionKind kind;
   final Widget? artwork;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
-    return ListenableBuilder(
-      listenable: playback,
-      builder: (context, _) => _content(context, playback),
+    return StreamBuilder<Map<String, DateTime>>(
+      stream: ref.watch(albumDatesStreamProvider),
+      initialData: const {},
+      builder: (context, snapshot) => ListenableBuilder(
+        listenable: playback,
+        builder: (context, _) =>
+            _content(context, playback, snapshot.data ?? const {}),
+      ),
     );
+  }
+
+  Widget _headerArtwork() {
+    if (artwork != null) return artwork!;
+    if (tracks.isNotEmpty &&
+        (kind == CollectionKind.album || kind == CollectionKind.artist)) {
+      final first = tracks.first;
+      return Artwork(
+        itemId: first.albumId ?? first.id,
+        size: 160,
+        borderRadius: SpotifinRadii.card,
+      );
+    }
+    return Icon(kind.fallbackIcon, size: 72, color: SpotifinColors.textMuted);
   }
 
   Widget _content(
     BuildContext context,
     PlaybackService playback,
-  ) => DecoratedBox(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [SpotifinColors.raised, SpotifinColors.background],
+    Map<String, DateTime> albumDates,
+  ) {
+    final metadata = _collectionMetadata(kind, tracks, albumDates);
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [SpotifinColors.raised, SpotifinColors.background],
+        ),
       ),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(SpotifinSpacing.xl),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.end,
-        spacing: SpotifinSpacing.lg,
-        runSpacing: SpotifinSpacing.lg,
-        children: [
-          Container(
-            width: 160,
-            height: 160,
-            decoration: const BoxDecoration(
-              color: SpotifinColors.interactive,
-              borderRadius: BorderRadius.all(
-                Radius.circular(SpotifinRadii.card),
+      child: Padding(
+        padding: const EdgeInsets.all(SpotifinSpacing.xl),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: SpotifinSpacing.lg,
+          runSpacing: SpotifinSpacing.lg,
+          children: [
+            Container(
+              width: 160,
+              height: 160,
+              decoration: const BoxDecoration(
+                color: SpotifinColors.interactive,
+                borderRadius: BorderRadius.all(
+                  Radius.circular(SpotifinRadii.card),
+                ),
+                boxShadow: [SpotifinShadows.dialog],
               ),
-              boxShadow: [SpotifinShadows.dialog],
+              clipBehavior: Clip.antiAlias,
+              child: _headerArtwork(),
             ),
-            child:
-                artwork ??
-                Icon(icon, size: 72, color: SpotifinColors.textMuted),
-          ),
-          SizedBox(
-            width: 320,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'COLLECTION',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: SpotifinSpacing.xs),
-                Text(title, style: Theme.of(context).textTheme.headlineLarge),
-                const SizedBox(height: SpotifinSpacing.md),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: SpotifinSpacing.sm,
-                  runSpacing: SpotifinSpacing.sm,
-                  children: [
-                    SpotifinCountLabel(tracks.length),
-                    SpotifinPlayButton(
-                      onPressed: tracks.isEmpty
-                          ? null
-                          : () => playback.replaceQueue(tracks, shuffle: false),
+            SizedBox(
+              width: 320,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    kind.label,
+                    style: Theme.of(context).textTheme.labelMedium
+                        ?.copyWith(color: SpotifinColors.textMuted),
+                  ),
+                  const SizedBox(height: SpotifinSpacing.xs),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  if (metadata.isNotEmpty) ...[
+                    const SizedBox(height: SpotifinSpacing.xs),
+                    Text(
+                      metadata,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    IconButton(
-                      tooltip: 'Shuffle',
-                      color: playback.shuffle
-                          ? SpotifinColors.accent
-                          : SpotifinColors.textMuted,
-                      onPressed: tracks.isEmpty
-                          ? null
-                          : () => playback.replaceQueue(tracks, shuffle: true),
-                      icon: const Icon(Icons.shuffle_rounded),
-                    ),
-                    CollectionDownloadButton(tracks: tracks),
                   ],
-                ),
-              ],
+                  const SizedBox(height: SpotifinSpacing.md),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: SpotifinSpacing.sm,
+                    runSpacing: SpotifinSpacing.sm,
+                    children: [
+                      SpotifinPlayButton(
+                        onPressed: tracks.isEmpty
+                            ? null
+                            : () =>
+                                  playback.replaceQueue(tracks, shuffle: false),
+                      ),
+                      IconButton(
+                        tooltip: 'Shuffle',
+                        color: playback.shuffle
+                            ? SpotifinColors.accent
+                            : SpotifinColors.textMuted,
+                        onPressed: tracks.isEmpty
+                            ? null
+                            : () =>
+                                  playback.replaceQueue(tracks, shuffle: true),
+                        icon: const Icon(Icons.shuffle_rounded),
+                      ),
+                      CollectionDownloadButton(tracks: tracks),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

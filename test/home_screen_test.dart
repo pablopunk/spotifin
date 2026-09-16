@@ -101,6 +101,88 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
+
+  testWidgets('horizontal track cards reveal the shared play button', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'track-0',
+        name: 'Track 0',
+        artist: const Value('Artist'),
+        album: const Value('Album'),
+        albumId: const Value('album-0'),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('All songs'), findsOneWidget);
+    expect(find.byType(SpotifinCollectionCard), findsWidgets);
+    expect(find.byType(SpotifinPlayButton), findsNothing);
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(
+      tester.getCenter(find.byType(SpotifinCollectionCard).first),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpotifinPlayButton), findsOneWidget);
+    await gesture.removePointer();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('search album results keep artwork on the detail page', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'track-0',
+        name: 'Song',
+        artist: const Value('Artist'),
+        album: const Value('Album'),
+        albumId: const Value('album-0'),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(SearchBar), 'Album');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpotifinCollectionCard), findsWidgets);
+    await tester.tap(find.byType(SpotifinCollectionCard).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ALBUM'), findsOneWidget);
+    expect(find.text('Album'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
 }
 
 Future<void> _secondaryTap(WidgetTester tester, Finder finder) async {

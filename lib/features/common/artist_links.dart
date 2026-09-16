@@ -22,8 +22,7 @@ Future<void> openArtistCollection(
         tracks: tracks
             .where((item) => includesArtist(item, artist))
             .toList(growable: false),
-        icon: Icons.person_rounded,
-        artist: true,
+        kind: CollectionKind.artist,
       ),
     ),
   );
@@ -44,7 +43,7 @@ Future<void> openAlbumCollection(
       builder: (_) => CollectionScreen(
         title: track.album,
         tracks: albumTracks,
-        icon: Icons.album_rounded,
+        kind: CollectionKind.album,
       ),
     ),
   );

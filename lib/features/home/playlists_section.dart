@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
-import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
@@ -60,52 +59,32 @@ class PlaylistsSection extends ConsumerWidget {
       );
 }
 
-class _PlaylistCard extends StatelessWidget {
+class _PlaylistCard extends ConsumerWidget {
   const _PlaylistCard({required this.playlist, required this.tracksById});
 
   final Playlist playlist;
   final Map<String, Track> tracksById;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tracks = tracksInPlaylist(playlist, tracksById);
     return PlaylistContextMenu(
       playlist: playlist,
       tracks: tracks,
       child: SizedBox(
         width: 164,
-        child: Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(SpotifinRadii.card),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => PlaylistScreen(playlistId: playlist.id),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(SpotifinSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  PlaylistArtwork(tracks: tracks, size: 140),
-                  const SizedBox(height: SpotifinSpacing.sm),
-                  Text(
-                    playlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${tracks.length} songs',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+        child: SpotifinCollectionCard(
+          artwork: PlaylistArtwork(tracks: tracks, size: 140),
+          title: playlist.name,
+          subtitle: '${tracks.length} songs',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PlaylistScreen(playlistId: playlist.id),
             ),
           ),
+          onPlay: tracks.isEmpty
+              ? null
+              : () => ref.read(playbackProvider).replaceQueue(tracks),
         ),
       ),
     );

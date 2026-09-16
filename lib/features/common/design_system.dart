@@ -237,12 +237,16 @@ class SpotifinCountLabel extends StatelessWidget {
   );
 }
 
-class SpotifinCollectionCard extends StatelessWidget {
+class SpotifinCollectionCard extends StatefulWidget {
   const SpotifinCollectionCard({
     required this.artwork,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.onPlay,
+    this.active = false,
+    this.playing = false,
+    this.playTooltip = 'Play',
     super.key,
   });
 
@@ -250,37 +254,85 @@ class SpotifinCollectionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final VoidCallback? onPlay;
+  final bool active;
+  final bool playing;
+  final String playTooltip;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      borderRadius: BorderRadius.circular(SpotifinRadii.card),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(SpotifinSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: artwork),
-            const SizedBox(height: SpotifinSpacing.sm),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleSmall,
+  State<SpotifinCollectionCard> createState() => _SpotifinCollectionCardState();
+}
+
+class _SpotifinCollectionCardState extends State<SpotifinCollectionCard> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final showPlay = widget.onPlay != null && (_hovered || widget.active);
+    final titleStyle = Theme.of(context).textTheme.titleSmall
+        ?.copyWith(color: widget.active ? SpotifinColors.accent : null);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          color: _hovered ? SpotifinColors.hover : SpotifinColors.surface,
+          borderRadius: BorderRadius.circular(SpotifinRadii.card),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(SpotifinRadii.card),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(SpotifinRadii.card),
+            onTap: widget.onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(SpotifinSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(child: widget.artwork),
+                        if (showPlay)
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: Tooltip(
+                              message: widget.playTooltip,
+                              child: SpotifinPlayButton(
+                                onPressed: widget.onPlay,
+                                playing: widget.active && widget.playing,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: SpotifinSpacing.sm),
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Widget spotifinGrid({

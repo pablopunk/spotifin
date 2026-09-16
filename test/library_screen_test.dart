@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +12,7 @@ import 'package:spotifin/features/library/library_screen.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
-  testWidgets('library shows the collection header above its tabs', (
+  testWidgets('library shows the library header above its tabs', (
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
@@ -32,9 +33,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('COLLECTION'), findsOneWidget);
+    expect(find.text('LIBRARY'), findsOneWidget);
     expect(find.text('Your library'), findsWidgets);
-    expect(find.byType(SpotifinCountLabel), findsOneWidget);
+    expect(find.text('1 song'), findsOneWidget);
     expect(find.byType(PlaylistArtwork), findsOneWidget);
 
     final play = tester.widget<SpotifinPlayButton>(
@@ -96,6 +97,105 @@ void main() {
 
     expect(find.text('Cantaré'), findsOneWidget);
     expect(find.text('Otra'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('album cards reveal direct play on hover', (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'one',
+        name: 'First song',
+        artist: const Value('Artist'),
+        album: const Value('Album'),
+        albumId: const Value('album-one'),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: MaterialApp(theme: buildTheme(), home: const LibraryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Albums'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SpotifinCollectionCard), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SpotifinCollectionCard),
+        matching: find.byType(SpotifinPlayButton),
+      ),
+      findsNothing,
+    );
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(tester.getCenter(find.byType(SpotifinCollectionCard)));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(SpotifinCollectionCard),
+        matching: find.byType(SpotifinPlayButton),
+      ),
+      findsOneWidget,
+    );
+    await gesture.removePointer();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('empty playlists do not expose an enabled play control', (
+    tester,
+  ) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'one',
+        name: 'First song',
+        artist: const Value('Artist'),
+      ),
+    ]);
+    await database.replacePlaylists([
+      PlaylistsCompanion.insert(
+        id: 'empty',
+        name: 'Empty mix',
+        trackIds: const Value('[]'),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(database)],
+        child: MaterialApp(theme: buildTheme(), home: const LibraryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(Tab, 'Playlists'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Empty mix'), findsOneWidget);
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(tester.getCenter(find.byType(SpotifinCollectionCard)));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(SpotifinCollectionCard),
+        matching: find.byType(SpotifinPlayButton),
+      ),
+      findsNothing,
+    );
+    await gesture.removePointer();
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

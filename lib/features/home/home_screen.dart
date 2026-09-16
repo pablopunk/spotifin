@@ -476,14 +476,14 @@ class _ExternalSongResults extends StatelessWidget {
   }
 }
 
-class _CollectionResults extends StatelessWidget {
+class _CollectionResults extends ConsumerWidget {
   const _CollectionResults({required this.entries, this.artist = false});
 
   final List<MapEntry<String, List<Track>>> entries;
   final bool artist;
 
   @override
-  Widget build(BuildContext context) => SliverPadding(
+  Widget build(BuildContext context, WidgetRef ref) => SliverPadding(
     padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
     sliver: SliverGrid.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -513,11 +513,11 @@ class _CollectionResults extends StatelessWidget {
               builder: (_) => CollectionScreen(
                 title: entry.key,
                 tracks: entry.value,
-                icon: artist ? Icons.person_rounded : Icons.album_rounded,
-                artist: artist,
+                kind: artist ? CollectionKind.artist : CollectionKind.album,
               ),
             ),
           ),
+          onPlay: () => ref.read(playbackProvider).replaceQueue(entry.value),
         );
         return artist
             ? card
@@ -610,7 +610,7 @@ class _HomeCatalog {
   final List<DailyMix> mixes;
 }
 
-class _HorizontalSection extends StatelessWidget {
+class _HorizontalSection extends ConsumerWidget {
   const _HorizontalSection({
     required this.title,
     required this.tracks,
@@ -623,90 +623,90 @@ class _HorizontalSection extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: SpotifinSpacing.xl),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
-          child: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ),
-              if (action != null) const SizedBox(width: SpotifinSpacing.xs),
-              ?action,
-            ],
-          ),
-        ),
-        const SizedBox(height: SpotifinSpacing.sm),
-        SizedBox(
-          height: 224,
-          child: ListView.separated(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playback = ref.watch(playbackProvider);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpotifinSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.lg),
-            scrollDirection: Axis.horizontal,
-            itemCount: tracks.length,
-            separatorBuilder: (_, _) =>
-                const SizedBox(width: SpotifinSpacing.md),
-            itemBuilder: (context, index) {
-              final track = tracks[index];
-              return TrackContextMenu(
-                track: track,
-                contextTracks: contextTracks,
-                child: DraggableTrack(
-                  track: track,
-                  child: SizedBox(
-                    width: 164,
-                    child: Card(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(SpotifinRadii.card),
-                        onTap: () =>
-                            ProviderScope.containerOf(context)
-                                .read(playbackProvider)
-                                .playTrack(track, contextTracks),
-                        child: Padding(
-                          padding: const EdgeInsets.all(SpotifinSpacing.sm),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Artwork(
-                                itemId: track.albumId ?? track.id,
-                                size: 140,
-                                borderRadius: SpotifinRadii.small,
-                              ),
-                              const SizedBox(height: SpotifinSpacing.sm),
-                              Text(
-                                track.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                if (action != null) const SizedBox(width: SpotifinSpacing.xs),
+                ?action,
+              ],
+            ),
+          ),
+          const SizedBox(height: SpotifinSpacing.sm),
+          SizedBox(
+            height: 224,
+            child: ListenableBuilder(
+              listenable: playback,
+              builder: (context, _) => ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpotifinSpacing.lg,
+                ),
+                scrollDirection: Axis.horizontal,
+                itemCount: tracks.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: SpotifinSpacing.md),
+                itemBuilder: (context, index) {
+                  final track = tracks[index];
+                  final active = playback.currentTrack?.id == track.id;
+                  return TrackContextMenu(
+                    track: track,
+                    contextTracks: contextTracks,
+                    child: DraggableTrack(
+                      track: track,
+                      child: SizedBox(
+                        width: 164,
+                        child: SpotifinCollectionCard(
+                          artwork: LayoutBuilder(
+                            builder: (context, constraints) => Artwork(
+                              itemId: track.albumId ?? track.id,
+                              size: constraints.biggest.shortestSide,
+                              borderRadius: SpotifinRadii.small,
+                            ),
                           ),
+                          title: track.name,
+                          subtitle: track.artist,
+                          active: active,
+                          playing: playback.playing,
+                          playTooltip: active && playback.playing
+                              ? 'Pause'
+                              : 'Play',
+                          onTap: () => ref
+                              .read(playbackProvider)
+                              .playTrack(track, contextTracks),
+                          onPlay: () {
+                            final player = ref.read(playbackProvider);
+                            if (player.currentTrack?.id == track.id) {
+                              player.toggle();
+                            } else {
+                              player.playTrack(track, contextTracks);
+                            }
+                          },
                         ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyCatalog extends StatelessWidget {

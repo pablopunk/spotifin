@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
+import 'package:spotifin/features/common/artwork.dart';
 import 'package:spotifin/features/player/player_collection_links.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -39,6 +40,20 @@ void main() {
     expect(find.text('Toni Solo'), findsOneWidget);
     expect(find.text('Cantaré'), findsOneWidget);
     expect(find.text('Otra'), findsNothing);
+
+    await _close(tester, database);
+  });
+
+  testWidgets('artist links open an ARTIST page with artwork', (tester) async {
+    final database = await _database();
+    final cantare = await _cantare(database);
+
+    await _pump(tester, database, cantare);
+    await tester.tapOnText(find.textRange.ofSubstring('Lia Kali'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ARTIST'), findsOneWidget);
+    expect(find.byType(Artwork), findsWidgets);
 
     await _close(tester, database);
   });

@@ -9,7 +9,7 @@ import 'artwork.dart';
 import 'context_menu.dart';
 import 'design_system.dart';
 
-class TrackTile extends ConsumerWidget {
+class TrackTile extends ConsumerStatefulWidget {
   const TrackTile({
     required this.track,
     required this.contextTracks,
@@ -22,12 +22,81 @@ class TrackTile extends ConsumerWidget {
   final bool showAlbum;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final downloadStatus = ref.watch(downloadStatusesProvider).value?[track.id];
-    final tile = Padding(
+  ConsumerState<TrackTile> createState() => _TrackTileState();
+}
+
+class _TrackTileState extends ConsumerState<TrackTile> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final downloadStatus = ref
+        .watch(downloadStatusesProvider)
+        .value?[widget.track.id];
+    final playback = ref.watch(playbackProvider);
+    final tile = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: ListenableBuilder(
+        listenable: playback,
+        builder: (context, _) {
+          final active = playback.currentTrack?.id == widget.track.id;
+          return TrackTileContent(
+            track: widget.track,
+            contextTracks: widget.contextTracks,
+            showAlbum: widget.showAlbum,
+            downloadStatus: downloadStatus,
+            active: active,
+            playing: playback.playing,
+            hovered: _hovered,
+            onRowTap: () =>
+                playback.playTrack(widget.track, widget.contextTracks),
+            onArtworkTap: () => active
+                ? playback.toggle()
+                : playback.playTrack(widget.track, widget.contextTracks),
+          );
+        },
+      ),
+    );
+    return TrackContextMenu(
+      track: widget.track,
+      contextTracks: widget.contextTracks,
+      child: DraggableTrack(track: widget.track, child: tile),
+    );
+  }
+}
+
+class TrackTileContent extends StatelessWidget {
+  const TrackTileContent({
+    required this.track,
+    required this.contextTracks,
+    required this.downloadStatus,
+    required this.active,
+    required this.playing,
+    required this.hovered,
+    required this.onRowTap,
+    required this.onArtworkTap,
+    this.showAlbum = true,
+    super.key,
+  });
+
+  final Track track;
+  final List<Track> contextTracks;
+  final String? downloadStatus;
+  final bool active;
+  final bool playing;
+  final bool hovered;
+  final VoidCallback onRowTap;
+  final VoidCallback onArtworkTap;
+  final bool showAlbum;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: active,
+    child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.sm),
       child: Material(
-        color: Colors.transparent,
+        color: hovered ? SpotifinColors.hover : Colors.transparent,
         borderRadius: BorderRadius.circular(SpotifinRadii.small),
         child: Row(
           children: [
@@ -35,24 +104,55 @@ class TrackTile extends ConsumerWidget {
               child: ListTile(
                 minTileHeight: 64,
                 contentPadding: const EdgeInsets.only(left: SpotifinSpacing.xs),
-                leading: Artwork(
-                  itemId: track.albumId ?? track.id,
-                  size: 48,
-                  borderRadius: SpotifinRadii.small,
+                leading: SizedBox.square(
+                  dimension: 48,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                    child: Stack(
+                      children: [
+                        Artwork(
+                          itemId: track.albumId ?? track.id,
+                          size: 48,
+                          borderRadius: 0,
+                        ),
+                        if (hovered || active)
+                          Positioned.fill(
+                            child: ColoredBox(
+                              color: const Color(0x99000000),
+                              child: IconButton(
+                                tooltip: active
+                                    ? (playing ? 'Pause' : 'Play')
+                                    : 'Play',
+                                padding: EdgeInsets.zero,
+                                onPressed: onArtworkTap,
+                                icon: Icon(
+                                  active && playing
+                                      ? Icons.graphic_eq_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: active
+                                      ? SpotifinColors.accent
+                                      : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
                 title: Text(
                   track.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(color: active ? SpotifinColors.accent : null),
                 ),
                 subtitle: TrackSubtitle(
                   track: track,
                   showAlbum: showAlbum,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                onTap: () =>
-                    ref.read(playbackProvider).playTrack(track, contextTracks),
+                onTap: onRowTap,
               ),
             ),
             _DownloadIndicator(status: downloadStatus),
@@ -64,13 +164,8 @@ class TrackTile extends ConsumerWidget {
           ],
         ),
       ),
-    );
-    return TrackContextMenu(
-      track: track,
-      contextTracks: contextTracks,
-      child: DraggableTrack(track: track, child: tile),
-    );
-  }
+    ),
+  );
 }
 
 enum _TrackAction {
