@@ -320,11 +320,7 @@ class _SearchResults extends StatelessWidget {
     stream: results,
     builder: (context, snapshot) {
       final tracks = snapshot.data ?? const [];
-      final artists = _matchingGroups(
-        tracks,
-        query,
-        (track) => track.artistCredits.map((artist) => artist.name),
-      );
+      final artists = _matchingArtistGroups(tracks, query);
       final albums = _matchingGroups(tracks, query, (track) => [track.album]);
       final visibleExternal = filter == _SearchFilter.all
           ? externalResults
@@ -533,6 +529,26 @@ class _CollectionResults extends StatelessWidget {
       },
     ),
   );
+}
+
+List<MapEntry<String, List<Track>>> _matchingArtistGroups(
+  List<Track> tracks,
+  String query,
+) {
+  final words = query.toLowerCase().split(RegExp(r'\s+'));
+  final groups = <String, MapEntry<String, List<Track>>>{};
+  for (final track in tracks) {
+    for (final artist in track.artistCredits) {
+      final name = artist.name.trim();
+      final normalized = name.toLowerCase();
+      if (name.isEmpty || !words.every(normalized.contains)) continue;
+      final key = artist.id ?? 'name:$name';
+      (groups[key] ??= MapEntry(name, [])).value.add(track);
+    }
+  }
+  final entries = groups.values.toList();
+  entries.sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
+  return entries;
 }
 
 List<MapEntry<String, List<Track>>> _matchingGroups(

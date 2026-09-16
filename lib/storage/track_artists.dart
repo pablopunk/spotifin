@@ -26,16 +26,20 @@ String encodeArtistItems(Iterable<TrackArtist> artists) => jsonEncode([
 
 List<TrackArtist> parseArtistItems(String encoded, String fallbackArtist) {
   final decoded = _decodeList(encoded);
-  final items = [
-    for (final entry in decoded)
-      if (entry is Map &&
-          entry['name'] is String &&
-          (entry['name'] as String).trim().isNotEmpty)
-        TrackArtist(
-          name: (entry['name'] as String).trim(),
-          id: entry['id'] is String ? entry['id'] as String : null,
-        ),
-  ];
+  final items = <TrackArtist>[];
+  for (final entry in decoded) {
+    if (entry is! Map ||
+        entry['name'] is! String ||
+        (entry['name'] as String).trim().isEmpty) {
+      continue;
+    }
+    final names = _splitNames(entry['name'] as String);
+    final id = entry['id'] is String ? entry['id'] as String : null;
+    items.addAll([
+      for (final name in names)
+        TrackArtist(name: name, id: names.length == 1 ? id : null),
+    ]);
+  }
   if (items.isNotEmpty) return items;
 
   final names = _splitNames(fallbackArtist);
@@ -68,7 +72,7 @@ List<Object?> _decodeList(String encoded) {
 }
 
 List<String> _splitNames(String artist) => artist
-    .split(', ')
+    .split(',')
     .map((name) => name.trim())
     .where((name) => name.isNotEmpty)
     .toList(growable: false);

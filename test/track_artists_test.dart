@@ -60,6 +60,27 @@ void main() {
     expect(includesArtist(track, const TrackArtist(name: 'Lia Kali')), isTrue);
   });
 
+  test('splits a combined artist item into separate credits', () {
+    final track = _track(
+      artist: 'Lia Kali, Toni Anzis',
+      artistItems: '[{"id":"combined","name":"Lia Kali, Toni Anzis"}]',
+    );
+
+    expect(track.artistCredits, const [
+      TrackArtist(name: 'Lia Kali'),
+      TrackArtist(name: 'Toni Anzis'),
+    ]);
+  });
+
+  test('splits names without a space after the comma', () {
+    final track = _track(artist: 'Lia Kali,Toni Anzis');
+
+    expect(track.artistCredits, const [
+      TrackArtist(name: 'Lia Kali'),
+      TrackArtist(name: 'Toni Anzis'),
+    ]);
+  });
+
   test('encodeArtistItems round trips through parseArtistItems', () {
     const artists = [
       TrackArtist(id: 'lia', name: 'Lia Kali'),

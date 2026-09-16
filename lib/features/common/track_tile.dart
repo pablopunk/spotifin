@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
+import 'artist_links.dart';
 import 'artwork.dart';
 import 'context_menu.dart';
 import 'design_system.dart';
@@ -45,13 +46,9 @@ class TrackTile extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                subtitle: Text(
-                  [
-                    track.artist,
-                    if (showAlbum && track.album.isNotEmpty) track.album,
-                  ].join(' • '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                subtitle: TrackSubtitle(
+                  track: track,
+                  showAlbum: showAlbum,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 onTap: () =>
