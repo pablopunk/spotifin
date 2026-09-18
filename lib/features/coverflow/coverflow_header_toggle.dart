@@ -33,7 +33,10 @@ class CoverflowToggleButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mobile = MediaQuery.sizeOf(context).width < SpotifinBreakpoints.rail;
+    final width = MediaQuery.sizeOf(context).width;
+    final mobile = width < SpotifinBreakpoints.rail;
+    final compactLandscape =
+        mobile && MediaQuery.orientationOf(context) == Orientation.landscape;
     final active = ref.watch(coverflowModeProvider(viewId));
     return IconButton(
       tooltip: mobile
@@ -45,7 +48,7 @@ class CoverflowToggleButton extends ConsumerWidget {
           ? SpotifinColors.accent
           : SpotifinColors.textMuted,
       onPressed: mobile
-          ? _rotateToCoverflow
+          ? () => _openMobileCoverflow(ref, rotate: !compactLandscape)
           : () => ref.read(coverflowModeProvider(viewId).notifier).toggle(),
       icon: Icon(
         !mobile && active
@@ -53,6 +56,15 @@ class CoverflowToggleButton extends ConsumerWidget {
             : Icons.view_carousel_rounded,
       ),
     );
+  }
+
+  Future<void> _openMobileCoverflow(
+    WidgetRef ref, {
+    required bool rotate,
+  }) async {
+    ref.read(mobileCoverflowDismissedProvider.notifier).reopen();
+    if (!rotate) return;
+    await _rotateToCoverflow();
   }
 
   Future<void> _rotateToCoverflow() async {

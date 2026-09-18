@@ -35,6 +35,24 @@ final mobileCoverflowCollectionProvider = Provider((ref) {
   return MobileCoverflowCollectionRegistry();
 });
 
+final mobileCoverflowDismissedProvider =
+    NotifierProvider<MobileCoverflowDismissedController, bool>(
+      MobileCoverflowDismissedController.new,
+    );
+
+class MobileCoverflowDismissedController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void dismiss() {
+    if (!state) state = true;
+  }
+
+  void reopen() {
+    if (state) state = false;
+  }
+}
+
 class MobileCoverflowCollectionRegistry {
   final _collections = <Object, MobileCoverflowCollection>{};
 

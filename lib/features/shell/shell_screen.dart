@@ -41,7 +41,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   late final RemoteSessionService _remoteSessions;
   late final MobileCoverflowCollectionRegistry _coverflowCollections;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
-  bool _coverflowDismissed = false;
   OverlayEntry? _coverflowOverlayEntry;
   final _navigatorKeys = List.generate(
     _destinations.length,
@@ -141,11 +140,12 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
-    _scheduleCoverflowOverlay(compactLandscape && !_coverflowDismissed);
-    if (!compactLandscape && _coverflowDismissed) {
+    final dismissed = ref.watch(mobileCoverflowDismissedProvider);
+    _scheduleCoverflowOverlay(compactLandscape && !dismissed);
+    if (!compactLandscape && dismissed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        setState(() => _coverflowDismissed = false);
+        ref.read(mobileCoverflowDismissedProvider.notifier).reopen();
       });
     }
     return _buildScaffold(context);
@@ -178,7 +178,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   void _dismissCoverflow() {
     _removeCoverflowOverlay();
-    setState(() => _coverflowDismissed = true);
+    ref.read(mobileCoverflowDismissedProvider.notifier).dismiss();
   }
 
   void _removeCoverflowOverlay() {
