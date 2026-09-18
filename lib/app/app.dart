@@ -7,6 +7,7 @@ import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/updates/update_prompt.dart';
+import '../services/shortcuts/play_library_handler.dart';
 import '../services/updates/release_info.dart';
 import 'app_shortcuts.dart';
 import 'providers.dart';
@@ -31,6 +32,7 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
     Future.microtask(() => initCarListeners(ref));
+    Future.microtask(() => configurePlayLibraryShortcut(ref));
     Future.microtask(
       ref.read(updateControllerProvider.notifier).checkOnStartup,
     );

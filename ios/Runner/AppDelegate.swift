@@ -17,6 +17,15 @@ import UIKit
       AirPlayViewFactory(),
       withId: "spotifin_airplay"
     )
+    if let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "SpotifinDeepLink"
+    ) {
+      let channel = FlutterMethodChannel(
+        name: "spotifin/deep-link",
+        binaryMessenger: registrar.messenger()
+      )
+      DeepLinkStore.attach(channel: channel)
+    }
   }
 }
 
