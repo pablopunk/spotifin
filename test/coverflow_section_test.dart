@@ -84,6 +84,7 @@ void main() {
     expect(find.text('list-mode'), findsOneWidget);
     expect(find.byType(CoverflowStage), findsOneWidget);
     expect(find.text('First'), findsOneWidget);
+    expect(find.byKey(const ValueKey('reflection:track:1')), findsOneWidget);
 
     await tester.tap(find.text('toggle'));
     await tester.pumpAndSettle();

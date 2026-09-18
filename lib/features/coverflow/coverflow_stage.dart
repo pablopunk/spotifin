@@ -63,7 +63,7 @@ class _CoverflowStageState extends State<CoverflowStage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final coverSize = _coverSize(constraints);
-        final stageHeight = coverSize * 1.2;
+        final stageHeight = coverSize * 1.24;
         final visible = _visibleIndices();
         return MouseRegion(
           cursor: SystemMouseCursors.grab,
@@ -189,7 +189,7 @@ class _CoverflowStageState extends State<CoverflowStage>
 
   double _coverSize(BoxConstraints constraints) {
     final byWidth = constraints.maxWidth * 0.3;
-    final byHeight = (constraints.maxHeight - 90) / 1.2;
+    final byHeight = (constraints.maxHeight - 90) / 1.24;
     return math.min(byWidth, byHeight).clamp(120.0, 360.0).toDouble();
   }
 }
@@ -214,7 +214,7 @@ class _Cover extends StatelessWidget {
     final nearCenter = distance.clamp(0.0, 1.0);
     final sideStep = math.max(0.0, distance - 1) * coverSize * 0.15;
     final horizontal = side * (nearCenter * coverSize * 0.5 + sideStep);
-    final angle = side * -0.79 * nearCenter;
+    final angle = side * 0.79 * nearCenter;
     final scale = 1 - 0.33 * nearCenter - 0.015 * math.min(distance - 1, 3);
     final opacity = (1 - math.max(0, distance - 3) * 0.28).clamp(0.2, 1.0);
     final transform = Matrix4.identity()
@@ -287,32 +287,45 @@ class _Reflection extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: size,
-    height: size * 0.2,
-    child: ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0x52FFFFFF), Colors.transparent],
-        stops: [0, 0.85],
-      ).createShader(rect),
-      child: Opacity(
-        opacity: 0.35,
-        child: Transform(
-          alignment: Alignment.topCenter,
-          transform: Matrix4.diagonal3Values(1, -1, 1),
-          child: Artwork(
-            key: ValueKey('mirror:${item.id}'),
-            itemId: item.artItemId,
-            size: size,
-            borderRadius: 0,
+  Widget build(BuildContext context) {
+    final reflectionHeight = size * 0.24;
+    return SizedBox(
+      key: ValueKey('reflection:${item.id}'),
+      width: size,
+      height: reflectionHeight,
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (rect) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x8AFFFFFF), Colors.transparent],
+          stops: [0, 0.92],
+        ).createShader(rect),
+        child: Opacity(
+          opacity: 0.42,
+          child: ClipRect(
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              minWidth: size,
+              maxWidth: size,
+              minHeight: size,
+              maxHeight: size,
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.diagonal3Values(1, -1, 1),
+                child: Artwork(
+                  key: ValueKey('mirror:${item.id}'),
+                  itemId: item.artItemId,
+                  size: size,
+                  borderRadius: 0,
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _Caption extends StatelessWidget {
