@@ -166,12 +166,11 @@ class AppController extends Notifier<AppState> {
             smallStreaming: smallStreaming,
             normalization: normalization,
           );
+      ref.read(carControllerProvider.notifier).setSignedIn(true);
       final cached = await ref.read(databaseProvider).allTracks();
       if (cached.isEmpty) return;
       await ref.read(playbackProvider).restore(cached);
-      await ref
-          .read(carPlayProvider)
-          .configure(cached, ref.read(playbackProvider));
+      ref.read(carControllerProvider.notifier).refreshCatalog(tracks: cached);
     } catch (_) {}
   }
 
@@ -201,6 +200,7 @@ class AppController extends Notifier<AppState> {
         session: session,
         syncing: true,
       );
+      ref.read(carControllerProvider.notifier).setSignedIn(true);
       await refresh();
       return true;
     } catch (error) {
@@ -266,9 +266,9 @@ class AppController extends Notifier<AppState> {
         await database.replaceAlbumDates(albumDates);
       } catch (_) {}
       final catalog = await ref.read(databaseProvider).allTracks();
-      await ref
-          .read(carPlayProvider)
-          .configure(catalog, ref.read(playbackProvider));
+      try {
+        await ref.read(carControllerProvider.notifier).refreshNow();
+      } catch (_) {}
       if (ref.read(playbackProvider).queue.isEmpty) {
         await ref.read(playbackProvider).restore(catalog);
       }
@@ -438,6 +438,7 @@ class AppController extends Notifier<AppState> {
     await ref.read(downloadProvider).clear();
     await ref.read(databaseProvider).clearAccountData();
     await ref.read(sessionStoreProvider).clear();
+    ref.read(carControllerProvider.notifier).setSignedIn(false);
     state = state.copyWith(
       status: AppStatus.signedOut,
       clearSession: true,
@@ -474,6 +475,7 @@ class AppController extends Notifier<AppState> {
     await ref.read(remoteSessionProvider).clear();
     await ref.read(playbackProvider).clear();
     await ref.read(sessionStoreProvider).clear();
+    ref.read(carControllerProvider.notifier).setSignedIn(false);
     state = state.copyWith(
       status: AppStatus.signedOut,
       clearSession: true,

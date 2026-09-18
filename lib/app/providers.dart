@@ -12,9 +12,9 @@ import '../services/playback/playback_service.dart';
 import '../services/playback/remote_session_service.dart';
 import '../services/updates/update_controller.dart';
 import '../services/updates/update_service.dart';
+import '../features/car/car_controller.dart';
 import '../platform/download_store.dart';
 import '../platform/artwork_store.dart';
-import '../platform/carplay_service.dart';
 import '../storage/database.dart';
 import 'state/app_controller.dart';
 import 'state/downtify_controller.dart';
@@ -132,7 +132,9 @@ final playerPanelProvider =
       PlayerPanelController.new,
     );
 
-final carPlayProvider = Provider<CarPlayService>((ref) => CarPlayService());
+final carControllerProvider = NotifierProvider<CarController, CarState>(
+  CarController.new,
+);
 
 final updateServiceProvider = Provider<UpdateService>((ref) {
   final service = UpdateService();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/login_screen.dart';
+import '../features/car/car_bootstrap.dart';
 import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
@@ -29,6 +30,7 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
+    Future.microtask(() => initCarListeners(ref));
     Future.microtask(
       ref.read(updateControllerProvider.notifier).checkOnStartup,
     );
