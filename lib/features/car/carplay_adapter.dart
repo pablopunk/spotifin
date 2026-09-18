@@ -9,11 +9,13 @@ typedef CarPlayHandler = Future<void> Function(
   Track track,
   List<Track> context,
 );
+typedef CarArtworkUrl = String? Function(String itemId);
 
 class CarPlayAdapter {
-  CarPlayAdapter({required this.play});
+  CarPlayAdapter({required this.play, this.artworkUrl});
 
   final CarPlayHandler play;
+  final CarArtworkUrl? artworkUrl;
 
   CPTemplate buildRoot(CarState state) {
     if (!state.signedIn) return signedOutTemplate();
@@ -86,6 +88,7 @@ class CarPlayAdapter {
             CPListItem(
               text: playlist.name,
               detailText: _countLabel(playlistChildren(playlist, byId).length),
+              image: _playlistArtwork(playlist, byId),
               accessoryType: CPListItemAccessoryType.disclosureIndicator,
               onPress: (complete, _) async {
                 await _pushTrackList(
@@ -112,6 +115,7 @@ class CarPlayAdapter {
             CPListItem(
               text: group.title,
               detailText: _countLabel(group.trackCount),
+              image: _artistArtwork(group.title, tracks),
               accessoryType: CPListItemAccessoryType.disclosureIndicator,
               onPress: (complete, _) async {
                 await _pushTrackList(
@@ -158,6 +162,7 @@ class CarPlayAdapter {
               id: carTrackId(ref.id),
               text: ref.title,
               detailText: ref.subtitle.isEmpty ? null : ref.subtitle,
+              image: _trackArtwork(index[carTrackId(ref.id)]!),
               onPress: (complete, _) async {
                 final track = index[carTrackId(ref.id)];
                 if (track != null) await _playAndShow(track, scope);
@@ -188,22 +193,37 @@ class CarPlayAdapter {
   List<CarTrackRef> _refs(List<Track> tracks) =>
       tracks.map(CarTrackRef.fromTrack).toList();
 
-  List<CPListItem> _trackItems(List<CarTrackRef> refs, List<Track> scope) => [
-    for (final ref in refs)
-      CPListItem(
-        id: carTrackId(ref.id),
-        text: ref.title,
-        detailText: ref.subtitle.isEmpty ? null : ref.subtitle,
-        onPress: (complete, _) async {
-          final track = scope.firstWhere(
-            (t) => t.id == ref.id,
-            orElse: () => scope.first,
-          );
-          await _playAndShow(track, scope);
-          complete();
-        },
-      ),
-  ];
+  List<CPListItem> _trackItems(List<CarTrackRef> refs, List<Track> scope) {
+    final byId = {for (final track in scope) track.id: track};
+    return [
+      for (final ref in refs)
+        CPListItem(
+          id: carTrackId(ref.id),
+          text: ref.title,
+          detailText: ref.subtitle.isEmpty ? null : ref.subtitle,
+          image: byId[ref.id] == null ? null : _trackArtwork(byId[ref.id]!),
+          onPress: (complete, _) async {
+            final track = byId[ref.id];
+            if (track != null) await _playAndShow(track, scope);
+            complete();
+          },
+        ),
+    ];
+  }
+
+  String? _trackArtwork(Track track) =>
+      artworkUrl?.call(track.albumId ?? track.id);
+
+  String? _playlistArtwork(Playlist playlist, Map<String, Track> byId) {
+    if (playlist.imageTag != null) return artworkUrl?.call(playlist.id);
+    final children = playlistChildren(playlist, byId, limit: 1);
+    return children.isEmpty ? null : _trackArtwork(children.first);
+  }
+
+  String? _artistArtwork(String artist, List<Track> tracks) {
+    final matches = tracksForArtist(tracks, artist);
+    return matches.isEmpty ? null : _trackArtwork(matches.first);
+  }
 
   Future<void> _pushTrackList(String title, List<Track> scope) async {
     try {

@@ -12,11 +12,19 @@ bool _carConnected(String status) =>
 Future<void> syncCarTemplates(WidgetRef ref) async {
   final state = ref.read(carControllerProvider);
   final play = ref.read(carControllerProvider.notifier).playTrack;
+  final session = ref.read(appControllerProvider).session;
+  final client = ref.read(jellyfinClientProvider);
+  String? artworkUrl(String itemId) => session == null
+      ? null
+      : client.imageUri(session, itemId, width: 128).toString();
   if (_carConnected(FlutterCarplay.connectionStatus)) {
-    await CarPlayAdapter(play: play).showRoot(state);
+    await CarPlayAdapter(play: play, artworkUrl: artworkUrl).showRoot(state);
   }
   if (_carConnected(FlutterAndroidAuto.connectionStatus)) {
-    await AndroidAutoAdapter(play: play).showRoot(state);
+    await AndroidAutoAdapter(
+      play: play,
+      artworkUrl: artworkUrl,
+    ).showRoot(state);
   }
 }
 

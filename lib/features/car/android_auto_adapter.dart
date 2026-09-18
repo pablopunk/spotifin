@@ -8,11 +8,13 @@ typedef AndroidAutoHandler = Future<void> Function(
   Track track,
   List<Track> context,
 );
+typedef AndroidAutoArtworkUrl = String? Function(String itemId);
 
 class AndroidAutoAdapter {
-  AndroidAutoAdapter({required this.play});
+  AndroidAutoAdapter({required this.play, this.artworkUrl});
 
   final AndroidAutoHandler play;
+  final AndroidAutoArtworkUrl? artworkUrl;
 
   AATemplate buildRoot(CarState state) {
     if (!state.signedIn) {
@@ -70,6 +72,7 @@ class AndroidAutoAdapter {
             AAListItem(
               title: playlist.name,
               subtitle: _countLabel(playlistChildren(playlist, byId).length),
+              imageUrl: _playlistArtwork(playlist, byId),
               isBrowsable: true,
               onPress: (complete, _) async {
                 await _pushTrackList(
@@ -96,6 +99,7 @@ class AndroidAutoAdapter {
             AAListItem(
               title: group.title,
               subtitle: _countLabel(group.trackCount),
+              imageUrl: _artistArtwork(group.title, tracks),
               isBrowsable: true,
               onPress: (complete, _) async {
                 await _pushTrackList(
@@ -142,21 +146,36 @@ class AndroidAutoAdapter {
   List<CarTrackRef> _refs(List<Track> tracks) =>
       tracks.map(CarTrackRef.fromTrack).toList();
 
-  List<AAListItem> _trackItems(List<CarTrackRef> refs, List<Track> scope) => [
-    for (final ref in refs)
-      AAListItem(
-        title: ref.title,
-        subtitle: ref.subtitle.isEmpty ? null : ref.subtitle,
-        onPress: (complete, _) async {
-          final track = scope.firstWhere(
-            (t) => t.id == ref.id,
-            orElse: () => scope.first,
-          );
-          await _play(track, scope);
-          complete();
-        },
-      ),
-  ];
+  List<AAListItem> _trackItems(List<CarTrackRef> refs, List<Track> scope) {
+    final byId = {for (final track in scope) track.id: track};
+    return [
+      for (final ref in refs)
+        AAListItem(
+          title: ref.title,
+          subtitle: ref.subtitle.isEmpty ? null : ref.subtitle,
+          imageUrl: byId[ref.id] == null ? null : _trackArtwork(byId[ref.id]!),
+          onPress: (complete, _) async {
+            final track = byId[ref.id];
+            if (track != null) await _play(track, scope);
+            complete();
+          },
+        ),
+    ];
+  }
+
+  String? _trackArtwork(Track track) =>
+      artworkUrl?.call(track.albumId ?? track.id);
+
+  String? _playlistArtwork(Playlist playlist, Map<String, Track> byId) {
+    if (playlist.imageTag != null) return artworkUrl?.call(playlist.id);
+    final children = playlistChildren(playlist, byId, limit: 1);
+    return children.isEmpty ? null : _trackArtwork(children.first);
+  }
+
+  String? _artistArtwork(String artist, List<Track> tracks) {
+    final matches = tracksForArtist(tracks, artist);
+    return matches.isEmpty ? null : _trackArtwork(matches.first);
+  }
 
   Future<void> _pushTrackList(String title, List<Track> scope) async {
     try {

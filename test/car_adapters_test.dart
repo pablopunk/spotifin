@@ -82,4 +82,23 @@ void main() {
     final results = auto().searchResults('', tracks);
     expect(results.sections.single.items, isEmpty);
   });
+
+  test('song rows include album artwork on both car platforms', () {
+    final tracks = [makeTrack('album-art')];
+    String artwork(String id) => 'https://music.test/$id.jpg';
+
+    final carPlayTab = CarPlayAdapter(
+      play: (_, _) async {},
+      artworkUrl: artwork,
+    ).allSongsTab(tracks);
+    final carPlayItem = carPlayTab.sections.single.items.single as CPListItem;
+    expect(carPlayItem.image, 'https://music.test/album-art.jpg');
+
+    final androidAutoTab = AndroidAutoAdapter(
+      play: (_, _) async {},
+      artworkUrl: artwork,
+    ).allSongsTab(tracks);
+    final androidAutoItem = androidAutoTab.sections.single.items.single;
+    expect(androidAutoItem.imageUrl, 'https://music.test/album-art.jpg');
+  });
 }
