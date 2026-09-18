@@ -39,6 +39,10 @@ class _DowntifySettingsScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(downtifyControllerProvider);
+    final downloadQueue = state.imports.where(_isDownloadQueueItem).toList();
+    final libraryImports = state.imports
+        .where((item) => !_isDownloadQueueItem(item))
+        .toList();
     if (!_seededAddress && state.serverUrl != null) {
       _seededAddress = true;
       _serverController.text = state.serverUrl!;
@@ -136,11 +140,19 @@ class _DowntifySettingsScreenState
                 for (final song in _results) ExternalTrackTile(song: song),
               ],
             ),
-            if (state.imports.isNotEmpty)
+            if (downloadQueue.isNotEmpty)
               SpotifinSettingsGroup(
-                title: 'Server imports',
+                title: 'Download queue',
                 children: [
-                  for (final item in state.imports) _ImportTile(item: item),
+                  for (final item in downloadQueue)
+                    _ImportTile(item: item, queueItem: true),
+                ],
+              ),
+            if (libraryImports.isNotEmpty)
+              SpotifinSettingsGroup(
+                title: 'Library imports',
+                children: [
+                  for (final item in libraryImports) _ImportTile(item: item),
                 ],
               ),
           ],
@@ -200,9 +212,10 @@ class _DowntifySettingsScreenState
 }
 
 class _ImportTile extends ConsumerWidget {
-  const _ImportTile({required this.item});
+  const _ImportTile({required this.item, this.queueItem = false});
 
   final DowntifyImport item;
+  final bool queueItem;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -217,12 +230,26 @@ class _ImportTile extends ConsumerWidget {
       leading: Icon(_importIcon(item.status)),
       title: Text(song.name),
       subtitle: Text(_importLabel(item)),
-      trailing: failed
-          ? IconButton(
-              tooltip: 'Retry import',
-              onPressed: () =>
-                  ref.read(downtifyControllerProvider.notifier).retry(item),
-              icon: const Icon(Icons.refresh_rounded),
+      trailing: queueItem
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (failed)
+                  IconButton(
+                    tooltip: 'Retry import',
+                    onPressed: () => ref
+                        .read(downtifyControllerProvider.notifier)
+                        .retry(item),
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                IconButton(
+                  tooltip: failed ? 'Remove from queue' : 'Stop download',
+                  onPressed: () => ref
+                      .read(downtifyControllerProvider.notifier)
+                      .removeFromQueue(item),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
             )
           : item.status == 'imported'
           ? IconButton(
@@ -235,6 +262,14 @@ class _ImportTile extends ConsumerWidget {
     );
   }
 }
+
+bool _isDownloadQueueItem(DowntifyImport item) => const {
+  'submitting',
+  'queued',
+  'downloading',
+  'retrying',
+  'downloadFailed',
+}.contains(item.status);
 
 IconData _availabilityIcon(DowntifyAvailability value) => switch (value) {
   DowntifyAvailability.loading => Icons.sync_rounded,
@@ -263,6 +298,8 @@ String _importLabel(DowntifyImport item) => switch (item.status) {
   'submitting' => 'Submitting…',
   'queued' => 'Queued',
   'downloading' => 'Downloading ${item.progress.round()}%',
+  'retrying' =>
+    'Retrying ${item.retryCount} of ${DowntifyController.maxDownloadRetries}…',
   'requestingScan' => 'Starting Jellyfin scan…',
   'waitingForJellyfin' => 'Waiting for Jellyfin',
   'scanDenied' => 'Waiting for Jellyfin’s scheduled scan',

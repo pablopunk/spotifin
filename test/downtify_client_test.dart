@@ -126,4 +126,25 @@ void main() {
     expect(jobs.single.progress, 42.5);
     expect(jobs.single.message, 'Downloading');
   });
+
+  test('removes one song from the server queue', () async {
+    late http.Request request;
+    final client = DowntifyClient(
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('{"removed":true}', 200);
+      }),
+    );
+    addTearDown(client.close);
+
+    final removed = await client.removeQueueItem(
+      'https://downtify.example.com',
+      'video/id',
+    );
+
+    expect(removed, isTrue);
+    expect(request.method, 'DELETE');
+    expect(request.url.path, '/api/queue/item');
+    expect(request.url.queryParameters, {'song_id': 'video/id'});
+  });
 }

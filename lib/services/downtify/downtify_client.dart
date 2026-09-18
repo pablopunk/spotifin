@@ -109,6 +109,19 @@ class DowntifyClient {
         .toList(growable: false);
   }
 
+  Future<bool> removeQueueItem(String serverUrl, String songId) async {
+    final response = await _http
+        .delete(_uri(serverUrl, '/api/queue/item', {'song_id': songId}))
+        .timeout(timeout);
+    final decoded = _decode(response);
+    if (decoded is! Map<String, dynamic> || decoded['removed'] is! bool) {
+      throw const DowntifyException(
+        'Downtify returned an invalid queue response.',
+      );
+    }
+    return decoded['removed'] as bool;
+  }
+
   Future<http.Response> _get(Uri uri) => _http.get(uri).timeout(timeout);
 
   Uri _uri(String serverUrl, String path, [Map<String, String>? query]) {
