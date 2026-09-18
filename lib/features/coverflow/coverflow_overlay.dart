@@ -143,7 +143,7 @@ class _OverlayShellState extends State<_OverlayShell> {
                         Positioned(
                           left: 48,
                           right: 88,
-                          bottom: 6,
+                          bottom: 0,
                           child: _TrackLine(item: widget.items[_focused]),
                         ),
                         Positioned(
