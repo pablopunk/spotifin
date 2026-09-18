@@ -31,10 +31,9 @@ class AndroidAutoAdapter {
     return AATabBarTemplate(
       tabs: [
         recentsTab(state.tracks),
-        favoritesTab(state.tracks),
+        allSongsTab(state.tracks),
         playlistsTab(state.playlists, byId),
         artistsTab(state.tracks),
-        songsTab(state.tracks),
       ],
     );
   }
@@ -54,18 +53,6 @@ class AndroidAutoAdapter {
       systemIcon: 'clock',
       sections: [AAListSection(items: _trackItems(recent, scope))],
       emptyViewTitleVariants: const ['No recent music'],
-    );
-  }
-
-  AAListTemplate favoritesTab(List<Track> tracks) {
-    final favorites = buildFavorites(tracks);
-    final scope = _scopeFor(favorites, tracks);
-    return AAListTemplate(
-      title: 'Favorites',
-      tabTitle: 'Favorites',
-      systemIcon: 'heart',
-      sections: [AAListSection(items: _trackItems(favorites, scope))],
-      emptyViewTitleVariants: const ['No favorites yet'],
     );
   }
 
@@ -124,11 +111,11 @@ class AndroidAutoAdapter {
     emptyViewTitleVariants: const ['No artists yet'],
   );
 
-  AAListTemplate songsTab(List<Track> tracks) {
+  AAListTemplate allSongsTab(List<Track> tracks) {
     final scope = tracks.take(50).toList();
     return AAListTemplate(
-      title: 'Songs',
-      tabTitle: 'Songs',
+      title: 'All Songs',
+      tabTitle: 'All Songs',
       systemIcon: 'music.note',
       sections: [AAListSection(items: _trackItems(_refs(scope), scope))],
       emptyViewTitleVariants: const ['No music available'],

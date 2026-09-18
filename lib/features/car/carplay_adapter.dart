@@ -22,10 +22,9 @@ class CarPlayAdapter {
     return CPTabBarTemplate(
       templates: [
         recentsTab(state.tracks),
-        favoritesTab(state.tracks),
+        allSongsTab(state.tracks),
         playlistsTab(state.playlists, byId),
         artistsTab(state.tracks),
-        songsTab(state.tracks),
       ],
     );
   }
@@ -70,18 +69,6 @@ class CarPlayAdapter {
       systemIcon: 'clock',
       sections: [CPListSection(items: _trackItems(recent, scope))],
       emptyViewTitleVariants: const ['No recent music'],
-    );
-  }
-
-  CPListTemplate favoritesTab(List<Track> tracks) {
-    final favorites = buildFavorites(tracks);
-    final scope = _scopeFor(favorites, tracks);
-    return CPListTemplate(
-      title: 'Favorites',
-      tabTitle: 'Favorites',
-      systemIcon: 'heart',
-      sections: [CPListSection(items: _trackItems(favorites, scope))],
-      emptyViewTitleVariants: const ['No favorites yet'],
     );
   }
 
@@ -140,11 +127,11 @@ class CarPlayAdapter {
     emptyViewTitleVariants: const ['No artists yet'],
   );
 
-  CPListTemplate songsTab(List<Track> tracks) {
+  CPListTemplate allSongsTab(List<Track> tracks) {
     final scope = tracks.take(50).toList();
     return CPListTemplate(
-      title: 'Songs',
-      tabTitle: 'Songs',
+      title: 'All Songs',
+      tabTitle: 'All Songs',
       systemIcon: 'music.note',
       sections: [CPListSection(items: _trackItems(_refs(scope), scope))],
       emptyViewTitleVariants: const ['No music available'],

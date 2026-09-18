@@ -32,7 +32,7 @@ void main() {
     expect(root, isA<CPListTemplate>());
   });
 
-  test('carplay ready root has five tabs', () {
+  test('carplay ready root has four ordered tabs', () {
     final root = carPlay().buildRoot(
       CarState(
         signedIn: true,
@@ -43,7 +43,13 @@ void main() {
       ),
     );
     expect(root, isA<CPTabBarTemplate>());
-    expect((root as CPTabBarTemplate).templates, hasLength(5));
+    final tabs = (root as CPTabBarTemplate).templates.cast<CPListTemplate>();
+    expect(tabs.map((tab) => tab.tabTitle), [
+      'Recents',
+      'All Songs',
+      'Playlists',
+      'Artists',
+    ]);
   });
 
   test('android auto signed-out root is a message', () {
@@ -51,7 +57,7 @@ void main() {
     expect(root, isA<AAMessageTemplate>());
   });
 
-  test('android auto ready root has five tabs', () {
+  test('android auto ready root has four ordered tabs', () {
     final root = auto().buildRoot(
       CarState(
         signedIn: true,
@@ -62,7 +68,13 @@ void main() {
       ),
     );
     expect(root, isA<AATabBarTemplate>());
-    expect((root as AATabBarTemplate).tabs, hasLength(5));
+    final tabs = (root as AATabBarTemplate).tabs.cast<AAListTemplate>();
+    expect(tabs.map((tab) => tab.tabTitle), [
+      'Recents',
+      'All Songs',
+      'Playlists',
+      'Artists',
+    ]);
   });
 
   test('android auto search respects empty query', () {
