@@ -143,7 +143,7 @@ class _OverlayShellState extends State<_OverlayShell> {
                         Positioned(
                           left: 48,
                           right: 88,
-                          bottom: 14,
+                          bottom: 6,
                           child: _TrackLine(item: widget.items[_focused]),
                         ),
                         Positioned(
@@ -205,8 +205,16 @@ class _TrackLine extends StatelessWidget {
   final CoverflowItem item;
 
   @override
-  Widget build(BuildContext context) => Text(
-    '${item.title}  ·  ${item.subtitle}',
+  Widget build(BuildContext context) => Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(text: '${item.title}  ·  '),
+        TextSpan(
+          text: item.subtitle,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
     maxLines: 1,
     overflow: TextOverflow.ellipsis,
     textAlign: TextAlign.center,
