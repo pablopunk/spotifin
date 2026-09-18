@@ -126,4 +126,54 @@ void main() {
     expect(jobs.single.progress, 42.5);
     expect(jobs.single.message, 'Downloading');
   });
+
+  test('skips malformed jobs without rejecting the server queue', () async {
+    final client = DowntifyClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode([
+            {
+              'song': {
+                'song_id': 'valid',
+                'name': 'Song',
+                'artists': ['Artist'],
+              },
+              'status': 'queued',
+            },
+            {
+              'song': {'song_id': 'old', 'name': '', 'artists': <String>[]},
+              'status': 'done',
+            },
+          ]),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+
+    final jobs = await client.fetchQueue('https://downtify.example.com');
+
+    expect(jobs.map((job) => job.song.id), ['valid']);
+  });
+
+  test('removes one song from the server queue', () async {
+    late http.Request request;
+    final client = DowntifyClient(
+      httpClient: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('{"removed":true}', 200);
+      }),
+    );
+    addTearDown(client.close);
+
+    final removed = await client.removeQueueItem(
+      'https://downtify.example.com',
+      'video/id',
+    );
+
+    expect(removed, isTrue);
+    expect(request.method, 'DELETE');
+    expect(request.url.path, '/api/queue/item');
+    expect(request.url.queryParameters, {'song_id': 'video/id'});
+  });
 }

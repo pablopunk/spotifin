@@ -11,6 +11,8 @@ import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../coverflow/coverflow_overlay.dart';
+import '../coverflow/coverflow_controller.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
@@ -37,7 +39,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   late final PlaybackService _playback;
   late final RemoteSessionService _remoteSessions;
+  late final MobileCoverflowCollectionRegistry _coverflowCollections;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
+  bool _coverflowDismissed = false;
+  OverlayEntry? _coverflowOverlayEntry;
   final _navigatorKeys = List.generate(
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
@@ -56,12 +61,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     _playback = ref.read(playbackProvider)..addListener(_refreshPlaybackLayout);
     _remoteSessions = ref.read(remoteSessionProvider)
       ..addListener(_refreshPlaybackLayout);
+    _coverflowCollections = ref.read(mobileCoverflowCollectionProvider);
   }
 
   @override
   void dispose() {
     _playback.removeListener(_refreshPlaybackLayout);
     _remoteSessions.removeListener(_refreshPlaybackLayout);
+    _removeCoverflowOverlay();
     super.dispose();
   }
 
@@ -113,6 +120,57 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   }
 
   Widget _buildShell(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
+    _scheduleCoverflowOverlay(compactLandscape && !_coverflowDismissed);
+    if (!compactLandscape && _coverflowDismissed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _coverflowDismissed = false);
+      });
+    }
+    return _buildScaffold(context);
+  }
+
+  void _scheduleCoverflowOverlay(bool visible) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!visible) {
+        _removeCoverflowOverlay();
+        return;
+      }
+      final entry = _coverflowOverlayEntry;
+      if (entry != null) {
+        entry.markNeedsBuild();
+        return;
+      }
+      final overlay = Overlay.of(context, rootOverlay: true);
+      _coverflowOverlayEntry = OverlayEntry(
+        builder: (_) => CoverflowOverlay(
+          onDismiss: _dismissCoverflow,
+          collection: widget.controller.selectedIndex == 1
+              ? _coverflowCollections.active
+              : null,
+        ),
+      );
+      overlay.insert(_coverflowOverlayEntry!);
+    });
+  }
+
+  void _dismissCoverflow() {
+    _removeCoverflowOverlay();
+    setState(() => _coverflowDismissed = true);
+  }
+
+  void _removeCoverflowOverlay() {
+    _coverflowOverlayEntry?.remove();
+    _coverflowOverlayEntry?.dispose();
+    _coverflowOverlayEntry = null;
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
     final playerPanels = ref.watch(playerPanelProvider);

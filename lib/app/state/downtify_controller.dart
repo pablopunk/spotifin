@@ -63,6 +63,8 @@ class DowntifyState {
 }
 
 class DowntifyController extends Notifier<DowntifyState> {
+  static const maxDownloadRetries = 3;
+
   Timer? _searchTimer;
   Timer? _pollTimer;
   Timer? _scanTimer;
@@ -188,6 +190,7 @@ class DowntifyController extends Notifier<DowntifyState> {
         filename: null,
         matchedTrackId: null,
         messageShown: false,
+        retryCount: 0,
         createdAt: now,
         updatedAt: now,
       ),
@@ -227,6 +230,21 @@ class DowntifyController extends Notifier<DowntifyState> {
     await _loadImports();
   }
 
+  Future<void> removeFromQueue(DowntifyImport item) async {
+    try {
+      await ref
+          .read(downtifyClientProvider)
+          .removeQueueItem(item.downtifyUrl, item.jobId ?? item.externalSongId);
+      await ref.read(databaseProvider).removeDowntifyImport(item.id);
+      await _loadImports();
+    } catch (error) {
+      _addNotice(
+        'Could not remove ${_songFromImport(item).name}: $error',
+        error: true,
+      );
+    }
+  }
+
   void dismissNotice(String id) {
     state = state.copyWith(
       notices: state.notices.where((notice) => notice.id != id).toList(),
@@ -249,15 +267,13 @@ class DowntifyController extends Notifier<DowntifyState> {
         final job = byId[item.jobId ?? item.externalSongId];
         if (job == null) continue;
         if (job.status == DowntifyJobStatus.error) {
-          await _update(
-            item.id,
-            status: 'downloadFailed',
-            progress: job.progress,
-            message: job.message,
-          );
-          _addNotice('Import failed for ${job.song.name}.', error: true);
+          await _handleDownloadFailure(item, job);
         } else if (job.status == DowntifyJobStatus.done) {
-          if (item.status == 'queued' || item.status == 'downloading') {
+          if (const {
+            'queued',
+            'downloading',
+            'retrying',
+          }.contains(item.status)) {
             await _update(
               item.id,
               status: 'requestingScan',
@@ -282,6 +298,47 @@ class DowntifyController extends Notifier<DowntifyState> {
       state = state.copyWith(availability: DowntifyAvailability.unavailable);
     } finally {
       _polling = false;
+    }
+  }
+
+  Future<void> _handleDownloadFailure(
+    DowntifyImport item,
+    DowntifyJob job,
+  ) async {
+    if (item.status == 'downloadFailed') return;
+    if (item.retryCount >= maxDownloadRetries) {
+      await _update(
+        item.id,
+        status: 'downloadFailed',
+        progress: job.progress,
+        message: job.message,
+        messageShown: true,
+      );
+      if (!item.messageShown) {
+        _addNotice('Import failed for ${job.song.name}.', error: true);
+      }
+      return;
+    }
+    await _update(
+      item.id,
+      status: 'retrying',
+      progress: 0,
+      message: 'Retrying download…',
+      retryCount: item.retryCount + 1,
+    );
+    try {
+      final client = ref.read(downtifyClientProvider);
+      await client.removeQueueItem(
+        item.downtifyUrl,
+        item.jobId ?? item.externalSongId,
+      );
+      final jobId = await client.enqueue(
+        item.downtifyUrl,
+        _songFromImport(item),
+      );
+      await _update(item.id, status: 'queued', jobId: jobId, message: '');
+    } catch (error) {
+      await _update(item.id, status: 'queued', message: error.toString());
     }
   }
 
@@ -426,6 +483,8 @@ class DowntifyController extends Notifier<DowntifyState> {
     String? message,
     String? filename,
     String? matchedTrackId,
+    bool? messageShown,
+    int? retryCount,
   }) async {
     final item = state.imports
         .where((candidate) => candidate.id == id)
@@ -439,6 +498,8 @@ class DowntifyController extends Notifier<DowntifyState> {
         message: message ?? item.message,
         filename: Value(filename ?? item.filename),
         matchedTrackId: Value(matchedTrackId ?? item.matchedTrackId),
+        messageShown: messageShown ?? item.messageShown,
+        retryCount: retryCount ?? item.retryCount,
         updatedAt: DateTime.now(),
       ),
     );

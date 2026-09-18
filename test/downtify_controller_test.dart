@@ -176,6 +176,161 @@ void main() {
       DowntifyAvailability.available,
     );
   });
+
+  test('retries a failed download three times and reports it once', () async {
+    SharedPreferences.setMockInitialValues({
+      'downtifyServerUrl': 'https://downtify.example.com',
+    });
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    var enqueueRequests = 0;
+    var removeRequests = 0;
+    final client = DowntifyClient(
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/api/version') {
+          return http.Response(jsonEncode('2.10.2'), 200);
+        }
+        if (request.url.path == '/api/download/batch') {
+          enqueueRequests++;
+          return http.Response(
+            jsonEncode({
+              'job_ids': ['external'],
+              'count': 1,
+            }),
+            200,
+          );
+        }
+        if (request.method == 'DELETE') {
+          removeRequests++;
+          return http.Response('{"removed":true}', 200);
+        }
+        return http.Response(
+          jsonEncode([
+            {
+              'song': {
+                'song_id': 'external',
+                'name': 'Broken Song',
+                'artists': ['Artist'],
+              },
+              'status': 'error',
+              'progress': 20,
+              'message': 'No match',
+              'filename': null,
+            },
+          ]),
+          200,
+        );
+      }),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+        downtifyClientProvider.overrideWithValue(client),
+        appControllerProvider.overrideWith(_AuthenticatedAppController.new),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      client.close();
+      await database.close();
+    });
+    final subscription = container.listen(
+      downtifyControllerProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final controller = container.read(downtifyControllerProvider.notifier);
+    final song = DowntifySong.fromJson({
+      'song_id': 'external',
+      'name': 'Broken Song',
+      'artists': ['Artist'],
+    });
+
+    await controller.enqueue(song);
+    await controller.poll();
+    await controller.poll();
+    await controller.poll();
+    await controller.poll();
+
+    final state = container.read(downtifyControllerProvider);
+    expect(enqueueRequests, 4);
+    expect(removeRequests, 3);
+    expect(state.imports.single.retryCount, 3);
+    expect(state.imports.single.status, 'downloadFailed');
+    expect(state.notices, hasLength(1));
+
+    await controller.poll();
+    expect(container.read(downtifyControllerProvider).notices, hasLength(1));
+    expect(enqueueRequests, 4);
+  });
+
+  test('removes a queued download remotely and locally', () async {
+    SharedPreferences.setMockInitialValues({
+      'downtifyServerUrl': 'https://downtify.example.com',
+    });
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    var removedSongId = '';
+    final client = DowntifyClient(
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/api/version') {
+          return http.Response(jsonEncode('2.10.2'), 200);
+        }
+        if (request.method == 'DELETE') {
+          removedSongId = request.url.queryParameters['song_id'] ?? '';
+          return http.Response('{"removed":true}', 200);
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+    final now = DateTime(2026);
+    await database.putDowntifyImport(
+      DowntifyImportsCompanion.insert(
+        id: 'server:user:external',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        downtifyUrl: 'https://downtify.example.com',
+        externalSongId: 'external',
+        jobId: const Value('job-id'),
+        songJson: jsonEncode({
+          'song_id': 'external',
+          'name': 'Queued Song',
+          'artists': ['Artist'],
+        }),
+        status: 'queued',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+        downtifyClientProvider.overrideWithValue(client),
+        appControllerProvider.overrideWith(_AuthenticatedAppController.new),
+      ],
+    );
+    addTearDown(() async {
+      container.dispose();
+      client.close();
+      await database.close();
+    });
+    final subscription = container.listen(
+      downtifyControllerProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final item = container.read(downtifyControllerProvider).imports.single;
+
+    await container
+        .read(downtifyControllerProvider.notifier)
+        .removeFromQueue(item);
+
+    expect(removedSongId, 'job-id');
+    expect(container.read(downtifyControllerProvider).imports, isEmpty);
+    expect(await database.getDowntifyImports('server', 'user'), isEmpty);
+  });
 }
 
 class _AuthenticatedAppController extends AppController {

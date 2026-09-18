@@ -78,6 +78,7 @@ class DowntifyImports extends Table {
   TextColumn get filename => text().nullable()();
   TextColumn get matchedTrackId => text().nullable()();
   BoolColumn get messageShown => boolean().withDefault(const Constant(false))();
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -118,7 +119,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -166,6 +167,9 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE tracks RENAME COLUMN artist_ids TO artist_items',
           );
         }
+      }
+      if (from >= 5 && from < 10) {
+        await migrator.addColumn(downtifyImports, downtifyImports.retryCount);
       }
     },
   );

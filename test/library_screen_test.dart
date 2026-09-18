@@ -8,10 +8,59 @@ import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/common/playlist_artwork.dart';
+import 'package:spotifin/features/coverflow/coverflow_controller.dart';
 import 'package:spotifin/features/library/library_screen.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
+  testWidgets('mobile Coverflow follows the selected library tab', (
+    tester,
+  ) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'one',
+        name: 'First song',
+        artist: const Value('Artist'),
+        album: const Value('Selected album'),
+        albumId: const Value('selected-album'),
+      ),
+    ]);
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(database)],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: buildTheme(), home: const LibraryScreen()),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      container
+          .read(mobileCoverflowCollectionProvider)
+          .active
+          ?.items
+          .single
+          .title,
+      'First song',
+    );
+
+    await tester.tap(find.widgetWithText(Tab, 'Albums'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final collection = container.read(mobileCoverflowCollectionProvider).active;
+    expect(collection?.items.single.title, 'Selected album');
+    expect(collection?.playback, MobileCoverflowPlayback.collection);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    container.dispose();
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
   testWidgets('library shows the library header above its tabs', (
     tester,
   ) async {

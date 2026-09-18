@@ -42,6 +42,11 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 | -------- |
 | ![Web screenshot](assets/screenshots/remote%20play.png) |
 
+
+| ✨ COVERFLOW IS NOT DEAD BABY! ✨ |
+| -------- |
+| ![Coverflow screenshot](assets/screenshots/coverflow.png) |
+| ![Coverflow list screenshot](assets/screenshots/coverflow-list.png) |
 ## *Download songs* to your library with the [Downtify](https://downtify.henriquesebastiao.com/) integration
 
 Select your Downtify server and search results will include Downtify songs you can add to your library with one click.

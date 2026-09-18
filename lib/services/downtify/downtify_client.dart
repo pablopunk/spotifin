@@ -103,10 +103,28 @@ class DowntifyClient {
     if (decoded is! List<dynamic>) {
       throw const DowntifyException('Downtify returned an invalid queue.');
     }
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(DowntifyJob.fromJson)
-        .toList(growable: false);
+    final jobs = <DowntifyJob>[];
+    for (final value in decoded.whereType<Map<String, dynamic>>()) {
+      try {
+        jobs.add(DowntifyJob.fromJson(value));
+      } on FormatException {
+        continue;
+      }
+    }
+    return jobs;
+  }
+
+  Future<bool> removeQueueItem(String serverUrl, String songId) async {
+    final response = await _http
+        .delete(_uri(serverUrl, '/api/queue/item', {'song_id': songId}))
+        .timeout(timeout);
+    final decoded = _decode(response);
+    if (decoded is! Map<String, dynamic> || decoded['removed'] is! bool) {
+      throw const DowntifyException(
+        'Downtify returned an invalid queue response.',
+      );
+    }
+    return decoded['removed'] as bool;
   }
 
   Future<http.Response> _get(Uri uri) => _http.get(uri).timeout(timeout);

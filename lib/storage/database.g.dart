@@ -2210,6 +2210,18 @@ class $DowntifyImportsTable extends DowntifyImports
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _retryCountMeta = const VerificationMeta(
+    'retryCount',
+  );
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+    'retry_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -2247,6 +2259,7 @@ class $DowntifyImportsTable extends DowntifyImports
     filename,
     matchedTrackId,
     messageShown,
+    retryCount,
     createdAt,
     updatedAt,
   ];
@@ -2369,6 +2382,12 @@ class $DowntifyImportsTable extends DowntifyImports
         ),
       );
     }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+        _retryCountMeta,
+        retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -2446,6 +2465,10 @@ class $DowntifyImportsTable extends DowntifyImports
         DriftSqlType.bool,
         data['${effectivePrefix}message_shown'],
       )!,
+      retryCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retry_count'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -2477,6 +2500,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
   final String? filename;
   final String? matchedTrackId;
   final bool messageShown;
+  final int retryCount;
   final DateTime createdAt;
   final DateTime updatedAt;
   const DowntifyImport({
@@ -2493,6 +2517,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
     this.filename,
     this.matchedTrackId,
     required this.messageShown,
+    required this.retryCount,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -2518,6 +2543,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
       map['matched_track_id'] = Variable<String>(matchedTrackId);
     }
     map['message_shown'] = Variable<bool>(messageShown);
+    map['retry_count'] = Variable<int>(retryCount);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -2544,6 +2570,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
           ? const Value.absent()
           : Value(matchedTrackId),
       messageShown: Value(messageShown),
+      retryCount: Value(retryCount),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -2568,6 +2595,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
       filename: serializer.fromJson<String?>(json['filename']),
       matchedTrackId: serializer.fromJson<String?>(json['matchedTrackId']),
       messageShown: serializer.fromJson<bool>(json['messageShown']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -2589,6 +2617,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
       'filename': serializer.toJson<String?>(filename),
       'matchedTrackId': serializer.toJson<String?>(matchedTrackId),
       'messageShown': serializer.toJson<bool>(messageShown),
+      'retryCount': serializer.toJson<int>(retryCount),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -2608,6 +2637,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
     Value<String?> filename = const Value.absent(),
     Value<String?> matchedTrackId = const Value.absent(),
     bool? messageShown,
+    int? retryCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => DowntifyImport(
@@ -2626,6 +2656,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
         ? matchedTrackId.value
         : this.matchedTrackId,
     messageShown: messageShown ?? this.messageShown,
+    retryCount: retryCount ?? this.retryCount,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -2656,6 +2687,9 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
       messageShown: data.messageShown.present
           ? data.messageShown.value
           : this.messageShown,
+      retryCount: data.retryCount.present
+          ? data.retryCount.value
+          : this.retryCount,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -2677,6 +2711,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
           ..write('filename: $filename, ')
           ..write('matchedTrackId: $matchedTrackId, ')
           ..write('messageShown: $messageShown, ')
+          ..write('retryCount: $retryCount, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2698,6 +2733,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
     filename,
     matchedTrackId,
     messageShown,
+    retryCount,
     createdAt,
     updatedAt,
   );
@@ -2718,6 +2754,7 @@ class DowntifyImport extends DataClass implements Insertable<DowntifyImport> {
           other.filename == this.filename &&
           other.matchedTrackId == this.matchedTrackId &&
           other.messageShown == this.messageShown &&
+          other.retryCount == this.retryCount &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -2736,6 +2773,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
   final Value<String?> filename;
   final Value<String?> matchedTrackId;
   final Value<bool> messageShown;
+  final Value<int> retryCount;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -2753,6 +2791,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
     this.filename = const Value.absent(),
     this.matchedTrackId = const Value.absent(),
     this.messageShown = const Value.absent(),
+    this.retryCount = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2771,6 +2810,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
     this.filename = const Value.absent(),
     this.matchedTrackId = const Value.absent(),
     this.messageShown = const Value.absent(),
+    this.retryCount = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -2797,6 +2837,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
     Expression<String>? filename,
     Expression<String>? matchedTrackId,
     Expression<bool>? messageShown,
+    Expression<int>? retryCount,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -2815,6 +2856,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
       if (filename != null) 'filename': filename,
       if (matchedTrackId != null) 'matched_track_id': matchedTrackId,
       if (messageShown != null) 'message_shown': messageShown,
+      if (retryCount != null) 'retry_count': retryCount,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -2835,6 +2877,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
     Value<String?>? filename,
     Value<String?>? matchedTrackId,
     Value<bool>? messageShown,
+    Value<int>? retryCount,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -2853,6 +2896,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
       filename: filename ?? this.filename,
       matchedTrackId: matchedTrackId ?? this.matchedTrackId,
       messageShown: messageShown ?? this.messageShown,
+      retryCount: retryCount ?? this.retryCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -2901,6 +2945,9 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
     if (messageShown.present) {
       map['message_shown'] = Variable<bool>(messageShown.value);
     }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -2929,6 +2976,7 @@ class DowntifyImportsCompanion extends UpdateCompanion<DowntifyImport> {
           ..write('filename: $filename, ')
           ..write('matchedTrackId: $matchedTrackId, ')
           ..write('messageShown: $messageShown, ')
+          ..write('retryCount: $retryCount, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -4260,6 +4308,7 @@ typedef $$DowntifyImportsTableCreateCompanionBuilder =
       Value<String?> filename,
       Value<String?> matchedTrackId,
       Value<bool> messageShown,
+      Value<int> retryCount,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -4279,6 +4328,7 @@ typedef $$DowntifyImportsTableUpdateCompanionBuilder =
       Value<String?> filename,
       Value<String?> matchedTrackId,
       Value<bool> messageShown,
+      Value<int> retryCount,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -4355,6 +4405,11 @@ class $$DowntifyImportsTableFilterComposer
 
   ColumnFilters<bool> get messageShown => $composableBuilder(
     column: $table.messageShown,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4443,6 +4498,11 @@ class $$DowntifyImportsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -4514,6 +4574,11 @@ class $$DowntifyImportsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -4571,6 +4636,7 @@ class $$DowntifyImportsTableTableManager
                 Value<String?> filename = const Value.absent(),
                 Value<String?> matchedTrackId = const Value.absent(),
                 Value<bool> messageShown = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4588,6 +4654,7 @@ class $$DowntifyImportsTableTableManager
                 filename: filename,
                 matchedTrackId: matchedTrackId,
                 messageShown: messageShown,
+                retryCount: retryCount,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -4607,6 +4674,7 @@ class $$DowntifyImportsTableTableManager
                 Value<String?> filename = const Value.absent(),
                 Value<String?> matchedTrackId = const Value.absent(),
                 Value<bool> messageShown = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -4624,6 +4692,7 @@ class $$DowntifyImportsTableTableManager
                 filename: filename,
                 matchedTrackId: matchedTrackId,
                 messageShown: messageShown,
+                retryCount: retryCount,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
