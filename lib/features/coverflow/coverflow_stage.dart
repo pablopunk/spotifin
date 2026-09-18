@@ -12,6 +12,7 @@ class CoverflowStage extends StatefulWidget {
     required this.onCenterTap,
     this.initialIndex = 0,
     this.onFocus,
+    this.showCaption = true,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class CoverflowStage extends StatefulWidget {
   final ValueChanged<CoverflowItem> onCenterTap;
   final int initialIndex;
   final ValueChanged<int>? onFocus;
+  final bool showCaption;
 
   @override
   State<CoverflowStage> createState() => _CoverflowStageState();
@@ -77,7 +79,7 @@ class _CoverflowStageState extends State<CoverflowStage>
             child: Center(
               child: SizedBox(
                 width: math.min(constraints.maxWidth, coverSize * 3.5),
-                height: stageHeight + 68,
+                height: stageHeight + (widget.showCaption ? 68 : 0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -98,8 +100,10 @@ class _CoverflowStageState extends State<CoverflowStage>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _Caption(item: widget.items[_focused]),
+                    if (widget.showCaption) ...[
+                      const SizedBox(height: 12),
+                      _Caption(item: widget.items[_focused]),
+                    ],
                   ],
                 ),
               ),
@@ -189,7 +193,8 @@ class _CoverflowStageState extends State<CoverflowStage>
 
   double _coverSize(BoxConstraints constraints) {
     final byWidth = constraints.maxWidth * 0.3;
-    final byHeight = (constraints.maxHeight - 90) / 1.24;
+    final captionHeight = widget.showCaption ? 90 : 16;
+    final byHeight = (constraints.maxHeight - captionHeight) / 1.24;
     return math.min(byWidth, byHeight).clamp(120.0, 360.0).toDouble();
   }
 }

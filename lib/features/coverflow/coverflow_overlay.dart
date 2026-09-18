@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
+import '../common/design_system.dart';
 import 'coverflow_model.dart';
 import 'coverflow_stage.dart';
 
@@ -25,13 +26,10 @@ class CoverflowOverlay extends ConsumerWidget {
             onDismiss: onDismiss,
             items: trackCoverflowItems(queue),
             initialIndex: _safeIndex(playback.currentIndex, queue.length),
-            currentId: playback.currentTrack?.id,
             playing: playback.playing,
-            showTransport: true,
-            onPrevious: playback.previous,
+            hasPlayback: true,
             onToggle: playback.toggle,
-            onNext: playback.next,
-            onSelect: (index) => playback.playQueueIndex(index),
+            onSelect: playback.playQueueIndex,
           );
         }
         return StreamBuilder<List<Track>>(
@@ -43,7 +41,6 @@ class CoverflowOverlay extends ConsumerWidget {
               onDismiss: onDismiss,
               items: trackCoverflowItems(fallback),
               initialIndex: 0,
-              showTransport: false,
               onSelect: (index) =>
                   playback.replaceQueue(fallback, startIndex: index),
             );
@@ -59,34 +56,51 @@ class CoverflowOverlay extends ConsumerWidget {
   }
 }
 
-class _OverlayShell extends StatelessWidget {
+class _OverlayShell extends StatefulWidget {
   const _OverlayShell({
     required this.onDismiss,
     required this.items,
     required this.onSelect,
     this.initialIndex = 0,
-    this.currentId,
     this.playing = false,
-    this.showTransport = false,
-    this.onPrevious,
+    this.hasPlayback = false,
     this.onToggle,
-    this.onNext,
   });
 
   final VoidCallback onDismiss;
   final List<CoverflowItem> items;
   final ValueChanged<int> onSelect;
   final int initialIndex;
-  final String? currentId;
   final bool playing;
-  final bool showTransport;
-  final VoidCallback? onPrevious;
+  final bool hasPlayback;
   final VoidCallback? onToggle;
-  final VoidCallback? onNext;
+
+  @override
+  State<_OverlayShell> createState() => _OverlayShellState();
+}
+
+class _OverlayShellState extends State<_OverlayShell> {
+  late int _focused;
+
+  @override
+  void initState() {
+    super.initState();
+    _focused = _safeIndex(widget.initialIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OverlayShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      _focused = _safeIndex(widget.initialIndex);
+    } else if (widget.items != oldWidget.items) {
+      _focused = _safeIndex(_focused);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
+    if (widget.items.isEmpty) return const SizedBox.shrink();
     return Material(
       color: Colors.black,
       child: SafeArea(
@@ -96,36 +110,57 @@ class _OverlayShell extends StatelessWidget {
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: constraints.maxHeight,
-                  child: Column(
-                    children: [
-                      _TopBar(onDismiss: onDismiss),
-                      Expanded(
-                        child: CoverflowStage(
-                          items: items,
-                          initialIndex: initialIndex,
-                          onCenterTap: (item) => onSelect(_indexOf(item)),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragEnd: (details) {
+                      if ((details.primaryVelocity ?? 0) > 320) {
+                        widget.onDismiss();
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CoverflowStage(
+                            items: widget.items,
+                            initialIndex: _focused,
+                            showCaption: false,
+                            onFocus: _select,
+                            onCenterTap: (item) => _select(_indexOf(item)),
+                          ),
                         ),
-                      ),
-                      if (showTransport)
-                        _Transport(
-                          playing: playing,
-                          onPrevious: onPrevious,
-                          onToggle: onToggle,
-                          onNext: onNext,
-                        )
-                      else
-                        const SizedBox(height: 12),
-                    ],
+                        Positioned(
+                          top: 4,
+                          right: 8,
+                          child: IconButton(
+                            tooltip: 'Dismiss',
+                            onPressed: widget.onDismiss,
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                            color: SpotifinColors.textMuted,
+                          ),
+                        ),
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: _NowPlayingPill(
+                            item: widget.items[_focused],
+                            playing: widget.playing,
+                            onToggle: widget.hasPlayback
+                                ? widget.onToggle
+                                : () => widget.onSelect(_focused),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
               const SliverToBoxAdapter(child: Divider(height: 1)),
               SliverList.builder(
-                itemCount: items.length,
+                itemCount: widget.items.length,
                 itemBuilder: (context, index) => _QueueRow(
-                  item: items[index],
-                  selected: index == initialIndex,
-                  onTap: () => onSelect(index),
+                  item: widget.items[index],
+                  selected: index == _focused,
+                  onTap: () => _select(index),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -137,43 +172,73 @@ class _OverlayShell extends StatelessWidget {
   }
 
   int _indexOf(CoverflowItem item) {
-    final index = items.indexWhere((entry) => entry.id == item.id);
+    final index = widget.items.indexWhere((entry) => entry.id == item.id);
     return index < 0 ? 0 : index;
+  }
+
+  void _select(int index) {
+    final selected = _safeIndex(index);
+    if (selected == _focused) return;
+    setState(() => _focused = selected);
+    widget.onSelect(selected);
+  }
+
+  int _safeIndex(int index) {
+    if (widget.items.isEmpty) return 0;
+    return index.clamp(0, widget.items.length - 1);
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onDismiss});
+class _NowPlayingPill extends StatelessWidget {
+  const _NowPlayingPill({
+    required this.item,
+    required this.playing,
+    required this.onToggle,
+  });
 
-  final VoidCallback onDismiss;
+  final CoverflowItem item;
+  final bool playing;
+  final VoidCallback? onToggle;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onVerticalDragEnd: (details) {
-      if ((details.primaryVelocity ?? 0) > 320) onDismiss();
-    },
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
-        children: [
-          const SizedBox(width: 40),
-          Expanded(
-            child: Text(
-              'Cover Flow',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelLarge
-                  ?.copyWith(color: SpotifinColors.textMuted),
-            ),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 320),
+    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+    decoration: BoxDecoration(
+      color: SpotifinColors.surface.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      boxShadow: const [
+        BoxShadow(color: Colors.black54, blurRadius: 24, offset: Offset(0, 8)),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              Text(
+                item.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: SpotifinColors.textMuted),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Dismiss',
-            onPressed: onDismiss,
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            color: SpotifinColors.textMuted,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        SpotifinPlayButton(onPressed: onToggle, playing: playing),
+      ],
     ),
   );
 }
@@ -201,52 +266,5 @@ class _QueueRow extends StatelessWidget {
     title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
     subtitle: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
     onTap: onTap,
-  );
-}
-
-class _Transport extends StatelessWidget {
-  const _Transport({
-    required this.playing,
-    this.onPrevious,
-    this.onToggle,
-    this.onNext,
-  });
-
-  final bool playing;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onToggle;
-  final VoidCallback? onNext;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          tooltip: 'Previous',
-          onPressed: onPrevious,
-          icon: const Icon(Icons.skip_previous_rounded, size: 32),
-          color: SpotifinColors.text,
-        ),
-        const SizedBox(width: 24),
-        IconButton(
-          tooltip: playing ? 'Pause' : 'Play',
-          onPressed: onToggle,
-          icon: Icon(
-            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            size: 40,
-          ),
-          color: SpotifinColors.text,
-        ),
-        const SizedBox(width: 24),
-        IconButton(
-          tooltip: 'Next',
-          onPressed: onNext,
-          icon: const Icon(Icons.skip_next_rounded, size: 32),
-          color: SpotifinColors.text,
-        ),
-      ],
-    ),
   );
 }

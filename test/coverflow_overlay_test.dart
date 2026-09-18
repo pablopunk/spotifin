@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
+import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/coverflow/coverflow_overlay.dart';
+import 'package:spotifin/features/coverflow/coverflow_stage.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -35,7 +37,9 @@ void main() {
     registerFallbackValue(Duration.zero);
   });
 
-  testWidgets('overlay shows queue with transport', (tester) async {
+  testWidgets('overlay fills the viewport with a compact playback pill', (
+    tester,
+  ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     final playback = _MockPlayback();
     final queue = [_track('1', 'First'), _track('2', 'Second')];
@@ -63,13 +67,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Cover Flow'), findsOneWidget);
-    expect(find.text('First'), findsOneWidget);
-    expect(find.byTooltip('Previous'), findsOneWidget);
-    expect(find.byTooltip('Play'), findsOneWidget);
-    expect(find.byTooltip('Next'), findsOneWidget);
+    expect(find.text('Cover Flow'), findsNothing);
+    expect(find.text('First'), findsWidgets);
+    expect(find.byType(SpotifinPlayButton), findsOneWidget);
+    expect(find.byTooltip('Previous'), findsNothing);
+    expect(find.byTooltip('Next'), findsNothing);
+    expect(find.byTooltip('Dismiss'), findsOneWidget);
 
-    await tester.fling(find.text('Cover Flow'), const Offset(0, 400), 1000);
+    await tester.fling(find.byType(CoverflowStage), const Offset(0, 400), 1000);
     await tester.pumpAndSettle();
     expect(dismissed, isTrue);
 
@@ -112,7 +117,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Lonely song'), findsOneWidget);
+    expect(find.text('Lonely song'), findsWidgets);
     expect(find.byTooltip('Previous'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
