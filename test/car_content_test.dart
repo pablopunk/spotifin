@@ -66,6 +66,24 @@ void main() {
     expect(ids, ['a', 'b']);
   });
 
+  test('recently added matches library ordering', () {
+    final tracks = [
+      makeTrack(id: 'undated-z', name: 'Zulu'),
+      makeTrack(id: 'old', name: 'Old', dateCreated: DateTime(2024)),
+      makeTrack(id: 'same-b', name: 'Bravo', dateCreated: DateTime(2026)),
+      makeTrack(id: 'same-a', name: 'Alpha', dateCreated: DateTime(2026)),
+      makeTrack(id: 'undated-a', name: 'Alpha'),
+    ];
+
+    expect(buildRecentlyAdded(tracks).map((track) => track.id), [
+      'same-a',
+      'same-b',
+      'old',
+      'undated-a',
+      'undated-z',
+    ]);
+  });
+
   test('artist groups skip unknown artists', () {
     final tracks = [
       makeTrack(id: '1', artist: 'Miles'),

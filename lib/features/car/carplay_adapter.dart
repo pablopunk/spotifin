@@ -128,7 +128,7 @@ class CarPlayAdapter {
   );
 
   CPListTemplate allSongsTab(List<Track> tracks) {
-    final scope = tracks.take(50).toList();
+    final scope = buildRecentlyAdded(tracks);
     return CPListTemplate(
       title: 'All Songs',
       tabTitle: 'All Songs',

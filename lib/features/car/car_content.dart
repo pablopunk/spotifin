@@ -77,6 +77,23 @@ List<CarTrackRef> buildFavorites(List<Track> tracks, {int limit = 50}) {
   return favorites.take(limit).map(CarTrackRef.fromTrack).toList();
 }
 
+List<Track> buildRecentlyAdded(List<Track> tracks, {int limit = 50}) {
+  final sorted = List<Track>.of(tracks)
+    ..sort((a, b) {
+      final aDate = a.dateCreated;
+      final bDate = b.dateCreated;
+      if (aDate == null && bDate != null) return 1;
+      if (aDate != null && bDate == null) return -1;
+      if (aDate != null && bDate != null) {
+        final date = bDate.compareTo(aDate);
+        if (date != 0) return date;
+      }
+      final name = a.name.compareTo(b.name);
+      return name != 0 ? name : a.id.compareTo(b.id);
+    });
+  return sorted.take(limit).toList();
+}
+
 List<CarGroup> groupArtists(List<Track> tracks, {int limit = 50}) {
   final counts = <String, int>{};
   for (final track in tracks) {

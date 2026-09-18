@@ -112,7 +112,7 @@ class AndroidAutoAdapter {
   );
 
   AAListTemplate allSongsTab(List<Track> tracks) {
-    final scope = tracks.take(50).toList();
+    final scope = buildRecentlyAdded(tracks);
     return AAListTemplate(
       title: 'All Songs',
       tabTitle: 'All Songs',
