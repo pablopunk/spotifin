@@ -211,7 +211,10 @@ class _TrackLine extends StatelessWidget {
         TextSpan(text: '${item.title}  ·  '),
         TextSpan(
           text: item.subtitle,
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ],
     ),
