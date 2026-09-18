@@ -24,14 +24,13 @@ class CoverflowOverlay extends ConsumerWidget {
       listenable: playback,
       builder: (context, _) {
         if (collection case final collection?) {
-          final currentIndex = _collectionIndex(
-            collection,
-            playback.currentTrack,
-          );
+          final initialIndex = collection.viewId == null
+              ? collection.initialIndex
+              : ref.watch(coverflowPositionProvider(collection.viewId!));
           return _OverlayShell(
             onDismiss: onDismiss,
             items: collection.items,
-            initialIndex: currentIndex,
+            initialIndex: initialIndex,
             playing: playback.playing,
             currentTrackId: playback.currentTrack?.id,
             onToggle: playback.toggle,
@@ -76,17 +75,6 @@ class CoverflowOverlay extends ConsumerWidget {
   int _safeIndex(int? index, int length) {
     if (length == 0) return 0;
     return (index ?? 0).clamp(0, length - 1);
-  }
-
-  int _collectionIndex(
-    MobileCoverflowCollection collection,
-    Track? currentTrack,
-  ) {
-    if (currentTrack == null) return 0;
-    final index = collection.items.indexWhere(
-      (item) => item.tracks.any((track) => track.id == currentTrack.id),
-    );
-    return index < 0 ? 0 : index;
   }
 
   void _playCollectionItem(
@@ -179,7 +167,9 @@ class _OverlayShellState extends State<_OverlayShell> {
                             showCaption: false,
                             showReflection: false,
                             fillHeight: true,
-                            onFocus: _select,
+                            currentTrackId: widget.currentTrackId,
+                            playing: widget.playing,
+                            onFocus: _focus,
                             onCenterTap: (item) => _activate(_indexOf(item)),
                             onTrackTap: widget.onTrackTap,
                           ),
@@ -195,7 +185,7 @@ class _OverlayShellState extends State<_OverlayShell> {
                           ),
                         ),
                         Positioned(
-                          left: 48,
+                          left: 88,
                           right: 88,
                           bottom: 0,
                           child: _TrackLine(item: widget.items[_focused]),
@@ -224,7 +214,7 @@ class _OverlayShellState extends State<_OverlayShell> {
                 itemBuilder: (context, index) => _QueueRow(
                   item: widget.items[index],
                   selected: index == _focused,
-                  onTap: () => _select(index),
+                  onTap: () => widget.onSelect(index),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -240,10 +230,9 @@ class _OverlayShellState extends State<_OverlayShell> {
     return index < 0 ? 0 : index;
   }
 
-  void _select(int index) {
+  void _focus(int index) {
     final selected = _safeIndex(index);
     if (selected != _focused) setState(() => _focused = selected);
-    widget.onSelect(selected);
   }
 
   void _activate(int index) {

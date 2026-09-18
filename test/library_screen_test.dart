@@ -36,21 +36,28 @@ void main() {
         child: MaterialApp(theme: buildTheme(), home: const LibraryScreen()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     expect(
-      container.read(mobileCoverflowCollectionProvider)?.items.single.title,
+      container
+          .read(mobileCoverflowCollectionProvider)
+          .active
+          ?.items
+          .single
+          .title,
       'First song',
     );
 
     await tester.tap(find.widgetWithText(Tab, 'Albums'));
-    await tester.pumpAndSettle();
-    final collection = container.read(mobileCoverflowCollectionProvider);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final collection = container.read(mobileCoverflowCollectionProvider).active;
     expect(collection?.items.single.title, 'Selected album');
     expect(collection?.playback, MobileCoverflowPlayback.collection);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
     container.dispose();
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
 

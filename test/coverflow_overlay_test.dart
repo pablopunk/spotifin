@@ -81,6 +81,15 @@ void main() {
     await tester.pump();
     verify(() => playback.toggle()).called(1);
 
+    await tester.fling(
+      find.byType(CoverflowStage),
+      const Offset(-400, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    verifyNever(() => playback.playQueueIndex(any()));
+    expect(find.textContaining('Second'), findsWidgets);
+
     await tester.fling(find.byType(CoverflowStage), const Offset(0, 400), 1000);
     await tester.pumpAndSettle();
     expect(dismissed, isTrue);
@@ -143,6 +152,7 @@ void main() {
     when(() => playback.removeListener(any())).thenReturn(null);
     when(() => playback.currentTrack).thenReturn(queued);
     when(() => playback.playing).thenReturn(false);
+    when(() => playback.playTrack(any(), any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       ProviderScope(
@@ -156,9 +166,18 @@ void main() {
             body: CoverflowOverlay(
               onDismiss: () {},
               collection: MobileCoverflowCollection(
-                items: trackCoverflowItems([albumTrack]),
+                items: [
+                  CoverflowItem(
+                    id: 'album:selected',
+                    title: 'Selected album',
+                    subtitle: '1 song',
+                    artItemId: 'album',
+                    tracks: [albumTrack],
+                    collection: true,
+                  ),
+                ],
                 contextTracks: [albumTrack],
-                playback: MobileCoverflowPlayback.tracks,
+                playback: MobileCoverflowPlayback.collection,
               ),
             ),
           ),
@@ -167,8 +186,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Album song'), findsWidgets);
+    expect(find.textContaining('Selected album'), findsWidgets);
     expect(find.textContaining('Queued song'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('art:album:selected')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Album song'), findsOneWidget);
+    await tester.tap(find.textContaining('Album song'));
+    verify(() => playback.playTrack(albumTrack, [albumTrack])).called(1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

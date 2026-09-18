@@ -27,6 +27,7 @@ Widget _app({
   required ProviderContainer container,
   required List<CoverflowItem> items,
   required ValueChanged<CoverflowItem> onTap,
+  Widget list = const Text('list-mode'),
 }) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
@@ -46,7 +47,7 @@ Widget _app({
               child: CoverflowSection(
                 viewId: 'test-view',
                 items: items,
-                list: const Text('list-mode'),
+                list: list,
                 onCenterTap: onTap,
               ),
             ),
@@ -112,6 +113,39 @@ void main() {
     expect(tapped?.title, 'First');
   });
 
+  testWidgets('coverflow opens near the visible list item', (tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final tracks = [
+      for (var index = 0; index < 30; index++) _track('$index', 'Song $index'),
+    ];
+    await tester.pumpWidget(
+      _app(
+        container: container,
+        items: trackCoverflowItems(tracks),
+        onTap: (_) {},
+        list: ListView.builder(
+          itemExtent: 60,
+          itemCount: tracks.length,
+          itemBuilder: (context, index) => Text('Row $index'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    final visibleIndex = container.read(coverflowPositionProvider('test-view'));
+    expect(visibleIndex, greaterThan(0));
+
+    await tester.tap(find.text('toggle'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<CoverflowStage>(find.byType(CoverflowStage)).initialIndex,
+      visibleIndex,
+    );
+  });
+
   testWidgets('tapping a centered collection reveals its compact track list', (
     tester,
   ) async {
@@ -131,6 +165,8 @@ void main() {
           home: Scaffold(
             body: CoverflowStage(
               items: [item],
+              currentTrackId: '2',
+              playing: true,
               onCenterTap: (_) => fail('Collection cover must open its tracks'),
               onTrackTap: (_, track) => tappedTrack = track,
             ),
@@ -145,6 +181,7 @@ void main() {
     expect(find.textContaining('First'), findsOneWidget);
     expect(find.textContaining('Second'), findsOneWidget);
     expect(find.byKey(const ValueKey('back:album:one')), findsOneWidget);
+    expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
 
     await tester.tap(find.textContaining('Second'));
     expect(tappedTrack?.id, '2');
@@ -198,6 +235,42 @@ void main() {
       PointerDeviceKind.mouse,
     );
     expect(find.text('First'), findsOneWidget);
+  });
+
+  testWidgets('a new drag continues from an active settle animation', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    _enableCoverflow(container);
+    final tracks = [_track('1', 'First'), _track('2', 'Second')];
+    await tester.pumpWidget(
+      _app(
+        container: container,
+        items: trackCoverflowItems(tracks),
+        onTap: (_) {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final stage = find.byType(CoverflowStage);
+    final firstDrag = await tester.startGesture(tester.getCenter(stage));
+    for (var step = 0; step < 10; step++) {
+      await firstDrag.moveBy(const Offset(-20, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await firstDrag.up();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final secondDrag = await tester.startGesture(tester.getCenter(stage));
+    for (var step = 0; step < 3; step++) {
+      await secondDrag.moveBy(const Offset(-10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await secondDrag.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Second'), findsOneWidget);
   });
 
   testWidgets('coverflow mode is isolated per view', (tester) async {
@@ -264,9 +337,7 @@ void main() {
   test('mobile collection registry restores the previous route', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    final controller = container.read(
-      mobileCoverflowCollectionProvider.notifier,
-    );
+    final controller = container.read(mobileCoverflowCollectionProvider);
     final libraryOwner = Object();
     final collectionOwner = Object();
     final library = MobileCoverflowCollection(
@@ -282,12 +353,12 @@ void main() {
 
     controller.register(libraryOwner, library);
     controller.register(collectionOwner, album);
-    expect(container.read(mobileCoverflowCollectionProvider), same(album));
+    expect(controller.active, same(album));
 
     controller.register(libraryOwner, library);
-    expect(container.read(mobileCoverflowCollectionProvider), same(album));
+    expect(controller.active, same(album));
 
     controller.unregister(collectionOwner);
-    expect(container.read(mobileCoverflowCollectionProvider), same(library));
+    expect(controller.active, same(library));
   });
 }

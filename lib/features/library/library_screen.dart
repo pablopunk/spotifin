@@ -93,6 +93,7 @@ class _TrackList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = trackCoverflowItems(tracks);
     return MobileCoverflowScope(
+      viewId: libraryCoverflowViewId(CoverflowSource.tracks),
       tabIndex: 0,
       collection: MobileCoverflowCollection(
         items: items,
@@ -126,6 +127,7 @@ class _AlbumList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = albumCoverflowItems(tracks);
     return MobileCoverflowScope(
+      viewId: libraryCoverflowViewId(CoverflowSource.albums),
       tabIndex: 1,
       collection: MobileCoverflowCollection(
         items: items,
@@ -174,6 +176,7 @@ class _ArtistList extends ConsumerWidget {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     final items = artistCoverflowItems(tracks);
     return MobileCoverflowScope(
+      viewId: libraryCoverflowViewId(CoverflowSource.artists),
       tabIndex: 2,
       collection: MobileCoverflowCollection(
         items: items,
@@ -299,6 +302,7 @@ class _ArtistAlbumsTab extends ConsumerWidget {
           }
           final items = albumCoverflowItems(tracks);
           return MobileCoverflowScope(
+            viewId: viewId,
             tabIndex: 1,
             collection: MobileCoverflowCollection(
               items: items,
@@ -430,6 +434,7 @@ class _PlaylistsTab extends ConsumerWidget {
               ),
           ];
           return MobileCoverflowScope(
+            viewId: 'library:playlists',
             tabIndex: 3,
             collection: MobileCoverflowCollection(
               items: items,
@@ -668,8 +673,10 @@ class CollectionScreen extends ConsumerWidget {
     if (!kind.hasArtistTabs) {
       final viewId = collectionCoverflowViewId(kind.name, title, albumStableId);
       final coverflow = ref.watch(coverflowModeProvider(viewId));
+      final playback = ref.watch(playbackProvider);
       final items = trackCoverflowItems(tracks);
       return MobileCoverflowScope(
+        viewId: viewId,
         collection: MobileCoverflowCollection(
           items: items,
           contextTracks: tracks,
@@ -685,30 +692,50 @@ class CollectionScreen extends ConsumerWidget {
               ? SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 24),
-                    child: CoverflowStage(
-                      items: items,
-                      onCenterTap: (item) => ref
-                          .read(playbackProvider)
-                          .playTrack(item.tracks.single, tracks),
+                    child: ListenableBuilder(
+                      listenable: playback,
+                      builder: (context, _) => CoverflowStage(
+                        items: items,
+                        initialIndex: ref.watch(
+                          coverflowPositionProvider(viewId),
+                        ),
+                        currentTrackId: playback.currentTrack?.id,
+                        playing: playback.playing,
+                        onFocus: (index) => ref
+                            .read(coverflowPositionProvider(viewId).notifier)
+                            .set(index),
+                        onCenterTap: (item) {
+                          if (playback.currentTrack?.id ==
+                              item.tracks.single.id) {
+                            playback.toggle();
+                          } else {
+                            playback.playTrack(item.tracks.single, tracks);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 )
-              : CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(child: header),
-                    SliverList.builder(
-                      itemCount: tracks.length,
-                      itemBuilder: (context, index) => TrackTile(
-                        track: tracks[index],
-                        contextTracks: tracks,
+              : CoverflowScrollTracker(
+                  viewId: viewId,
+                  itemCount: items.length,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: header),
+                      SliverList.builder(
+                        itemCount: tracks.length,
+                        itemBuilder: (context, index) => TrackTile(
+                          track: tracks[index],
+                          contextTracks: tracks,
+                        ),
                       ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: SpotifinChromeInsets.bottomOf(context),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: SpotifinChromeInsets.bottomOf(context),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
         ),
       );
@@ -730,6 +757,7 @@ class CollectionScreen extends ConsumerWidget {
           body: TabBarView(
             children: [
               MobileCoverflowScope(
+                viewId: collectionCoverflowViewId('artist-songs', title, null),
                 tabIndex: 0,
                 collection: MobileCoverflowCollection(
                   items: trackCoverflowItems(tracks),

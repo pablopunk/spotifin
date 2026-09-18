@@ -16,6 +16,8 @@ class CoverflowStage extends StatefulWidget {
     this.initialIndex = 0,
     this.onFocus,
     this.onTrackTap,
+    this.currentTrackId,
+    this.playing = false,
     this.showCaption = true,
     this.showReflection = true,
     this.fillHeight = false,
@@ -27,6 +29,8 @@ class CoverflowStage extends StatefulWidget {
   final int initialIndex;
   final ValueChanged<int>? onFocus;
   final CoverflowTrackTap? onTrackTap;
+  final String? currentTrackId;
+  final bool playing;
   final bool showCaption;
   final bool showReflection;
   final bool fillHeight;
@@ -62,8 +66,10 @@ class _CoverflowStageState extends State<CoverflowStage>
         _openCollectionId = null;
       }
     }
-    final requested = _safeIndex(widget.initialIndex);
-    if (requested != _focused) _animateTo(requested);
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      final requested = _safeIndex(widget.initialIndex);
+      if (requested != _focused) _animateTo(requested);
+    }
   }
 
   @override
@@ -86,7 +92,7 @@ class _CoverflowStageState extends State<CoverflowStage>
           cursor: SystemMouseCursors.grab,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (_) => _animation.stop(),
+            onHorizontalDragStart: (_) => _beginDrag(),
             onHorizontalDragUpdate: (details) =>
                 _drag(details.delta.dx, coverSize),
             onHorizontalDragEnd: (details) =>
@@ -119,6 +125,8 @@ class _CoverflowStageState extends State<CoverflowStage>
                                 ),
                                 onCloseTracks: () =>
                                     setState(() => _openCollectionId = null),
+                                currentTrackId: widget.currentTrackId,
+                                playing: widget.playing,
                               ),
                             ),
                         ],
@@ -168,6 +176,12 @@ class _CoverflowStageState extends State<CoverflowStage>
       return a.compareTo(b);
     });
     return indices;
+  }
+
+  void _beginDrag() {
+    final visiblePosition = _displayPosition;
+    _animation.stop();
+    _position = visiblePosition;
   }
 
   void _drag(double delta, double coverSize) {
@@ -242,6 +256,8 @@ class _Cover extends StatelessWidget {
     required this.onTap,
     required this.onTrackTap,
     required this.onCloseTracks,
+    required this.currentTrackId,
+    required this.playing,
   });
 
   final CoverflowItem item;
@@ -252,6 +268,8 @@ class _Cover extends StatelessWidget {
   final VoidCallback onTap;
   final ValueChanged<Track> onTrackTap;
   final VoidCallback onCloseTracks;
+  final String? currentTrackId;
+  final bool playing;
 
   @override
   Widget build(BuildContext context) {
@@ -284,6 +302,8 @@ class _Cover extends StatelessWidget {
                     size: coverSize,
                     onTrackTap: onTrackTap,
                     onClose: onCloseTracks,
+                    currentTrackId: currentTrackId,
+                    playing: playing,
                   )
                 : GestureDetector(
                     key: ValueKey('art:${item.id}'),
@@ -317,6 +337,8 @@ class _CollectionTrackList extends StatelessWidget {
     required this.size,
     required this.onTrackTap,
     required this.onClose,
+    required this.currentTrackId,
+    required this.playing,
     super.key,
   });
 
@@ -324,6 +346,8 @@ class _CollectionTrackList extends StatelessWidget {
   final double size;
   final ValueChanged<Track> onTrackTap;
   final VoidCallback onClose;
+  final String? currentTrackId;
+  final bool playing;
 
   @override
   Widget build(BuildContext context) {
@@ -387,39 +411,65 @@ class _CollectionTrackList extends StatelessWidget {
               itemExtent: 38,
               itemBuilder: (context, index) {
                 final track = item.tracks[index];
-                return InkWell(
-                  onTap: () => onTrackTap(track),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: track.name),
-                                if (track.artist.isNotEmpty)
-                                  TextSpan(
-                                    text: '  ${track.artist}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                              ],
+                final active = track.id == currentTrackId;
+                return Semantics(
+                  selected: active,
+                  child: InkWell(
+                    onTap: () => onTrackTap(track),
+                    child: ColoredBox(
+                      color: active
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              child: active
+                                  ? Icon(
+                                      playing
+                                          ? Icons.graphic_eq_rounded
+                                          : Icons.play_arrow_rounded,
+                                      size: 14,
+                                      color: Colors.white,
+                                    )
+                                  : null,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: Colors.white),
-                          ),
+                            Expanded(
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(text: track.name),
+                                    if (track.artist.isNotEmpty)
+                                      TextSpan(
+                                        text: '  ${track.artist}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: active
+                                          ? FontWeight.w800
+                                          : null,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _trackDuration(track),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _trackDuration(track),
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );

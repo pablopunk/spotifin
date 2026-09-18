@@ -7,12 +7,14 @@ class MobileCoverflowScope extends ConsumerStatefulWidget {
   const MobileCoverflowScope({
     required this.collection,
     required this.child,
+    required this.viewId,
     this.tabIndex,
     super.key,
   });
 
   final MobileCoverflowCollection collection;
   final Widget child;
+  final String viewId;
   final int? tabIndex;
 
   @override
@@ -23,12 +25,12 @@ class MobileCoverflowScope extends ConsumerStatefulWidget {
 class _MobileCoverflowScopeState extends ConsumerState<MobileCoverflowScope> {
   final _owner = Object();
   TabController? _tabController;
-  late final MobileCoverflowCollectionController _registry;
+  late final MobileCoverflowCollectionRegistry _registry;
 
   @override
   void initState() {
     super.initState();
-    _registry = ref.read(mobileCoverflowCollectionProvider.notifier);
+    _registry = ref.read(mobileCoverflowCollectionProvider);
   }
 
   @override
@@ -66,7 +68,7 @@ class _MobileCoverflowScopeState extends ConsumerState<MobileCoverflowScope> {
   void _sync() {
     final tabIndex = widget.tabIndex;
     if (tabIndex == null || _tabController?.index == tabIndex) {
-      _registry.register(_owner, widget.collection);
+      _registry.register(_owner, widget.collection.forView(widget.viewId));
     } else {
       _registry.unregister(_owner);
     }
