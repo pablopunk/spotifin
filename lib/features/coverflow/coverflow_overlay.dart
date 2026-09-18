@@ -3,16 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'coverflow_controller.dart';
 import 'coverflow_model.dart';
 import 'coverflow_stage.dart';
 
 class CoverflowOverlay extends ConsumerWidget {
-  const CoverflowOverlay({required this.onDismiss, super.key});
+  const CoverflowOverlay({required this.onDismiss, this.collection, super.key});
 
   final VoidCallback onDismiss;
+  final MobileCoverflowCollection? collection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,6 +23,23 @@ class CoverflowOverlay extends ConsumerWidget {
     return ListenableBuilder(
       listenable: playback,
       builder: (context, _) {
+        if (collection case final collection?) {
+          final currentIndex = _collectionIndex(
+            collection,
+            playback.currentTrack,
+          );
+          return _OverlayShell(
+            onDismiss: onDismiss,
+            items: collection.items,
+            initialIndex: currentIndex,
+            playing: playback.playing,
+            currentTrackId: playback.currentTrack?.id,
+            onToggle: playback.toggle,
+            onSelect: (index) =>
+                _playCollectionItem(playback, collection, index),
+            onTrackTap: (item, track) => playback.playTrack(track, item.tracks),
+          );
+        }
         final queue = playback.queue;
         if (queue.isNotEmpty) {
           return _OverlayShell(
@@ -27,9 +47,10 @@ class CoverflowOverlay extends ConsumerWidget {
             items: trackCoverflowItems(queue),
             initialIndex: _safeIndex(playback.currentIndex, queue.length),
             playing: playback.playing,
-            hasPlayback: true,
+            currentTrackId: playback.currentTrack?.id,
             onToggle: playback.toggle,
             onSelect: playback.playQueueIndex,
+            onTrackTap: (item, track) => playback.playTrack(track, item.tracks),
           );
         }
         return StreamBuilder<List<Track>>(
@@ -43,6 +64,8 @@ class CoverflowOverlay extends ConsumerWidget {
               initialIndex: 0,
               onSelect: (index) =>
                   playback.replaceQueue(fallback, startIndex: index),
+              onTrackTap: (item, track) =>
+                  playback.playTrack(track, item.tracks),
             );
           },
         );
@@ -54,6 +77,31 @@ class CoverflowOverlay extends ConsumerWidget {
     if (length == 0) return 0;
     return (index ?? 0).clamp(0, length - 1);
   }
+
+  int _collectionIndex(
+    MobileCoverflowCollection collection,
+    Track? currentTrack,
+  ) {
+    if (currentTrack == null) return 0;
+    final index = collection.items.indexWhere(
+      (item) => item.tracks.any((track) => track.id == currentTrack.id),
+    );
+    return index < 0 ? 0 : index;
+  }
+
+  void _playCollectionItem(
+    PlaybackService playback,
+    MobileCoverflowCollection collection,
+    int index,
+  ) {
+    final item = collection.items[index];
+    if (item.tracks.isEmpty) return;
+    if (collection.playback == MobileCoverflowPlayback.tracks) {
+      playback.playTrack(item.tracks.single, collection.contextTracks);
+      return;
+    }
+    playback.replaceQueue(item.tracks, shuffle: false);
+  }
 }
 
 class _OverlayShell extends StatefulWidget {
@@ -61,18 +109,20 @@ class _OverlayShell extends StatefulWidget {
     required this.onDismiss,
     required this.items,
     required this.onSelect,
+    required this.onTrackTap,
     this.initialIndex = 0,
     this.playing = false,
-    this.hasPlayback = false,
+    this.currentTrackId,
     this.onToggle,
   });
 
   final VoidCallback onDismiss;
   final List<CoverflowItem> items;
   final ValueChanged<int> onSelect;
+  final CoverflowTrackTap onTrackTap;
   final int initialIndex;
   final bool playing;
-  final bool hasPlayback;
+  final String? currentTrackId;
   final VoidCallback? onToggle;
 
   @override
@@ -101,6 +151,9 @@ class _OverlayShellState extends State<_OverlayShell> {
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
+    final focusedIsPlaying = widget.items[_focused].tracks.any(
+      (track) => track.id == widget.currentTrackId,
+    );
     return Material(
       color: Colors.black,
       child: SafeArea(
@@ -127,7 +180,8 @@ class _OverlayShellState extends State<_OverlayShell> {
                             showReflection: false,
                             fillHeight: true,
                             onFocus: _select,
-                            onCenterTap: (item) => _select(_indexOf(item)),
+                            onCenterTap: (item) => _activate(_indexOf(item)),
+                            onTrackTap: widget.onTrackTap,
                           ),
                         ),
                         Positioned(
@@ -152,10 +206,10 @@ class _OverlayShellState extends State<_OverlayShell> {
                           child: Opacity(
                             opacity: 0.78,
                             child: SpotifinPlayButton(
-                              onPressed: widget.hasPlayback
+                              onPressed: focusedIsPlaying
                                   ? widget.onToggle
                                   : () => widget.onSelect(_focused),
-                              playing: widget.playing,
+                              playing: focusedIsPlaying && widget.playing,
                             ),
                           ),
                         ),
@@ -188,9 +242,20 @@ class _OverlayShellState extends State<_OverlayShell> {
 
   void _select(int index) {
     final selected = _safeIndex(index);
-    if (selected == _focused) return;
-    setState(() => _focused = selected);
+    if (selected != _focused) setState(() => _focused = selected);
     widget.onSelect(selected);
+  }
+
+  void _activate(int index) {
+    final selected = _safeIndex(index);
+    final isCurrent = widget.items[selected].tracks.any(
+      (track) => track.id == widget.currentTrackId,
+    );
+    if (isCurrent) {
+      widget.onToggle?.call();
+    } else {
+      widget.onSelect(selected);
+    }
   }
 
   int _safeIndex(int index) {

@@ -7,6 +7,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/design_system.dart';
+import 'package:spotifin/features/coverflow/coverflow_controller.dart';
+import 'package:spotifin/features/coverflow/coverflow_model.dart';
 import 'package:spotifin/features/coverflow/coverflow_overlay.dart';
 import 'package:spotifin/features/coverflow/coverflow_stage.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
@@ -49,6 +51,7 @@ void main() {
     when(() => playback.currentIndex).thenReturn(0);
     when(() => playback.currentTrack).thenReturn(queue.first);
     when(() => playback.playing).thenReturn(false);
+    when(() => playback.toggle()).thenAnswer((_) async {});
 
     var dismissed = false;
     await tester.pumpWidget(
@@ -73,6 +76,10 @@ void main() {
     expect(find.byTooltip('Previous'), findsNothing);
     expect(find.byTooltip('Next'), findsNothing);
     expect(find.byTooltip('Dismiss'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Cover for First'));
+    await tester.pump();
+    verify(() => playback.toggle()).called(1);
 
     await tester.fling(find.byType(CoverflowStage), const Offset(0, 400), 1000);
     await tester.pumpAndSettle();
@@ -119,6 +126,49 @@ void main() {
 
     expect(find.textContaining('Lonely song'), findsWidgets);
     expect(find.byTooltip('Previous'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('overlay uses the active collection instead of the queue', (
+    tester,
+  ) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final playback = _MockPlayback();
+    final queued = _track('queue', 'Queued song');
+    final albumTrack = _track('album-track', 'Album song');
+    when(() => playback.addListener(any())).thenReturn(null);
+    when(() => playback.removeListener(any())).thenReturn(null);
+    when(() => playback.currentTrack).thenReturn(queued);
+    when(() => playback.playing).thenReturn(false);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          playbackProvider.overrideWithValue(playback),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: CoverflowOverlay(
+              onDismiss: () {},
+              collection: MobileCoverflowCollection(
+                items: trackCoverflowItems([albumTrack]),
+                contextTracks: [albumTrack],
+                playback: MobileCoverflowPlayback.tracks,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Album song'), findsWidgets);
+    expect(find.textContaining('Queued song'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

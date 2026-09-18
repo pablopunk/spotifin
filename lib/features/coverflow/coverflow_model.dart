@@ -8,6 +8,7 @@ class CoverflowItem {
     required this.subtitle,
     required this.artItemId,
     required this.tracks,
+    this.collection = false,
   });
 
   final String id;
@@ -15,6 +16,7 @@ class CoverflowItem {
   final String subtitle;
   final String artItemId;
   final List<Track> tracks;
+  final bool collection;
 }
 
 List<CoverflowItem> trackCoverflowItems(List<Track> tracks) => [
@@ -45,6 +47,7 @@ List<CoverflowItem> albumCoverflowItems(List<Track> tracks) {
         subtitle: _countLabel(groups[key]!.length),
         artItemId: groups[key]!.first.albumId ?? groups[key]!.first.id,
         tracks: List.unmodifiable(groups[key]!),
+        collection: true,
       ),
   ];
   items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
@@ -72,6 +75,7 @@ List<CoverflowItem> artistCoverflowItems(List<Track> tracks) {
         artItemId:
             entry.value.tracks.first.albumId ?? entry.value.tracks.first.id,
         tracks: List.unmodifiable(entry.value.tracks),
+        collection: true,
       ),
   ];
   items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));

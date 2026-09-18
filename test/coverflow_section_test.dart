@@ -92,7 +92,7 @@ void main() {
     expect(tapped, isNull);
   });
 
-  testWidgets('tapping the centered cover plays it', (tester) async {
+  testWidgets('tapping a centered song activates it', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     _enableCoverflow(container);
@@ -110,6 +110,48 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Cover for First'));
     await tester.pumpAndSettle();
     expect(tapped?.title, 'First');
+  });
+
+  testWidgets('tapping a centered collection reveals its compact track list', (
+    tester,
+  ) async {
+    final tracks = [_track('1', 'First'), _track('2', 'Second')];
+    final item = CoverflowItem(
+      id: 'album:one',
+      title: 'Album One',
+      subtitle: '2 songs',
+      artItemId: 'album',
+      tracks: tracks,
+      collection: true,
+    );
+    Track? tappedTrack;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: CoverflowStage(
+              items: [item],
+              onCenterTap: (_) => fail('Collection cover must open its tracks'),
+              onTrackTap: (_, track) => tappedTrack = track,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('art:album:one')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('First'), findsOneWidget);
+    expect(find.textContaining('Second'), findsOneWidget);
+    expect(find.byKey(const ValueKey('back:album:one')), findsOneWidget);
+
+    await tester.tap(find.textContaining('Second'));
+    expect(tappedTrack?.id, '2');
+
+    await tester.tap(find.byKey(const ValueKey('back:album:one')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('art:album:one')), findsOneWidget);
   });
 
   testWidgets('touch and mouse drags slide between covers', (tester) async {
@@ -168,13 +210,18 @@ void main() {
   });
 
   testWidgets('header toggle flips its view', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final container = ProviderContainer();
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const MaterialApp(
-          home: Scaffold(body: CoverflowHeaderToggle(viewIds: ['v1'])),
+          home: MediaQuery(
+            data: MediaQueryData(size: Size(1200, 800)),
+            child: Scaffold(body: CoverflowHeaderToggle(viewIds: ['v1'])),
+          ),
         ),
       ),
     );
@@ -186,17 +233,22 @@ void main() {
   });
 
   testWidgets('header toggle follows the selected tab', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final container = ProviderContainer();
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const MaterialApp(
-          home: Scaffold(
-            body: DefaultTabController(
-              length: 2,
-              initialIndex: 1,
-              child: CoverflowHeaderToggle(viewIds: ['ta', 'tb']),
+          home: MediaQuery(
+            data: MediaQueryData(size: Size(1200, 800)),
+            child: Scaffold(
+              body: DefaultTabController(
+                length: 2,
+                initialIndex: 1,
+                child: CoverflowHeaderToggle(viewIds: ['ta', 'tb']),
+              ),
             ),
           ),
         ),
@@ -207,5 +259,35 @@ void main() {
     await tester.pump();
     expect(container.read(coverflowModeProvider('ta')), isFalse);
     expect(container.read(coverflowModeProvider('tb')), isTrue);
+  });
+
+  test('mobile collection registry restores the previous route', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(
+      mobileCoverflowCollectionProvider.notifier,
+    );
+    final libraryOwner = Object();
+    final collectionOwner = Object();
+    final library = MobileCoverflowCollection(
+      items: trackCoverflowItems([_track('1', 'Library')]),
+      contextTracks: [_track('1', 'Library')],
+      playback: MobileCoverflowPlayback.tracks,
+    );
+    final album = MobileCoverflowCollection(
+      items: trackCoverflowItems([_track('2', 'Album')]),
+      contextTracks: [_track('2', 'Album')],
+      playback: MobileCoverflowPlayback.tracks,
+    );
+
+    controller.register(libraryOwner, library);
+    controller.register(collectionOwner, album);
+    expect(container.read(mobileCoverflowCollectionProvider), same(album));
+
+    controller.register(libraryOwner, library);
+    expect(container.read(mobileCoverflowCollectionProvider), same(album));
+
+    controller.unregister(collectionOwner);
+    expect(container.read(mobileCoverflowCollectionProvider), same(library));
   });
 }

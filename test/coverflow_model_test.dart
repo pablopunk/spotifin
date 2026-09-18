@@ -33,6 +33,7 @@ void main() {
     expect(items.length, 2);
     expect(items.first.artItemId, 'a');
     expect(items.first.tracks.single.id, '1');
+    expect(items.first.collection, isFalse);
   });
 
   test('album items group by albumId not name', () {
@@ -44,6 +45,7 @@ void main() {
     final items = albumCoverflowItems(tracks);
     expect(items.length, 2);
     expect(items.map((item) => item.title), contains('Hits'));
+    expect(items.every((item) => item.collection), isTrue);
   });
 
   test('artist items split multi-artist tracks', () {
@@ -60,6 +62,7 @@ void main() {
     final items = artistCoverflowItems(tracks);
     expect(items.length, 2);
     expect(items.map((item) => item.title), containsAll(['X', 'Y']));
+    expect(items.every((item) => item.collection), isTrue);
   });
 
   test('empty input gives empty output', () {

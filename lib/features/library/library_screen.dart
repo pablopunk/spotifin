@@ -19,6 +19,7 @@ import '../coverflow/coverflow_header_toggle.dart';
 import '../coverflow/coverflow_model.dart';
 import '../coverflow/coverflow_section.dart';
 import '../coverflow/coverflow_stage.dart';
+import '../coverflow/mobile_coverflow_scope.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -89,19 +90,32 @@ class _TrackList extends ConsumerWidget {
   final List<Track> tracks;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => CoverflowSection(
-    viewId: libraryCoverflowViewId(CoverflowSource.tracks),
-    items: trackCoverflowItems(tracks),
-    onCenterTap: (item) =>
-        ref.read(playbackProvider).playTrack(item.tracks.single, tracks),
-    list: ListView.builder(
-      key: const PageStorageKey('library-songs'),
-      padding: EdgeInsets.only(bottom: SpotifinChromeInsets.bottomOf(context)),
-      itemCount: tracks.length,
-      itemBuilder: (context, index) =>
-          TrackTile(track: tracks[index], contextTracks: tracks),
-    ),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = trackCoverflowItems(tracks);
+    return MobileCoverflowScope(
+      tabIndex: 0,
+      collection: MobileCoverflowCollection(
+        items: items,
+        contextTracks: tracks,
+        playback: MobileCoverflowPlayback.tracks,
+      ),
+      child: CoverflowSection(
+        viewId: libraryCoverflowViewId(CoverflowSource.tracks),
+        items: items,
+        onCenterTap: (item) =>
+            ref.read(playbackProvider).playTrack(item.tracks.single, tracks),
+        list: ListView.builder(
+          key: const PageStorageKey('library-songs'),
+          padding: EdgeInsets.only(
+            bottom: SpotifinChromeInsets.bottomOf(context),
+          ),
+          itemCount: tracks.length,
+          itemBuilder: (context, index) =>
+              TrackTile(track: tracks[index], contextTracks: tracks),
+        ),
+      ),
+    );
+  }
 }
 
 class _AlbumList extends ConsumerWidget {
@@ -109,14 +123,27 @@ class _AlbumList extends ConsumerWidget {
   final List<Track> tracks;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => CoverflowSection(
-    viewId: libraryCoverflowViewId(CoverflowSource.albums),
-    items: albumCoverflowItems(tracks),
-    onCenterTap: (item) => item.tracks.isEmpty
-        ? null
-        : ref.read(playbackProvider).replaceQueue(item.tracks, shuffle: false),
-    list: _CollectionGrid(entries: _albumEntries(tracks)),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = albumCoverflowItems(tracks);
+    return MobileCoverflowScope(
+      tabIndex: 1,
+      collection: MobileCoverflowCollection(
+        items: items,
+        contextTracks: tracks,
+        playback: MobileCoverflowPlayback.collection,
+      ),
+      child: CoverflowSection(
+        viewId: libraryCoverflowViewId(CoverflowSource.albums),
+        items: items,
+        onCenterTap: (item) => item.tracks.isEmpty
+            ? null
+            : ref
+                  .read(playbackProvider)
+                  .replaceQueue(item.tracks, shuffle: false),
+        list: _CollectionGrid(entries: _albumEntries(tracks)),
+      ),
+    );
+  }
 }
 
 List<MapEntry<String, List<Track>>> _albumEntries(List<Track> tracks) {
@@ -145,19 +172,28 @@ class _ArtistList extends ConsumerWidget {
     }
     final entries = groups.values.toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return CoverflowSection(
-      viewId: libraryCoverflowViewId(CoverflowSource.artists),
-      items: artistCoverflowItems(tracks),
-      onCenterTap: (item) => item.tracks.isEmpty
-          ? null
-          : ref
-                .read(playbackProvider)
-                .replaceQueue(item.tracks, shuffle: false),
-      list: _CollectionGrid(
-        entries: [
-          for (final group in entries) MapEntry(group.name, group.tracks),
-        ],
-        artist: true,
+    final items = artistCoverflowItems(tracks);
+    return MobileCoverflowScope(
+      tabIndex: 2,
+      collection: MobileCoverflowCollection(
+        items: items,
+        contextTracks: tracks,
+        playback: MobileCoverflowPlayback.collection,
+      ),
+      child: CoverflowSection(
+        viewId: libraryCoverflowViewId(CoverflowSource.artists),
+        items: items,
+        onCenterTap: (item) => item.tracks.isEmpty
+            ? null
+            : ref
+                  .read(playbackProvider)
+                  .replaceQueue(item.tracks, shuffle: false),
+        list: _CollectionGrid(
+          entries: [
+            for (final group in entries) MapEntry(group.name, group.tracks),
+          ],
+          artist: true,
+        ),
       ),
     );
   }
@@ -261,20 +297,29 @@ class _ArtistAlbumsTab extends ConsumerWidget {
               title: 'Nothing here yet',
             );
           }
-          return CoverflowSection(
-            viewId: viewId,
-            items: albumCoverflowItems(tracks),
-            onCenterTap: (item) => item.tracks.isEmpty
-                ? null
-                : ref
-                      .read(playbackProvider)
-                      .replaceQueue(item.tracks, shuffle: false),
-            list: spotifinGrid(
-              itemCount: albums.length,
-              itemBuilder: (context, index) => _CollectionCard(
-                title: albums[index].name,
-                tracks: albums[index].tracks,
-                menu: true,
+          final items = albumCoverflowItems(tracks);
+          return MobileCoverflowScope(
+            tabIndex: 1,
+            collection: MobileCoverflowCollection(
+              items: items,
+              contextTracks: tracks,
+              playback: MobileCoverflowPlayback.collection,
+            ),
+            child: CoverflowSection(
+              viewId: viewId,
+              items: items,
+              onCenterTap: (item) => item.tracks.isEmpty
+                  ? null
+                  : ref
+                        .read(playbackProvider)
+                        .replaceQueue(item.tracks, shuffle: false),
+              list: spotifinGrid(
+                itemCount: albums.length,
+                itemBuilder: (context, index) => _CollectionCard(
+                  title: albums[index].name,
+                  tracks: albums[index].tracks,
+                  menu: true,
+                ),
               ),
             ),
           );
@@ -381,56 +426,65 @@ class _PlaylistsTab extends ConsumerWidget {
                   playlist.id,
                 ),
                 tracks: tracksInPlaylist(playlist, byId),
+                collection: true,
               ),
           ];
-          return CoverflowSection(
-            viewId: 'library:playlists',
-            items: items,
-            onCenterTap: (item) => item.tracks.isEmpty
-                ? null
-                : ref
-                      .read(playbackProvider)
-                      .replaceQueue(item.tracks, shuffle: false),
-            list: spotifinGrid(
-              itemCount: playlists.length,
-              itemBuilder: (context, index) {
-                final playlist = playlists[index];
-                final playlistTracks = tracksInPlaylist(playlist, byId);
-                return PlaylistContextMenu(
-                  playlist: playlist,
-                  tracks: playlistTracks,
-                  child: SpotifinCollectionCard(
-                    artwork: LayoutBuilder(
-                      builder: (context, constraints) => PlaylistArtwork(
-                        tracks: playlistTracks,
-                        size: constraints.biggest.shortestSide,
-                        borderRadius: SpotifinRadii.small,
-                      ),
-                    ),
-                    title: playlist.name,
-                    subtitle: '${playlistTracks.length} songs',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => CollectionScreen(
-                          title: playlist.name,
+          return MobileCoverflowScope(
+            tabIndex: 3,
+            collection: MobileCoverflowCollection(
+              items: items,
+              contextTracks: tracks,
+              playback: MobileCoverflowPlayback.collection,
+            ),
+            child: CoverflowSection(
+              viewId: 'library:playlists',
+              items: items,
+              onCenterTap: (item) => item.tracks.isEmpty
+                  ? null
+                  : ref
+                        .read(playbackProvider)
+                        .replaceQueue(item.tracks, shuffle: false),
+              list: spotifinGrid(
+                itemCount: playlists.length,
+                itemBuilder: (context, index) {
+                  final playlist = playlists[index];
+                  final playlistTracks = tracksInPlaylist(playlist, byId);
+                  return PlaylistContextMenu(
+                    playlist: playlist,
+                    tracks: playlistTracks,
+                    child: SpotifinCollectionCard(
+                      artwork: LayoutBuilder(
+                        builder: (context, constraints) => PlaylistArtwork(
                           tracks: playlistTracks,
-                          kind: CollectionKind.playlist,
-                          artwork: PlaylistArtwork(
+                          size: constraints.biggest.shortestSide,
+                          borderRadius: SpotifinRadii.small,
+                        ),
+                      ),
+                      title: playlist.name,
+                      subtitle: '${playlistTracks.length} songs',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => CollectionScreen(
+                            title: playlist.name,
                             tracks: playlistTracks,
-                            size: 160,
-                            borderRadius: SpotifinRadii.card,
+                            kind: CollectionKind.playlist,
+                            artwork: PlaylistArtwork(
+                              tracks: playlistTracks,
+                              size: 160,
+                              borderRadius: SpotifinRadii.card,
+                            ),
                           ),
                         ),
                       ),
+                      onPlay: playlistTracks.isEmpty
+                          ? null
+                          : () => ref
+                                .read(playbackProvider)
+                                .replaceQueue(playlistTracks),
                     ),
-                    onPlay: playlistTracks.isEmpty
-                        ? null
-                        : () => ref
-                              .read(playbackProvider)
-                              .replaceQueue(playlistTracks),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           );
         },
@@ -614,50 +668,49 @@ class CollectionScreen extends ConsumerWidget {
     if (!kind.hasArtistTabs) {
       final viewId = collectionCoverflowViewId(kind.name, title, albumStableId);
       final coverflow = ref.watch(coverflowModeProvider(viewId));
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(title),
-          backgroundColor: Colors.transparent,
-          actions: [
-            IconButton(
-              tooltip: coverflow ? 'List view' : 'Coverflow',
-              icon: Icon(
-                coverflow
-                    ? Icons.view_list_rounded
-                    : Icons.view_carousel_rounded,
-              ),
-              onPressed: () =>
-                  ref.read(coverflowModeProvider(viewId).notifier).toggle(),
-            ),
-          ],
+      final items = trackCoverflowItems(tracks);
+      return MobileCoverflowScope(
+        collection: MobileCoverflowCollection(
+          items: items,
+          contextTracks: tracks,
+          playback: MobileCoverflowPlayback.tracks,
         ),
-        body: coverflow
-            ? SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: CoverflowStage(
-                    items: trackCoverflowItems(tracks),
-                    onCenterTap: (item) => ref
-                        .read(playbackProvider)
-                        .playTrack(item.tracks.single, tracks),
-                  ),
-                ),
-              )
-            : CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(child: header),
-                  SliverList.builder(
-                    itemCount: tracks.length,
-                    itemBuilder: (context, index) =>
-                        TrackTile(track: tracks[index], contextTracks: tracks),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: SpotifinChromeInsets.bottomOf(context),
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            backgroundColor: Colors.transparent,
+            actions: [CoverflowToggleButton(viewId: viewId)],
+          ),
+          body: coverflow
+              ? SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: CoverflowStage(
+                      items: items,
+                      onCenterTap: (item) => ref
+                          .read(playbackProvider)
+                          .playTrack(item.tracks.single, tracks),
                     ),
                   ),
-                ],
-              ),
+                )
+              : CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: header),
+                    SliverList.builder(
+                      itemCount: tracks.length,
+                      itemBuilder: (context, index) => TrackTile(
+                        track: tracks[index],
+                        contextTracks: tracks,
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: SpotifinChromeInsets.bottomOf(context),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       );
     }
     return Scaffold(
@@ -676,20 +729,32 @@ class CollectionScreen extends ConsumerWidget {
           ],
           body: TabBarView(
             children: [
-              CoverflowSection(
-                viewId: collectionCoverflowViewId('artist-songs', title, null),
-                items: trackCoverflowItems(tracks),
-                onCenterTap: (item) => ref
-                    .read(playbackProvider)
-                    .playTrack(item.tracks.single, tracks),
-                list: ListView.builder(
-                  key: const PageStorageKey('artist-songs'),
-                  padding: EdgeInsets.only(
-                    bottom: SpotifinChromeInsets.bottomOf(context),
+              MobileCoverflowScope(
+                tabIndex: 0,
+                collection: MobileCoverflowCollection(
+                  items: trackCoverflowItems(tracks),
+                  contextTracks: tracks,
+                  playback: MobileCoverflowPlayback.tracks,
+                ),
+                child: CoverflowSection(
+                  viewId: collectionCoverflowViewId(
+                    'artist-songs',
+                    title,
+                    null,
                   ),
-                  itemCount: tracks.length,
-                  itemBuilder: (context, index) =>
-                      TrackTile(track: tracks[index], contextTracks: tracks),
+                  items: trackCoverflowItems(tracks),
+                  onCenterTap: (item) => ref
+                      .read(playbackProvider)
+                      .playTrack(item.tracks.single, tracks),
+                  list: ListView.builder(
+                    key: const PageStorageKey('artist-songs'),
+                    padding: EdgeInsets.only(
+                      bottom: SpotifinChromeInsets.bottomOf(context),
+                    ),
+                    itemCount: tracks.length,
+                    itemBuilder: (context, index) =>
+                        TrackTile(track: tracks[index], contextTracks: tracks),
+                  ),
                 ),
               ),
               _ArtistAlbumsTab(

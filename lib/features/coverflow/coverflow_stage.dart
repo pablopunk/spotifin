@@ -3,8 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../storage/database.dart';
 import '../common/artwork.dart';
 import 'coverflow_model.dart';
+
+typedef CoverflowTrackTap = void Function(CoverflowItem item, Track track);
 
 class CoverflowStage extends StatefulWidget {
   const CoverflowStage({
@@ -12,6 +15,7 @@ class CoverflowStage extends StatefulWidget {
     required this.onCenterTap,
     this.initialIndex = 0,
     this.onFocus,
+    this.onTrackTap,
     this.showCaption = true,
     this.showReflection = true,
     this.fillHeight = false,
@@ -22,6 +26,7 @@ class CoverflowStage extends StatefulWidget {
   final ValueChanged<CoverflowItem> onCenterTap;
   final int initialIndex;
   final ValueChanged<int>? onFocus;
+  final CoverflowTrackTap? onTrackTap;
   final bool showCaption;
   final bool showReflection;
   final bool fillHeight;
@@ -35,6 +40,7 @@ class _CoverflowStageState extends State<CoverflowStage>
   late final AnimationController _animation;
   late double _position;
   late int _focused;
+  String? _openCollectionId;
 
   @override
   void initState() {
@@ -52,6 +58,9 @@ class _CoverflowStageState extends State<CoverflowStage>
     if (oldWidget.items != widget.items) {
       _focused = _safeIndex(_focused);
       _position = _position.clamp(0, widget.items.length - 1).toDouble();
+      if (!widget.items.any((item) => item.id == _openCollectionId)) {
+        _openCollectionId = null;
+      }
     }
     final requested = _safeIndex(widget.initialIndex);
     if (requested != _focused) _animateTo(requested);
@@ -101,13 +110,21 @@ class _CoverflowStageState extends State<CoverflowStage>
                                 coverSize: coverSize,
                                 delta: index - _displayPosition,
                                 showReflection: widget.showReflection,
+                                showTracks:
+                                    widget.items[index].id == _openCollectionId,
                                 onTap: () => _tap(index),
+                                onTrackTap: (track) => widget.onTrackTap?.call(
+                                  widget.items[index],
+                                  track,
+                                ),
+                                onCloseTracks: () =>
+                                    setState(() => _openCollectionId = null),
                               ),
                             ),
                         ],
                       ),
                     ),
-                    if (widget.showCaption) ...[
+                    if (widget.showCaption && _openCollectionId == null) ...[
                       const SizedBox(height: 12),
                       _Caption(item: widget.items[_focused]),
                     ],
@@ -154,6 +171,7 @@ class _CoverflowStageState extends State<CoverflowStage>
   }
 
   void _drag(double delta, double coverSize) {
+    if (_openCollectionId != null) _openCollectionId = null;
     _position = (_position - delta / (coverSize * 0.72))
         .clamp(0, widget.items.length - 1)
         .toDouble();
@@ -170,9 +188,15 @@ class _CoverflowStageState extends State<CoverflowStage>
 
   void _tap(int index) {
     if (index == _focused && (_position - index).abs() < 0.01) {
-      widget.onCenterTap(widget.items[index]);
+      final item = widget.items[index];
+      if (item.collection) {
+        setState(() => _openCollectionId = item.id);
+      } else {
+        widget.onCenterTap(item);
+      }
       return;
     }
+    _openCollectionId = null;
     _animateTo(index);
   }
 
@@ -214,14 +238,20 @@ class _Cover extends StatelessWidget {
     required this.coverSize,
     required this.delta,
     required this.showReflection,
+    required this.showTracks,
     required this.onTap,
+    required this.onTrackTap,
+    required this.onCloseTracks,
   });
 
   final CoverflowItem item;
   final double coverSize;
   final double delta;
   final bool showReflection;
+  final bool showTracks;
   final VoidCallback onTap;
+  final ValueChanged<Track> onTrackTap;
+  final VoidCallback onCloseTracks;
 
   @override
   Widget build(BuildContext context) {
@@ -245,27 +275,167 @@ class _Cover extends StatelessWidget {
         child: Transform(
           alignment: Alignment.center,
           transform: transform,
-          child: GestureDetector(
-            behavior: HitTestBehavior.deferToChild,
-            onTap: onTap,
-            child: Semantics(
-              button: true,
-              label: 'Cover for ${item.title}',
-              child: RepaintBoundary(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _CoverArt(item: item, size: coverSize),
-                    if (showReflection)
-                      _Reflection(item: item, size: coverSize),
-                  ],
-                ),
-              ),
-            ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: showTracks
+                ? _CollectionTrackList(
+                    key: ValueKey('tracks:${item.id}'),
+                    item: item,
+                    size: coverSize,
+                    onTrackTap: onTrackTap,
+                    onClose: onCloseTracks,
+                  )
+                : GestureDetector(
+                    key: ValueKey('art:${item.id}'),
+                    behavior: HitTestBehavior.deferToChild,
+                    onTap: onTap,
+                    child: Semantics(
+                      button: true,
+                      label: 'Cover for ${item.title}',
+                      child: RepaintBoundary(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _CoverArt(item: item, size: coverSize),
+                            if (showReflection)
+                              _Reflection(item: item, size: coverSize),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _CollectionTrackList extends StatelessWidget {
+  const _CollectionTrackList({
+    required this.item,
+    required this.size,
+    required this.onTrackTap,
+    required this.onClose,
+    super.key,
+  });
+
+  final CoverflowItem item;
+  final double size;
+  final ValueChanged<Track> onTrackTap;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final headerHeight = (size * 0.22).clamp(52.0, 72.0);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(SpotifinRadii.small),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 28,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          SizedBox(
+            height: headerHeight,
+            child: Row(
+              children: [
+                Semantics(
+                  key: ValueKey('back:${item.id}'),
+                  button: true,
+                  label: 'Back to cover for ${item.title}',
+                  child: InkWell(
+                    onTap: onClose,
+                    child: Artwork(
+                      itemId: item.artItemId,
+                      size: headerHeight,
+                      borderRadius: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Colors.white24),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: item.tracks.length,
+              itemExtent: 38,
+              itemBuilder: (context, index) {
+                final track = item.tracks[index];
+                return InkWell(
+                  onTap: () => onTrackTap(track),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: track.name),
+                                if (track.artist.isNotEmpty)
+                                  TextSpan(
+                                    text: '  ${track.artist}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _trackDuration(track),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _trackDuration(Track track) {
+    final duration = Duration(microseconds: track.durationTicks ~/ 10);
+    final minutes = duration.inMinutes;
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }
 

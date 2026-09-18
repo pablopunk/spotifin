@@ -5,6 +5,45 @@ import 'coverflow_model.dart';
 
 enum CoverflowSource { tracks, albums, artists }
 
+enum MobileCoverflowPlayback { tracks, collection }
+
+class MobileCoverflowCollection {
+  const MobileCoverflowCollection({
+    required this.items,
+    required this.contextTracks,
+    required this.playback,
+  });
+
+  final List<CoverflowItem> items;
+  final List<Track> contextTracks;
+  final MobileCoverflowPlayback playback;
+}
+
+final mobileCoverflowCollectionProvider =
+    NotifierProvider<
+      MobileCoverflowCollectionController,
+      MobileCoverflowCollection?
+    >(MobileCoverflowCollectionController.new);
+
+class MobileCoverflowCollectionController
+    extends Notifier<MobileCoverflowCollection?> {
+  final _collections = <Object, MobileCoverflowCollection>{};
+
+  @override
+  MobileCoverflowCollection? build() => null;
+
+  void register(Object owner, MobileCoverflowCollection collection) {
+    _collections[owner] = collection;
+    state = _collections.values.last;
+  }
+
+  void unregister(Object owner) {
+    if (!ref.mounted) return;
+    _collections.remove(owner);
+    state = _collections.isEmpty ? null : _collections.values.last;
+  }
+}
+
 final coverflowModeProvider =
     NotifierProvider.family<CoverflowModeController, bool, String>(
       CoverflowModeController.new,

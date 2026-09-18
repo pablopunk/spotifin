@@ -12,6 +12,7 @@ import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import '../coverflow/coverflow_overlay.dart';
+import '../coverflow/coverflow_controller.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
@@ -133,6 +134,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         Positioned.fill(
           child: CoverflowOverlay(
             onDismiss: () => setState(() => _coverflowDismissed = true),
+            collection: widget.controller.selectedIndex == 1
+                ? ref.watch(mobileCoverflowCollectionProvider)
+                : null,
           ),
         ),
       ],
