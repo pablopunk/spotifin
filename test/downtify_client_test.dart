@@ -127,6 +127,35 @@ void main() {
     expect(jobs.single.message, 'Downloading');
   });
 
+  test('skips malformed jobs without rejecting the server queue', () async {
+    final client = DowntifyClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode([
+            {
+              'song': {
+                'song_id': 'valid',
+                'name': 'Song',
+                'artists': ['Artist'],
+              },
+              'status': 'queued',
+            },
+            {
+              'song': {'song_id': 'old', 'name': '', 'artists': <String>[]},
+              'status': 'done',
+            },
+          ]),
+          200,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+
+    final jobs = await client.fetchQueue('https://downtify.example.com');
+
+    expect(jobs.map((job) => job.song.id), ['valid']);
+  });
+
   test('removes one song from the server queue', () async {
     late http.Request request;
     final client = DowntifyClient(
