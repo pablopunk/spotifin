@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,10 +68,83 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(PageView), const Offset(-70, 0));
+    await tester.drag(find.byType(PageView), const Offset(-40, 0));
     await tester.pumpAndSettle();
 
     expect(changedIndexes, isEmpty);
+  });
+
+  testWidgets('dragging with the mouse changes the playing track', (
+    tester,
+  ) async {
+    final changedIndexes = <int>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 390,
+              child: PlayerArtworkCarousel(
+                tracks: [_track('one'), _track('two'), _track('three')],
+                currentIndex: 1,
+                onTrackChanged: (index) async => changedIndexes.add(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final center = tester.getCenter(find.byType(PageView));
+    final gesture = await tester.startGesture(
+      center,
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(-220, 0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(changedIndexes, [2]);
+  });
+
+  testWidgets('shows complete previous and next artwork around current', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 700,
+              height: 400,
+              child: PlayerArtworkCarousel(
+                tracks: [_track('one'), _track('two'), _track('three')],
+                currentIndex: 1,
+                onTrackChanged: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final viewport = tester.getRect(find.byType(PageView));
+    final previous = tester.getRect(find.byKey(const ValueKey('one')));
+    final current = tester.getRect(find.byKey(const ValueKey('two')));
+    final next = tester.getRect(find.byKey(const ValueKey('three')));
+
+    expect(viewport.contains(previous.topLeft), isTrue);
+    expect(viewport.contains(previous.bottomRight), isTrue);
+    expect(viewport.contains(next.topLeft), isTrue);
+    expect(viewport.contains(next.bottomRight), isTrue);
+    expect(current.width, greaterThan(previous.width));
+    expect(current.width, greaterThan(next.width));
   });
 }
 

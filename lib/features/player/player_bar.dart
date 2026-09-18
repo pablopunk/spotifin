@@ -164,13 +164,15 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                     const SizedBox(height: 32),
                     Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: PlayerArtworkCarousel(
-                            tracks: queue,
-                            currentIndex: playback.currentIndex,
-                            onTrackChanged: playback.playQueueIndex,
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) => SizedBox(
+                            height: constraints.maxWidth.clamp(0, 420),
+                            child: PlayerArtworkCarousel(
+                              tracks: queue,
+                              currentIndex: playback.currentIndex,
+                              onTrackChanged: playback.playQueueIndex,
+                            ),
                           ),
                         ),
                       ),
@@ -348,6 +350,8 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                         selected: index == playback.currentIndex,
                         selectedTileColor: SpotifinColors.interactive,
                         selectedColor: SpotifinColors.accent,
+                        hoverColor: SpotifinColors.hover,
+                        onTap: () => playback.playQueueIndex(index),
                         leading: Artwork(
                           itemId: item.albumId ?? item.id,
                           size: 42,
