@@ -13,6 +13,8 @@ class CoverflowStage extends StatefulWidget {
     this.initialIndex = 0,
     this.onFocus,
     this.showCaption = true,
+    this.showReflection = true,
+    this.fillHeight = false,
     super.key,
   });
 
@@ -21,6 +23,8 @@ class CoverflowStage extends StatefulWidget {
   final int initialIndex;
   final ValueChanged<int>? onFocus;
   final bool showCaption;
+  final bool showReflection;
+  final bool fillHeight;
 
   @override
   State<CoverflowStage> createState() => _CoverflowStageState();
@@ -65,7 +69,9 @@ class _CoverflowStageState extends State<CoverflowStage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final coverSize = _coverSize(constraints);
-        final stageHeight = coverSize * 1.24;
+        final stageHeight = widget.fillHeight
+            ? coverSize
+            : coverSize * (widget.showReflection ? 1.24 : 1);
         final visible = _visibleIndices();
         return MouseRegion(
           cursor: SystemMouseCursors.grab,
@@ -94,6 +100,7 @@ class _CoverflowStageState extends State<CoverflowStage>
                                 item: widget.items[index],
                                 coverSize: coverSize,
                                 delta: index - _displayPosition,
+                                showReflection: widget.showReflection,
                                 onTap: () => _tap(index),
                               ),
                             ),
@@ -192,10 +199,12 @@ class _CoverflowStageState extends State<CoverflowStage>
   }
 
   double _coverSize(BoxConstraints constraints) {
-    final byWidth = constraints.maxWidth * 0.3;
+    final byWidth = constraints.maxWidth * (widget.fillHeight ? 0.46 : 0.3);
     final captionHeight = widget.showCaption ? 90 : 16;
-    final byHeight = (constraints.maxHeight - captionHeight) / 1.24;
-    return math.min(byWidth, byHeight).clamp(120.0, 360.0).toDouble();
+    final reflectionScale = widget.showReflection ? 1.24 : 1.0;
+    final byHeight = (constraints.maxHeight - captionHeight) / reflectionScale;
+    final maximum = widget.fillHeight ? 520.0 : 360.0;
+    return math.min(byWidth, byHeight).clamp(120.0, maximum).toDouble();
   }
 }
 
@@ -204,12 +213,14 @@ class _Cover extends StatelessWidget {
     required this.item,
     required this.coverSize,
     required this.delta,
+    required this.showReflection,
     required this.onTap,
   });
 
   final CoverflowItem item;
   final double coverSize;
   final double delta;
+  final bool showReflection;
   final VoidCallback onTap;
 
   @override
@@ -245,7 +256,8 @@ class _Cover extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _CoverArt(item: item, size: coverSize),
-                    _Reflection(item: item, size: coverSize),
+                    if (showReflection)
+                      _Reflection(item: item, size: coverSize),
                   ],
                 ),
               ),

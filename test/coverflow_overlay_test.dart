@@ -68,7 +68,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cover Flow'), findsNothing);
-    expect(find.text('First'), findsWidgets);
+    expect(find.textContaining('First'), findsWidgets);
     expect(find.byType(SpotifinPlayButton), findsOneWidget);
     expect(find.byTooltip('Previous'), findsNothing);
     expect(find.byTooltip('Next'), findsNothing);
@@ -117,7 +117,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Lonely song'), findsWidgets);
+    expect(find.textContaining('Lonely song'), findsWidgets);
     expect(find.byTooltip('Previous'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());

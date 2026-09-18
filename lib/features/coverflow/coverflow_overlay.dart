@@ -124,6 +124,8 @@ class _OverlayShellState extends State<_OverlayShell> {
                             items: widget.items,
                             initialIndex: _focused,
                             showCaption: false,
+                            showReflection: false,
+                            fillHeight: true,
                             onFocus: _select,
                             onCenterTap: (item) => _select(_indexOf(item)),
                           ),
@@ -139,14 +141,22 @@ class _OverlayShellState extends State<_OverlayShell> {
                           ),
                         ),
                         Positioned(
-                          right: 16,
-                          bottom: 16,
-                          child: _NowPlayingPill(
-                            item: widget.items[_focused],
-                            playing: widget.playing,
-                            onToggle: widget.hasPlayback
-                                ? widget.onToggle
-                                : () => widget.onSelect(_focused),
+                          left: 48,
+                          right: 88,
+                          bottom: 14,
+                          child: _TrackLine(item: widget.items[_focused]),
+                        ),
+                        Positioned(
+                          right: 14,
+                          bottom: 10,
+                          child: Opacity(
+                            opacity: 0.78,
+                            child: SpotifinPlayButton(
+                              onPressed: widget.hasPlayback
+                                  ? widget.onToggle
+                                  : () => widget.onSelect(_focused),
+                              playing: widget.playing,
+                            ),
                           ),
                         ),
                       ],
@@ -189,56 +199,20 @@ class _OverlayShellState extends State<_OverlayShell> {
   }
 }
 
-class _NowPlayingPill extends StatelessWidget {
-  const _NowPlayingPill({
-    required this.item,
-    required this.playing,
-    required this.onToggle,
-  });
+class _TrackLine extends StatelessWidget {
+  const _TrackLine({required this.item});
 
   final CoverflowItem item;
-  final bool playing;
-  final VoidCallback? onToggle;
 
   @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(maxWidth: 320),
-    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-    decoration: BoxDecoration(
-      color: SpotifinColors.surface.withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      boxShadow: const [
-        BoxShadow(color: Colors.black54, blurRadius: 24, offset: Offset(0, 8)),
-      ],
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              Text(
-                item.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: SpotifinColors.textMuted),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        SpotifinPlayButton(onPressed: onToggle, playing: playing),
-      ],
+  Widget build(BuildContext context) => Text(
+    '${item.title}  ·  ${item.subtitle}',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    textAlign: TextAlign.center,
+    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: Colors.white.withValues(alpha: 0.82),
+      shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
     ),
   );
 }
