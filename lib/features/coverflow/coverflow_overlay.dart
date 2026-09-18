@@ -208,7 +208,7 @@ class _TrackLine extends StatelessWidget {
   Widget build(BuildContext context) => Text.rich(
     TextSpan(
       children: [
-        TextSpan(text: '${item.title}  ·  '),
+        TextSpan(text: '${item.title}  '),
         TextSpan(
           text: item.subtitle,
           style: const TextStyle(
