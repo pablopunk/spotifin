@@ -190,7 +190,7 @@ class _CoverflowStageState extends State<CoverflowStage>
   double _coverSize(BoxConstraints constraints) {
     final byWidth = constraints.maxWidth * 0.3;
     final byHeight = (constraints.maxHeight - 90) / 1.2;
-    return math.min(byWidth, byHeight).clamp(180.0, 360.0).toDouble();
+    return math.min(byWidth, byHeight).clamp(120.0, 360.0).toDouble();
   }
 }
 
@@ -212,10 +212,10 @@ class _Cover extends StatelessWidget {
     final distance = delta.abs();
     final side = delta.sign;
     final nearCenter = distance.clamp(0.0, 1.0);
-    final sideStep = math.max(0.0, distance - 1) * coverSize * 0.16;
-    final horizontal = side * (nearCenter * coverSize * 0.58 + sideStep);
-    final angle = side * -1.02 * nearCenter;
-    final scale = 1 - 0.08 * nearCenter - 0.035 * math.min(distance, 3);
+    final sideStep = math.max(0.0, distance - 1) * coverSize * 0.15;
+    final horizontal = side * (nearCenter * coverSize * 0.5 + sideStep);
+    final angle = side * -0.79 * nearCenter;
+    final scale = 1 - 0.33 * nearCenter - 0.015 * math.min(distance - 1, 3);
     final opacity = (1 - math.max(0, distance - 3) * 0.28).clamp(0.2, 1.0);
     final transform = Matrix4.identity()
       ..setEntry(3, 2, 0.0018)

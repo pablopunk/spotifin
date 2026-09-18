@@ -81,7 +81,7 @@ void main() {
     await tester.tap(find.text('toggle'));
     await tester.pumpAndSettle();
 
-    expect(find.text('list-mode'), findsNothing);
+    expect(find.text('list-mode'), findsOneWidget);
     expect(find.byType(CoverflowStage), findsOneWidget);
     expect(find.text('First'), findsOneWidget);
 

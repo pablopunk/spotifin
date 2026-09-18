@@ -22,9 +22,18 @@ class CoverflowSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final coverflow = ref.watch(coverflowModeProvider(viewId));
-    if (coverflow) {
-      return CoverflowStage(items: items, onCenterTap: onCenterTap);
-    }
-    return list;
+    if (!coverflow) return list;
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        children: [
+          SizedBox(
+            height: (constraints.maxHeight * 0.62).clamp(360.0, 560.0),
+            child: CoverflowStage(items: items, onCenterTap: onCenterTap),
+          ),
+          const Divider(height: 1),
+          Expanded(child: list),
+        ],
+      ),
+    );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../storage/database.dart';
+import '../common/artwork.dart';
 import 'coverflow_model.dart';
 import 'coverflow_stage.dart';
 
@@ -86,33 +87,48 @@ class _OverlayShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox.shrink();
-    return GestureDetector(
-      onVerticalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        if (velocity > 320) onDismiss();
-      },
-      child: Material(
-        color: Colors.black,
-        child: SafeArea(
-          child: Column(
-            children: [
-              _TopBar(onDismiss: onDismiss),
-              Expanded(
-                child: CoverflowStage(
-                  items: items,
-                  initialIndex: initialIndex,
-                  onCenterTap: (item) => onSelect(_indexOf(item)),
+    return Material(
+      color: Colors.black,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) => CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: constraints.maxHeight,
+                  child: Column(
+                    children: [
+                      _TopBar(onDismiss: onDismiss),
+                      Expanded(
+                        child: CoverflowStage(
+                          items: items,
+                          initialIndex: initialIndex,
+                          onCenterTap: (item) => onSelect(_indexOf(item)),
+                        ),
+                      ),
+                      if (showTransport)
+                        _Transport(
+                          playing: playing,
+                          onPrevious: onPrevious,
+                          onToggle: onToggle,
+                          onNext: onNext,
+                        )
+                      else
+                        const SizedBox(height: 12),
+                    ],
+                  ),
                 ),
               ),
-              if (showTransport)
-                _Transport(
-                  playing: playing,
-                  onPrevious: onPrevious,
-                  onToggle: onToggle,
-                  onNext: onNext,
-                )
-              else
-                const SizedBox(height: 12),
+              const SliverToBoxAdapter(child: Divider(height: 1)),
+              SliverList.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) => _QueueRow(
+                  item: items[index],
+                  selected: index == initialIndex,
+                  onTap: () => onSelect(index),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           ),
         ),
@@ -132,27 +148,59 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onDismiss;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-    child: Row(
-      children: [
-        const SizedBox(width: 40),
-        Expanded(
-          child: Text(
-            'Cover Flow',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(color: SpotifinColors.textMuted),
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onVerticalDragEnd: (details) {
+      if ((details.primaryVelocity ?? 0) > 320) onDismiss();
+    },
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 40),
+          Expanded(
+            child: Text(
+              'Cover Flow',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelLarge
+                  ?.copyWith(color: SpotifinColors.textMuted),
+            ),
           ),
-        ),
-        IconButton(
-          tooltip: 'Dismiss',
-          onPressed: onDismiss,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          color: SpotifinColors.textMuted,
-        ),
-      ],
+          IconButton(
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
+            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            color: SpotifinColors.textMuted,
+          ),
+        ],
+      ),
     ),
+  );
+}
+
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CoverflowItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    selected: selected,
+    selectedColor: SpotifinColors.accent,
+    leading: Artwork(
+      itemId: item.artItemId,
+      size: 44,
+      borderRadius: SpotifinRadii.small,
+    ),
+    title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+    subtitle: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+    onTap: onTap,
   );
 }
 
