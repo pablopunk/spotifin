@@ -11,6 +11,7 @@ import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../coverflow/coverflow_overlay.dart';
 import '../downloads/downloads_screen.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
@@ -38,6 +39,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   late final PlaybackService _playback;
   late final RemoteSessionService _remoteSessions;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
+  bool _coverflowDismissed = false;
   final _navigatorKeys = List.generate(
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
@@ -113,6 +115,31 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   }
 
   Widget _buildShell(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
+    if (!compactLandscape && _coverflowDismissed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _coverflowDismissed = false);
+      });
+    }
+    final scaffold = _buildScaffold(context);
+    if (!compactLandscape || _coverflowDismissed) return scaffold;
+    return Stack(
+      children: [
+        scaffold,
+        Positioned.fill(
+          child: CoverflowOverlay(
+            onDismiss: () => setState(() => _coverflowDismissed = true),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
     final playerPanels = ref.watch(playerPanelProvider);
