@@ -2,7 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.carplay-audio</key>
-	<true/>
+	<!--
+	  CarPlay audio goes here AFTER Apple approves the entitlement request
+	  (https://developer.apple.com/contact/carplay). Until approval, Xcode
+	  cannot provision any profile containing the key, so keep it commented
+	  out or all signed builds fail with "not found and could not be included
+	  in profile". Re-add then:
+	  <key>com.apple.developer.carplay-audio</key>
+	  <true/>
+	-->
 </dict>
 </plist>
