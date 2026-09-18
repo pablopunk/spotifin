@@ -42,4 +42,17 @@ void main() {
       await database.close();
     });
   }
+
+  test('a v9 database that already has retry_count still upgrades', () async {
+    final verifier = SchemaVerifier(GeneratedHelper());
+    final schema = await verifier.schemaAt(9);
+    schema.rawDatabase.execute(
+      'ALTER TABLE downtify_imports ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0',
+    );
+    final database = AppDatabase.forTesting(schema.newConnection());
+
+    await verifier.migrateAndValidate(database, database.schemaVersion);
+
+    await database.close();
+  });
 }

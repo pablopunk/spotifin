@@ -22,7 +22,9 @@ import '../coverflow/coverflow_stage.dart';
 import '../coverflow/mobile_coverflow_scope.dart';
 
 class LibraryScreen extends ConsumerWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,6 +32,7 @@ class LibraryScreen extends ConsumerWidget {
         MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
     return DefaultTabController(
       length: 4,
+      initialIndex: initialTabIndex.clamp(0, 3),
       child: Scaffold(
         appBar: AppBar(
           title: desktop ? null : const Text('Your library'),

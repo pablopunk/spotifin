@@ -49,7 +49,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   );
   final _visitedDestinations = <int>{0};
   late final List<Widget> _screens = [
-    HomeScreen(searchFocusNode: widget.controller.searchFocusNode),
+    HomeScreen(
+      searchFocusNode: widget.controller.searchFocusNode,
+      onOpenLibraryTab: _openLibraryTab,
+    ),
     const LibraryScreen(),
     const DownloadsScreen(),
     const SettingsScreen(),
@@ -86,6 +89,20 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           builder: (_) => PlaylistScreen(playlistId: playlist.id),
         ),
         (route) => route.isFirst,
+      );
+    });
+  }
+
+  void _openLibraryTab(int tabIndex) {
+    _visitedDestinations.add(1);
+    widget.controller.selectDestination(1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navigatorKeys[1].currentState?.pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => LibraryScreen(initialTabIndex: tabIndex),
+        ),
+        (_) => false,
       );
     });
   }

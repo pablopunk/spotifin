@@ -169,7 +169,15 @@ class AppDatabase extends _$AppDatabase {
         }
       }
       if (from >= 5 && from < 10) {
-        await migrator.addColumn(downtifyImports, downtifyImports.retryCount);
+        final downtifyColumns = await customSelect(
+          'PRAGMA table_info(downtify_imports)',
+        ).get();
+        final retryCountMissing = !downtifyColumns.any(
+          (row) => row.read<String>('name') == 'retry_count',
+        );
+        if (retryCountMissing) {
+          await migrator.addColumn(downtifyImports, downtifyImports.retryCount);
+        }
       }
     },
   );

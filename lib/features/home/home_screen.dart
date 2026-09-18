@@ -23,9 +23,10 @@ import 'playlists_section.dart';
 enum _SearchFilter { all, songs, artists, albums, downtify }
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({this.searchFocusNode, super.key});
+  const HomeScreen({this.searchFocusNode, this.onOpenLibraryTab, super.key});
 
   final FocusNode? searchFocusNode;
+  final ValueChanged<int>? onOpenLibraryTab;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -83,6 +84,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (identical(_cachedTracks, tracks)) return _cachedCatalog!;
     _cachedTracks = tracks;
     return _cachedCatalog = _HomeCatalog.fromTracks(tracks);
+  }
+
+  void _openLibraryTab(int tabIndex) {
+    final open = widget.onOpenLibraryTab;
+    if (open != null) {
+      open(tabIndex);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LibraryScreen(initialTabIndex: tabIndex),
+      ),
+    );
+  }
+
+  void _openCollection(String title, List<Track> tracks) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CollectionScreen(
+          title: title,
+          tracks: tracks,
+          kind: CollectionKind.library,
+        ),
+      ),
+    );
   }
 
   Future<void> _saveMix(DailyMix mix) async {
@@ -210,6 +236,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       title: 'Recently played',
                       tracks: catalog.recent.take(12).toList(),
                       contextTracks: catalog.recent,
+                      onTitleTap: () =>
+                          _openCollection('Recently played', catalog.recent),
                     ),
                   ),
                 SliverToBoxAdapter(
@@ -217,15 +245,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     title: 'Recently added',
                     tracks: catalog.added.take(12).toList(),
                     contextTracks: catalog.added,
+                    onTitleTap: () => _openLibraryTab(0),
                   ),
                 ),
-                SliverToBoxAdapter(child: PlaylistsSection(tracks: tracks)),
+                SliverToBoxAdapter(
+                  child: PlaylistsSection(
+                    tracks: tracks,
+                    onOpenPlaylists: () => _openLibraryTab(3),
+                  ),
+                ),
                 if (catalog.favorites.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _HorizontalSection(
                       title: 'Favorites',
                       tracks: catalog.favorites.take(12).toList(),
                       contextTracks: catalog.favorites,
+                      onTitleTap: () =>
+                          _openCollection('Favorites', catalog.favorites),
                     ),
                   ),
                 ...catalog.mixes
@@ -236,6 +272,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           title: mix.name,
                           tracks: mix.tracks.take(12).toList(),
                           contextTracks: mix.tracks,
+                          onTitleTap: () =>
+                              _openCollection(mix.name, mix.tracks),
                           action: IconButton(
                             tooltip: 'Save ${mix.name} as playlist',
                             visualDensity: VisualDensity.compact,
@@ -610,16 +648,50 @@ class _HomeCatalog {
   final List<DailyMix> mixes;
 }
 
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, this.onTap});
+
+  final String title;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Text(
+      title,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.headlineSmall,
+    );
+    if (onTap == null) return label;
+    return InkWell(
+      borderRadius: BorderRadius.circular(SpotifinRadii.small),
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: label),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 28,
+            color: SpotifinColors.textMuted,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HorizontalSection extends ConsumerWidget {
   const _HorizontalSection({
     required this.title,
     required this.tracks,
     required this.contextTracks,
+    this.onTitleTap,
     this.action,
   });
   final String title;
   final List<Track> tracks;
   final List<Track> contextTracks;
+  final VoidCallback? onTitleTap;
   final Widget? action;
 
   @override
@@ -635,11 +707,7 @@ class _HorizontalSection extends ConsumerWidget {
             child: Row(
               children: [
                 Flexible(
-                  child: Text(
-                    title,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                  child: _SectionTitle(title: title, onTap: onTitleTap),
                 ),
                 if (action != null) const SizedBox(width: SpotifinSpacing.xs),
                 ?action,

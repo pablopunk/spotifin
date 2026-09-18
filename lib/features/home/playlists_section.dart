@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../app/theme.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/playlist_artwork.dart';
@@ -9,9 +10,14 @@ import '../common/playlist_context_menu.dart';
 import '../library/library_screen.dart';
 
 class PlaylistsSection extends ConsumerWidget {
-  const PlaylistsSection({required this.tracks, super.key});
+  const PlaylistsSection({
+    required this.tracks,
+    this.onOpenPlaylists,
+    super.key,
+  });
 
   final List<Track> tracks;
+  final VoidCallback? onOpenPlaylists;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
@@ -30,9 +36,37 @@ class PlaylistsSection extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpotifinSpacing.lg,
                   ),
-                  child: Text(
-                    'Playlists',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(SpotifinRadii.small),
+                    onTap: () {
+                      if (onOpenPlaylists != null) {
+                        onOpenPlaylists!();
+                        return;
+                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              const LibraryScreen(initialTabIndex: 3),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Playlists',
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 28,
+                          color: SpotifinColors.textMuted,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: SpotifinSpacing.sm),
