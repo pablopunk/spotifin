@@ -13,6 +13,7 @@ import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'player_bar_controls.dart';
+import 'player_artwork_carousel.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
 
@@ -166,10 +167,10 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                         constraints: const BoxConstraints(maxWidth: 420),
                         child: AspectRatio(
                           aspectRatio: 1,
-                          child: Artwork(
-                            itemId: track.albumId ?? track.id,
-                            size: 420,
-                            borderRadius: SpotifinRadii.card,
+                          child: PlayerArtworkCarousel(
+                            tracks: queue,
+                            currentIndex: playback.currentIndex,
+                            onTrackChanged: playback.playQueueIndex,
                           ),
                         ),
                       ),
