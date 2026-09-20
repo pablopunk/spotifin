@@ -139,9 +139,6 @@ class _OverlayShellState extends State<_OverlayShell> {
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
-    final focusedIsPlaying = widget.items[_focused].tracks.any(
-      (track) => track.id == widget.currentTrackId,
-    );
     return Material(
       color: Colors.black,
       child: SafeArea(
@@ -196,10 +193,10 @@ class _OverlayShellState extends State<_OverlayShell> {
                           child: Opacity(
                             opacity: 0.78,
                             child: SpotifinPlayButton(
-                              onPressed: focusedIsPlaying
-                                  ? widget.onToggle
-                                  : () => widget.onSelect(_focused),
-                              playing: focusedIsPlaying && widget.playing,
+                              onPressed:
+                                  widget.onToggle ??
+                                  () => widget.onSelect(_focused),
+                              playing: widget.playing,
                             ),
                           ),
                         ),
