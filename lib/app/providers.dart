@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../services/jellyfin/jellyfin_client.dart';
 import '../services/downtify/downtify_client.dart';
 import '../services/downtify/downtify_store.dart';
+import '../services/jellyfin/secure_storage_config.dart';
 import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
@@ -69,15 +70,12 @@ final lyricsProvider = Provider<LyricsService>(
   (ref) => LyricsService(ref.watch(jellyfinClientProvider)),
 );
 
+final sessionSecureStorageProvider = Provider<FlutterSecureStorage>(
+  (ref) => buildSessionSecureStorage(),
+);
+
 final sessionStoreProvider = Provider<SessionStore>(
-  (ref) => const SessionStore(
-    FlutterSecureStorage(
-      mOptions: MacOsOptions(
-        accountName: 'com.pablopunk.spotifin.session',
-        usesDataProtectionKeychain: false,
-      ),
-    ),
-  ),
+  (ref) => SessionStore(ref.watch(sessionSecureStorageProvider)),
 );
 
 final downloadProvider = Provider<DownloadService>((ref) {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/jellyfin/jellyfin_client.dart';
+import '../../services/jellyfin/secure_storage_config.dart';
 import '../../services/jellyfin/session.dart';
 import '../../storage/database.dart';
 import '../providers.dart';
@@ -148,7 +149,7 @@ class AppController extends Notifier<AppState> {
       state = state.copyWith(
         status: AppStatus.signedOut,
         syncing: false,
-        error: 'Could not open saved Spotifin data: $error',
+        error: sessionRestoreErrorMessage(error),
       );
     }
   }
