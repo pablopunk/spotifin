@@ -141,6 +141,8 @@ void main() {
     expect(find.text('2 songs'), findsNWidgets(2));
     expect(find.text('1 songs'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Toni Anzis'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Toni Anzis'));
     await tester.pumpAndSettle();
 

@@ -241,6 +241,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
     container.dispose();
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
 
@@ -295,6 +296,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
     container.dispose();
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
   });
 }
