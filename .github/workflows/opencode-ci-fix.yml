@@ -2,7 +2,7 @@ name: OpenCode CI fix
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [Check]
     types: [completed]
     branches: [main]
 
@@ -66,7 +66,7 @@ jobs:
 
             Inspect the repository and reproduce the failure where possible.
             Make the smallest correct code change.
-            Follow the repository instructions and run the exact CI verification command: mise exec -- pnpm verify.
+            Follow the repository instructions and run the same verification as .github/workflows/check.yml: flutter analyze, flutter test, and dart format --output=none --set-exit-if-changed lib test.
             Also run the most relevant targeted test or check.
             Do not claim verification passed unless the command exits successfully.
             Do not commit or push; leave the changes in the working tree." \
@@ -101,7 +101,7 @@ jobs:
         run: |
           run_id=""
           for _ in {1..30}; do
-            run_id=$(gh run list --workflow ci.yml --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            run_id=$(gh run list --workflow check.yml --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
             if [ -n "$run_id" ]; then
               break
             fi
