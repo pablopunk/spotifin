@@ -88,30 +88,36 @@ void main() {
         dateCreated: DateTime(2025, 1, 1),
       ),
     ];
-    expect(
-      sortTracks(tracks, TrackSort.defaultOrder).map((t) => t.id),
-      ['1', '2', '3'],
-    );
-    expect(
-      sortTracks(tracks, TrackSort.nameAsc).map((t) => t.name),
-      ['alpha', 'Beta', 'Gamma'],
-    );
-    expect(
-      sortTracks(tracks, TrackSort.artistAsc).map((t) => t.id),
-      ['2', '3', '1'],
-    );
-    expect(
-      sortTracks(tracks, TrackSort.longestFirst).map((t) => t.id),
-      ['2', '3', '1'],
-    );
-    expect(
-      sortTracks(tracks, TrackSort.shortestFirst).map((t) => t.id),
-      ['1', '3', '2'],
-    );
-    expect(
-      sortTracks(tracks, TrackSort.recentlyAdded).map((t) => t.id),
-      ['3', '2', '1'],
-    );
+    expect(sortTracks(tracks, TrackSort.defaultOrder).map((t) => t.id), [
+      '1',
+      '2',
+      '3',
+    ]);
+    expect(sortTracks(tracks, TrackSort.nameAsc).map((t) => t.name), [
+      'alpha',
+      'Beta',
+      'Gamma',
+    ]);
+    expect(sortTracks(tracks, TrackSort.artistAsc).map((t) => t.id), [
+      '2',
+      '3',
+      '1',
+    ]);
+    expect(sortTracks(tracks, TrackSort.longestFirst).map((t) => t.id), [
+      '2',
+      '3',
+      '1',
+    ]);
+    expect(sortTracks(tracks, TrackSort.shortestFirst).map((t) => t.id), [
+      '1',
+      '3',
+      '2',
+    ]);
+    expect(sortTracks(tracks, TrackSort.recentlyAdded).map((t) => t.id), [
+      '3',
+      '2',
+      '1',
+    ]);
   });
 
   test('playlists sort by name and song count', () {
@@ -161,15 +167,17 @@ void main() {
       ),
     ];
     expect(
-      sortCoverflowCollections(items, CollectionSort.mostSongs).map(
-        (item) => item.title,
-      ),
+      sortCoverflowCollections(
+        items,
+        CollectionSort.mostSongs,
+      ).map((item) => item.title),
       ['alpha', 'Beta'],
     );
     expect(
-      sortCoverflowCollections(items, CollectionSort.nameDesc).map(
-        (item) => item.title,
-      ),
+      sortCoverflowCollections(
+        items,
+        CollectionSort.nameDesc,
+      ).map((item) => item.title),
       ['Beta', 'alpha'],
     );
   });
@@ -220,8 +228,9 @@ void main() {
         .toList();
     expect(titles, ['Alpha album', 'Zebra album']);
 
-    container.read(libraryAlbumSortProvider.notifier).state =
-        CollectionSort.fewestSongs;
+    container
+        .read(libraryAlbumSortProvider.notifier)
+        .set(CollectionSort.fewestSongs);
     await tester.pumpAndSettle();
     titles = tester
         .widgetList<SpotifinCollectionCard>(find.byType(SpotifinCollectionCard))
@@ -272,8 +281,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Sort artists'), findsOneWidget);
-    container.read(libraryArtistSortProvider.notifier).state =
-        CollectionSort.mostSongs;
+    container
+        .read(libraryArtistSortProvider.notifier)
+        .set(CollectionSort.mostSongs);
     await tester.pumpAndSettle();
 
     final titles = tester

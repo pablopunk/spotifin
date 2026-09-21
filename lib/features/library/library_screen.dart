@@ -120,7 +120,7 @@ class _TrackList extends ConsumerWidget {
               tooltip: 'Sort songs',
               onChanged: (option) {
                 if (option != null) {
-                  ref.read(libraryTrackSortProvider.notifier).state = option;
+                  ref.read(libraryTrackSortProvider.notifier).set(option);
                 }
               },
             ),
@@ -176,7 +176,7 @@ class _AlbumList extends ConsumerWidget {
               tooltip: 'Sort albums',
               onChanged: (option) {
                 if (option != null) {
-                  ref.read(libraryAlbumSortProvider.notifier).state = option;
+                  ref.read(libraryAlbumSortProvider.notifier).set(option);
                 }
               },
             ),
@@ -213,10 +213,9 @@ class _ArtistList extends ConsumerWidget {
         (groups[key] ??= _ArtistGroup(artist.name)).tracks.add(track);
       }
     }
-    final entries = sortCollectionEntries(
-      [for (final group in groups.values) MapEntry(group.name, group.tracks)],
-      sort,
-    );
+    final entries = sortCollectionEntries([
+      for (final group in groups.values) MapEntry(group.name, group.tracks),
+    ], sort);
     final items = sortCoverflowCollections(artistCoverflowItems(tracks), sort);
     return MobileCoverflowScope(
       viewId: libraryCoverflowViewId(CoverflowSource.artists),
@@ -243,13 +242,11 @@ class _ArtistList extends ConsumerWidget {
               tooltip: 'Sort artists',
               onChanged: (option) {
                 if (option != null) {
-                  ref.read(libraryArtistSortProvider.notifier).state = option;
+                  ref.read(libraryArtistSortProvider.notifier).set(option);
                 }
               },
             ),
-            Expanded(
-              child: _CollectionGrid(entries: entries, artist: true),
-            ),
+            Expanded(child: _CollectionGrid(entries: entries, artist: true)),
           ],
         ),
       ),
@@ -386,8 +383,7 @@ class _ArtistAlbumsTab extends ConsumerWidget {
                   tooltip: 'Sort artist albums',
                   onChanged: (option) {
                     if (option != null) {
-                      ref.read(artistAlbumsSortProvider.notifier).state =
-                          option;
+                      ref.read(artistAlbumsSortProvider.notifier).set(option);
                     }
                   },
                 ),
@@ -534,8 +530,7 @@ class _PlaylistsTab extends ConsumerWidget {
             CoverflowItem(
               id: 'playlist:${playlist.id}',
               title: playlist.name,
-              subtitle:
-                  '${tracksByPlaylistId[playlist.id]?.length ?? 0} songs',
+              subtitle: '${tracksByPlaylistId[playlist.id]?.length ?? 0} songs',
               artItemId: _playlistArtItemId(
                 tracksByPlaylistId[playlist.id] ?? const [],
                 playlist.id,
@@ -571,7 +566,7 @@ class _PlaylistsTab extends ConsumerWidget {
                     if (option != null) {
                       ref
                           .read(libraryPlaylistSortProvider.notifier)
-                          .state = option;
+                          .set(option);
                     }
                   },
                 ),
@@ -793,7 +788,7 @@ class CollectionScreen extends ConsumerWidget {
       tooltip: 'Sort collection songs',
       onChanged: (option) {
         if (option != null) {
-          ref.read(collectionTrackSortProvider.notifier).state = option;
+          ref.read(collectionTrackSortProvider.notifier).set(option);
         }
       },
     );
@@ -854,7 +849,10 @@ class CollectionScreen extends ConsumerWidget {
                               item.tracks.single.id) {
                             playback.toggle();
                           } else {
-                            playback.playTrack(item.tracks.single, sortedTracks);
+                            playback.playTrack(
+                              item.tracks.single,
+                              sortedTracks,
+                            );
                           }
                         },
                       ),

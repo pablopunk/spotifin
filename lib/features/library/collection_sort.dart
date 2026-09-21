@@ -6,12 +6,7 @@ import '../../storage/database.dart';
 import '../coverflow/coverflow_model.dart';
 
 /// Ordering options for collection grids (albums, artists, playlists).
-enum CollectionSort {
-  nameAsc,
-  nameDesc,
-  mostSongs,
-  fewestSongs,
-}
+enum CollectionSort { nameAsc, nameDesc, mostSongs, fewestSongs }
 
 extension CollectionSortX on CollectionSort {
   String get label => switch (this) {
@@ -62,24 +57,53 @@ extension ArtistAlbumSortX on ArtistAlbumSort {
   };
 }
 
-final libraryAlbumSortProvider = StateProvider<CollectionSort>(
-  (ref) => CollectionSort.nameAsc,
-);
-final libraryArtistSortProvider = StateProvider<CollectionSort>(
-  (ref) => CollectionSort.nameAsc,
-);
-final libraryPlaylistSortProvider = StateProvider<CollectionSort>(
-  (ref) => CollectionSort.nameAsc,
-);
-final libraryTrackSortProvider = StateProvider<TrackSort>(
-  (ref) => TrackSort.defaultOrder,
-);
-final collectionTrackSortProvider = StateProvider<TrackSort>(
-  (ref) => TrackSort.defaultOrder,
-);
-final artistAlbumsSortProvider = StateProvider<ArtistAlbumSort>(
-  (ref) => ArtistAlbumSort.featured,
-);
+class CollectionSortController extends Notifier<CollectionSort> {
+  @override
+  CollectionSort build() => CollectionSort.nameAsc;
+
+  void set(CollectionSort sort) {
+    if (state != sort) state = sort;
+  }
+}
+
+class TrackSortController extends Notifier<TrackSort> {
+  @override
+  TrackSort build() => TrackSort.defaultOrder;
+
+  void set(TrackSort sort) {
+    if (state != sort) state = sort;
+  }
+}
+
+class ArtistAlbumSortController extends Notifier<ArtistAlbumSort> {
+  @override
+  ArtistAlbumSort build() => ArtistAlbumSort.featured;
+
+  void set(ArtistAlbumSort sort) {
+    if (state != sort) state = sort;
+  }
+}
+
+final libraryAlbumSortProvider =
+    NotifierProvider<CollectionSortController, CollectionSort>(
+      CollectionSortController.new,
+    );
+final libraryArtistSortProvider =
+    NotifierProvider<CollectionSortController, CollectionSort>(
+      CollectionSortController.new,
+    );
+final libraryPlaylistSortProvider =
+    NotifierProvider<CollectionSortController, CollectionSort>(
+      CollectionSortController.new,
+    );
+final libraryTrackSortProvider =
+    NotifierProvider<TrackSortController, TrackSort>(TrackSortController.new);
+final collectionTrackSortProvider =
+    NotifierProvider<TrackSortController, TrackSort>(TrackSortController.new);
+final artistAlbumsSortProvider =
+    NotifierProvider<ArtistAlbumSortController, ArtistAlbumSort>(
+      ArtistAlbumSortController.new,
+    );
 
 int _compareNames(String a, String b) =>
     a.toLowerCase().compareTo(b.toLowerCase());
@@ -242,9 +266,8 @@ class SortByDropdown<T extends Enum> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: SpotifinColors.textMuted);
+    final textStyle = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: SpotifinColors.textMuted);
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
