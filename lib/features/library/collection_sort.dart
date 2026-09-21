@@ -283,21 +283,30 @@ class SortByDropdown<T extends Enum> extends StatelessWidget {
             const SizedBox(width: 8),
             Text('Sort by', style: textStyle),
             const SizedBox(width: 8),
-            Tooltip(
-              message: tooltip,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<T>(
-                  value: value,
-                  isDense: true,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  items: [
-                    for (final option in values)
-                      DropdownMenuItem<T>(
-                        value: option,
-                        child: Text(labelOf(option)),
-                      ),
-                  ],
-                  onChanged: onChanged,
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 200),
+                child: Tooltip(
+                  message: tooltip,
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<T>(
+                      value: value,
+                      isDense: true,
+                      isExpanded: true,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      items: [
+                        for (final option in values)
+                          DropdownMenuItem<T>(
+                            value: option,
+                            child: Text(
+                              labelOf(option),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: onChanged,
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -1050,8 +1050,8 @@ class _CollectionHeader extends ConsumerWidget {
               clipBehavior: Clip.antiAlias,
               child: _headerArtwork(),
             ),
-            SizedBox(
-              width: 320,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
