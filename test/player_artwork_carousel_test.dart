@@ -146,6 +146,157 @@ void main() {
     expect(current.width, greaterThan(previous.width));
     expect(current.width, greaterThan(next.width));
   });
+
+  testWidgets('a long drag advances only one track', (tester) async {
+    final tracks = [
+      _track('zero'),
+      _track('one'),
+      _track('two'),
+      _track('three'),
+      _track('four'),
+    ];
+    final changedIndexes = <int>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 390,
+              child: PlayerArtworkCarousel(
+                tracks: tracks,
+                currentIndex: 1,
+                onTrackChanged: (index) async => changedIndexes.add(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(PageView), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(changedIndexes, [2]);
+  });
+
+  testWidgets(
+    'a high-velocity fling advances only one track without chaining',
+    (tester) async {
+      final tracks = [
+        _track('zero'),
+        _track('one'),
+        _track('two'),
+        _track('three'),
+        _track('four'),
+      ];
+      final changedIndexes = <int>[];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 3000);
+      await tester.pumpAndSettle();
+
+      expect(changedIndexes, [2]);
+    },
+  );
+
+  testWidgets('a high-velocity fling back goes back only one track', (
+    tester,
+  ) async {
+    final tracks = [
+      _track('zero'),
+      _track('one'),
+      _track('two'),
+      _track('three'),
+      _track('four'),
+    ];
+    final changedIndexes = <int>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 390,
+              child: PlayerArtworkCarousel(
+                tracks: tracks,
+                currentIndex: 2,
+                onTrackChanged: (index) async => changedIndexes.add(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 3000);
+    await tester.pumpAndSettle();
+
+    expect(changedIndexes, [1]);
+  });
+
+  testWidgets('two successive swipes each move one track', (tester) async {
+    final tracks = [
+      _track('zero'),
+      _track('one'),
+      _track('two'),
+      _track('three'),
+      _track('four'),
+    ];
+    final changedIndexes = <int>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 390,
+              child: PlayerArtworkCarousel(
+                tracks: tracks,
+                currentIndex: 0,
+                onTrackChanged: (index) async => changedIndexes.add(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(PageView), const Offset(-220, 0));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(PageView), const Offset(-220, 0));
+    await tester.pumpAndSettle();
+
+    expect(changedIndexes, [1, 2]);
+  });
 }
 
 Track _track(String id) => Track(
