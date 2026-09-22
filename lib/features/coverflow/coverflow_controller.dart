@@ -35,6 +35,30 @@ final mobileCoverflowCollectionProvider = Provider((ref) {
   return MobileCoverflowCollectionRegistry();
 });
 
+final mobileCoverflowRequestedProvider =
+    NotifierProvider<
+      MobileCoverflowRequestedController,
+      MobileCoverflowCollection?
+    >(MobileCoverflowRequestedController.new);
+
+/// Explicit view collection requested by the Cover Flow button.
+///
+/// `null` means the rotation launch should fall back to the playback queue.
+/// The button snapshots the active library/view collection here before
+/// rotating, so physical rotation without a button press always shows the
+/// queue while the button keeps its view-specific behavior.
+class MobileCoverflowRequestedController
+    extends Notifier<MobileCoverflowCollection?> {
+  @override
+  MobileCoverflowCollection? build() => null;
+
+  void request(MobileCoverflowCollection? collection) => state = collection;
+
+  void clear() {
+    if (state != null) state = null;
+  }
+}
+
 final mobileCoverflowDismissedProvider =
     NotifierProvider<MobileCoverflowDismissedController, bool>(
       MobileCoverflowDismissedController.new,
