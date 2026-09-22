@@ -100,6 +100,51 @@ void main() {
     expect(results.map((track) => track.id), ['match']);
   });
 
+  test('search is accent-insensitive: rosalia matches ROSALÍA', () async {
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'rosalia',
+        name: 'Con Altura',
+        artist: const Value('ROSALÍA'),
+        album: const Value('El Mal Querer'),
+      ),
+      TracksCompanion.insert(id: 'other', name: 'Different Song'),
+    ]);
+
+    expect(
+      (await database.searchTracks(['rosalia']).first).map((track) => track.id),
+      ['rosalia'],
+    );
+    expect(
+      (await database.searchTracks(['ROSALIA']).first).map((track) => track.id),
+      ['rosalia'],
+    );
+    // Accented query matches unaccented rows too.
+    expect(
+      (await database.searchTracks(['rosalía']).first).map((track) => track.id),
+      ['rosalia'],
+    );
+    // Album field participates in the same folded match.
+    expect(
+      (await database.searchTracks([
+        'mal',
+        'querer',
+      ]).first).map((track) => track.id),
+      ['rosalia'],
+    );
+  });
+
+  test('search tolerates punctuation: dont matches Don\'t', () async {
+    await database.upsertTracks([
+      TracksCompanion.insert(id: 'stop', name: "Don't Stop Believin'"),
+    ]);
+
+    expect(
+      (await database.searchTracks(['dont']).first).map((track) => track.id),
+      ['stop'],
+    );
+  });
+
   test('orders library tracks by date added with newest first', () async {
     await database.upsertTracks([
       TracksCompanion.insert(

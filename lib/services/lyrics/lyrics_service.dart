@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../storage/database.dart';
 import '../../storage/track_artists.dart';
+import '../search/search_text.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 import 'lyric_line.dart';
@@ -155,11 +156,11 @@ class LyricsService {
     (match) => match[0]!.startsWith('Y') ? 'U' : 'u',
   );
 
-  String _normalize(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp(r'\byou\b'), 'u')
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .trim();
+  String _normalize(String value) =>
+      normalizeSearchText(value)
+          .replaceAll(RegExp(r'\byou\b'), 'u')
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .trim();
 
   List<LyricLine> _parseLrc(String value) {
     final timestamp = RegExp(r'^\[(\d+):(\d+(?:\.\d+)?)\](.*)$');

@@ -4,6 +4,8 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart';
 
+import '../services/search/search_text.dart';
+
 part 'database.g.dart';
 
 @TableIndex(name: 'tracks_name', columns: {#name})
@@ -203,26 +205,64 @@ class AppDatabase extends _$AppDatabase {
           ]))
           .get();
 
+  /// Accent- and case-insensitive substring search over name/artist/album.
+  ///
+  /// Stays blazing fast: a single SQLite scan whose `LIKE '%token%'`
+  /// predicates run against one accent-folded `name || artist || album`
+  /// expression (nested `REPLACE`s, no extensions, works on native and web).
+  /// Tokens are normalized with [normalizeSearchToken], so they only ever
+  /// contain `a-z0-9` and are inherently `LIKE`-safe.
   Stream<List<Track>> searchTracks(List<String> words, {int limit = 30}) {
+    final tokens = words
+        .map(normalizeSearchToken)
+        .where((token) => token.isNotEmpty)
+        .toList(growable: false);
     final query = select(tracks)
       ..where((track) {
+        if (tokens.isEmpty) return const Constant(false);
+        final haystack = _foldedSearchHaystack(track);
         Expression<bool>? predicate;
-        for (final word in words) {
-          final pattern = '%${_escapeLike(word)}%';
-          final matches =
-              track.name.like(pattern) |
-              track.artist.like(pattern) |
-              track.album.like(pattern);
+        for (final token in tokens) {
+          final matches = haystack.like('%$token%');
           predicate = predicate == null ? matches : predicate & matches;
         }
-        return predicate ?? const Constant(false);
+        return predicate!;
       })
       ..orderBy([(track) => OrderingTerm.asc(track.name)])
       ..limit(limit);
     return query.watch();
   }
 
-  String _escapeLike(String value) => value.replaceAll(RegExp(r'[%_]'), '');
+  /// `LOWER(name || ' ' || artist || ' ' || album)` with diacritics folded
+  /// to ASCII and punctuation stripped via nested `REPLACE` calls (see
+  /// [sqlFoldReplacements] and [sqlStripReplacements]).
+  ///
+  /// One concatenated expression instead of three per-column folds keeps the
+  /// per-row cost of the scan to a single fold chain per query word.
+  Expression<String> _foldedSearchHaystack($TracksTable track) {
+    Expression<String> haystack =
+        track.name +
+        const Constant(' ') +
+        track.artist +
+        const Constant(' ') +
+        track.album;
+    haystack = haystack.lower();
+    for (final replacement in sqlFoldReplacements) {
+      haystack = FunctionCallExpression<String>('REPLACE', [
+        haystack,
+        Constant(replacement.key),
+        Constant(replacement.value),
+      ]);
+    }
+    for (final replacement in sqlStripReplacements) {
+      haystack = FunctionCallExpression<String>('REPLACE', [
+        haystack,
+        Constant(replacement.key),
+        Constant(replacement.value),
+      ]);
+    }
+    return haystack;
+  }
 
   Future<void> upsertTracks(List<TracksCompanion> rows) =>
       batch((batch) => batch.insertAllOnConflictUpdate(tracks, rows));

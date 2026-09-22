@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../services/search/search_text.dart';
+
 import '../../storage/database.dart';
 import 'car_media_ids.dart';
 
@@ -186,17 +188,35 @@ List<Track> playlistChildren(
   return children;
 }
 
+/// Accent-insensitive fuzzy search over an in-memory catalog.
+///
+/// `Rosalia` matches `ROSALÍA`; single-typo words match too. Results are
+/// ranked by relevance (title > artist > album, exact > prefix > substring
+/// > typo) with name order breaking ties. The whole pass is allocation-light
+/// pure Dart, so it stays instant even for large libraries.
 List<CarTrackRef> searchCatalog(
   List<Track> tracks,
   String query, {
   int limit = 25,
 }) {
-  final needle = query.trim().toLowerCase();
-  if (needle.isEmpty) return const [];
-  final matches = tracks.where((track) {
-    return track.name.toLowerCase().contains(needle) ||
-        track.artist.toLowerCase().contains(needle) ||
-        track.album.toLowerCase().contains(needle);
-  }).toList()..sort((a, b) => a.name.compareTo(b.name));
-  return matches.take(limit).map(CarTrackRef.fromTrack).toList();
+  final tokens = splitSearchWords(query);
+  if (tokens.isEmpty) return const [];
+  final scored = <({CarTrackRef ref, int score})>[];
+  for (final track in tracks) {
+    final score = scoreTrackForSearch(
+      name: track.name,
+      artist: track.artist,
+      album: track.album,
+      tokens: tokens,
+    );
+    if (score > 0) {
+      scored.add((ref: CarTrackRef.fromTrack(track), score: score));
+    }
+  }
+  scored.sort(
+    (a, b) => b.score != a.score
+        ? b.score.compareTo(a.score)
+        : a.ref.title.compareTo(b.ref.title),
+  );
+  return scored.take(limit).map((entry) => entry.ref).toList();
 }

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/search/search_text.dart';
+
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/state/downtify_controller.dart';
@@ -73,7 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     _searchDebounce = Timer(const Duration(milliseconds: 40), () {
       if (!mounted || query != _query) return;
-      final words = query.toLowerCase().split(RegExp(r'\s+'));
+      final words = splitSearchWords(query);
       setState(() {
         _searchResults = ref.read(databaseProvider).searchTracks(words);
       });
@@ -573,13 +575,13 @@ List<MapEntry<String, List<Track>>> _matchingArtistGroups(
   List<Track> tracks,
   String query,
 ) {
-  final words = query.toLowerCase().split(RegExp(r'\s+'));
+  final tokens = splitSearchWords(query);
+  if (tokens.isEmpty) return const [];
   final groups = <String, MapEntry<String, List<Track>>>{};
   for (final track in tracks) {
     for (final artist in track.artistCredits) {
       final name = artist.name.trim();
-      final normalized = name.toLowerCase();
-      if (name.isEmpty || !words.every(normalized.contains)) continue;
+      if (name.isEmpty || !matchesAllTokens(name, tokens)) continue;
       final key = artist.id ?? 'name:$name';
       (groups[key] ??= MapEntry(name, [])).value.add(track);
     }
@@ -594,13 +596,13 @@ List<MapEntry<String, List<Track>>> _matchingGroups(
   String query,
   Iterable<String> Function(Track) names,
 ) {
-  final words = query.toLowerCase().split(RegExp(r'\s+'));
+  final tokens = splitSearchWords(query);
+  if (tokens.isEmpty) return const [];
   final groups = <String, List<Track>>{};
   for (final track in tracks) {
     for (final rawName in names(track)) {
       final name = rawName.trim();
-      final normalized = name.toLowerCase();
-      if (name.isEmpty || !words.every(normalized.contains)) continue;
+      if (name.isEmpty || !matchesAllTokens(name, tokens)) continue;
       groups.putIfAbsent(name, () => []).add(track);
     }
   }

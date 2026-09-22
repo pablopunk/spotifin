@@ -136,6 +136,25 @@ void main() {
     expect(none, isEmpty);
   });
 
+  test('search is accent-insensitive: rosalia matches ROSALÍA', () {
+    final tracks = [
+      makeTrack(id: 'unrelated', name: 'Metal Song', artist: 'Band'),
+      makeTrack(id: 'rosalia', name: 'Con Altura', artist: 'ROSALÍA'),
+    ];
+    final matches = searchCatalog(tracks, 'rosalia');
+    expect(matches.map((ref) => ref.id), ['rosalia']);
+    expect(searchCatalog(tracks, 'ROSALÍA').map((ref) => ref.id), ['rosalia']);
+  });
+
+  test('search ranks exact title matches above typo matches', () {
+    final tracks = [
+      makeTrack(id: 'typo', name: 'Rosaila Ballad', artist: 'Band'),
+      makeTrack(id: 'exact', name: 'Rosalia Anthem', artist: 'Band'),
+    ];
+    final matches = searchCatalog(tracks, 'rosalia');
+    expect(matches.map((ref) => ref.id), ['exact', 'typo']);
+  });
+
   test('track subtitle omits unknown artist', () {
     final known = makeTrack(id: 'k', name: 'N', artist: 'Miles', album: 'Blue');
     final unknown = makeTrack(

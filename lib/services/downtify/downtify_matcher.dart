@@ -1,3 +1,4 @@
+import '../../services/search/search_text.dart';
 import '../../storage/database.dart';
 import 'downtify_models.dart';
 
@@ -31,9 +32,9 @@ class DowntifyMatcher {
   bool isDuplicate(DowntifySong song, Iterable<Track> tracks) =>
       findMatch(song, tracks) != null;
 
-  String _normalize(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .trim()
-      .replaceAll(RegExp(r'\s+'), ' ');
+  String _normalize(String value) =>
+      normalizeSearchText(value)
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .trim()
+          .replaceAll(RegExp(r'\s+'), ' ');
 }
