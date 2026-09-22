@@ -12,6 +12,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import 'history_list.dart';
 import 'player_bar_controls.dart';
 import 'player_artwork_carousel.dart';
 import 'player_collection_links.dart';
@@ -131,7 +132,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
       final track = playback.currentTrack;
       if (track == null) return const SizedBox.shrink();
       final queue = playback.queue;
-      final history = playback.history;
       return DraggableScrollableSheet(
         expand: false,
         initialChildSize: .92,
@@ -294,12 +294,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                   setState(() => _detailsTab = index),
                             ),
                           ),
-                          if (_detailsTab == 2 && history.isNotEmpty)
-                            IconButton(
-                              tooltip: 'Clear history',
-                              onPressed: playback.clearHistory,
-                              icon: const Icon(Icons.delete_outline_rounded),
-                            ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -376,51 +370,9 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                       },
                     ),
                   )
-                else if (history.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: SpotifinEmptyState(
-                      icon: Icons.history_rounded,
-                      title: 'No history yet',
-                      message: 'Tracks you finish will show up here.',
-                    ),
-                  )
                 else
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpotifinSpacing.sm,
-                    ),
-                    sliver: SliverList.builder(
-                      itemCount: history.length,
-                      itemBuilder: (context, index) {
-                        final item = history[index];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          horizontalTitleGap: SpotifinSpacing.sm,
-                          hoverColor: SpotifinColors.hover,
-                          onTap: () => playback.playHistoryIndex(index),
-                          leading: Artwork(
-                            itemId: item.albumId ?? item.id,
-                            size: 42,
-                            borderRadius: SpotifinRadii.small,
-                          ),
-                          title: Text(
-                            item.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            item.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: const Icon(
-                            Icons.history_rounded,
-                            size: 18,
-                            color: SpotifinColors.textMuted,
-                          ),
-                        );
-                      },
-                    ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 480, child: HistoryList()),
                   ),
                 const SliverToBoxAdapter(child: SizedBox(height: 36)),
               ],

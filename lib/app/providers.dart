@@ -35,6 +35,15 @@ final tracksByDateAddedStreamProvider = Provider<Stream<List<Track>>>(
   (ref) => ref.watch(databaseProvider).watchTracksByDateAdded(),
 );
 
+/// Cached Jellyfin Recently Played history (see `watchRecentlyPlayed`).
+///
+/// Per AGENTS.md, drift `watch*()` streams are exposed here as providers;
+/// widgets must watch this provider instead of calling `database.*` in
+/// `build`.
+final recentlyPlayedStreamProvider = Provider<Stream<List<Track>>>(
+  (ref) => ref.watch(databaseProvider).watchRecentlyPlayed(),
+);
+
 final playlistsStreamProvider = Provider<Stream<List<Playlist>>>(
   (ref) => ref.watch(databaseProvider).watchPlaylists(),
 );

@@ -98,6 +98,13 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   double get volume => _userVolume;
   Stream<double> get volumeStream => _volumeController.stream;
   List<Track> get queue => UnmodifiableListView(_queue);
+
+  /// Tracks played this session since the last server confirmation.
+  ///
+  /// Transient overlay only: the History UI merges this on top of Jellyfin's
+  /// Recently Played truth (see `mergeRecentlyPlayed`). Never persisted;
+  /// Jellyfin remains the only durable history store via the playback reports
+  /// this service already sends.
   List<Track> get history => _history.items;
   bool get playing => _player.playing;
   bool get shuffle => _shuffle;
@@ -238,21 +245,18 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     notifyListeners();
   }
 
-  Future<void> clearHistory() async {
-    if (_history.isEmpty) return;
-    _history.clear();
-    await _saveQueue();
-    notifyListeners();
-  }
-
-  Future<void> playHistoryIndex(int index) async {
-    final session = _session;
-    if (session == null || index < 0 || index >= _history.items.length) {
-      return;
-    }
-    final track = _history.items[index];
+  /// Plays a track chosen from the History list.
+  ///
+  /// Takes the [Track] itself (not an index) because the visible History list
+  /// is Jellyfin's Recently Played merged with the session overlay, not the
+  /// overlay alone. Preserves the previous history-tap behavior: the track is
+  /// queued next and playback jumps to it, leaving the rest of the queue
+  /// intact.
+  Future<void> playHistoryTrack(Track track) async {
+    if (_session == null) return;
+    _rememberTracks([track]);
     await addNextToQueue([track]);
-    await playQueueIndex((currentIndex == null ? -1 : currentIndex!) + 1);
+    await playQueueIndex((currentIndex ?? -1) + 1);
   }
 
   @override
@@ -444,17 +448,13 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
-    final historyIds = (snapshot['history'] as List<dynamic>? ?? const [])
-        .cast<String>();
-    final restoredHistory = historyIds
-        .map((id) => byId[id])
-        .whereType<Track>()
-        .toList();
-    _history.load(restoredHistory);
+    // Older snapshots may contain a persisted 'history' list from when the
+    // app maintained its own duplicate history. It is intentionally ignored:
+    // Jellyfin is the durable history store and the session overlay starts
+    // empty on every launch.
     _shuffle = snapshot['shuffle'] as bool? ?? false;
     _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
-    _rememberTracks(restoredHistory);
     _context = List.of(_queue);
     _contextStart = 0;
     _contextEnd = _context.length;
@@ -549,7 +549,6 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         'index': currentIndex ?? 0,
         'positionMilliseconds': position.inMilliseconds,
         'shuffle': _shuffle,
-        'history': _history.toIds(),
       }),
     );
   }
@@ -738,6 +737,11 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     });
   }
 
+  /// Records the outgoing track in the transient session overlay.
+  ///
+  /// Durable history is recorded by Jellyfin itself from the
+  /// `/Sessions/Playing*` reports this service sends; this overlay only
+  /// covers plays made since the last sync so the UI stays instant offline.
   void _recordHistory() {
     final previousId = _reportedTrackId;
     if (previousId == null) return;
