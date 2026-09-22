@@ -62,6 +62,10 @@ class CoverflowToggleButton extends ConsumerWidget {
     WidgetRef ref, {
     required bool rotate,
   }) async {
+    // Snapshot the current view collection so the overlay opens view-specific
+    // content. Physical rotation leaves the request null and shows the queue.
+    final active = ref.read(mobileCoverflowCollectionProvider).active;
+    ref.read(mobileCoverflowRequestedProvider.notifier).request(active);
     ref.read(mobileCoverflowDismissedProvider.notifier).reopen();
     if (!rotate) return;
     await _rotateToCoverflow();

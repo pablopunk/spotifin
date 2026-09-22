@@ -39,9 +39,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   late final PlaybackService _playback;
   late final RemoteSessionService _remoteSessions;
-  late final MobileCoverflowCollectionRegistry _coverflowCollections;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
   OverlayEntry? _coverflowOverlayEntry;
+  MobileCoverflowCollection? _lastCoverflowCollection;
   final _navigatorKeys = List.generate(
     _destinations.length,
     (_) => GlobalKey<NavigatorState>(),
@@ -63,7 +63,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     _playback = ref.read(playbackProvider)..addListener(_refreshPlaybackLayout);
     _remoteSessions = ref.read(remoteSessionProvider)
       ..addListener(_refreshPlaybackLayout);
-    _coverflowCollections = ref.read(mobileCoverflowCollectionProvider);
   }
 
   @override
@@ -141,17 +140,25 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
     final dismissed = ref.watch(mobileCoverflowDismissedProvider);
-    _scheduleCoverflowOverlay(compactLandscape && !dismissed);
-    if (!compactLandscape && dismissed) {
+    // Rotation always opens the playback queue. Only an explicit Cover Flow
+    // button request carries a view collection; otherwise collection stays
+    // null so the overlay falls back to the queue.
+    final requested = ref.watch(mobileCoverflowRequestedProvider);
+    _scheduleCoverflowOverlay(compactLandscape && !dismissed, requested);
+    if (!compactLandscape && (dismissed || requested != null)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ref.read(mobileCoverflowDismissedProvider.notifier).reopen();
+        ref.read(mobileCoverflowRequestedProvider.notifier).clear();
       });
     }
     return _buildScaffold(context);
   }
 
-  void _scheduleCoverflowOverlay(bool visible) {
+  void _scheduleCoverflowOverlay(
+    bool visible,
+    MobileCoverflowCollection? collection,
+  ) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!visible) {
@@ -160,16 +167,18 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       }
       final entry = _coverflowOverlayEntry;
       if (entry != null) {
-        entry.markNeedsBuild();
-        return;
+        if (identical(_lastCoverflowCollection, collection)) {
+          entry.markNeedsBuild();
+          return;
+        }
+        _removeCoverflowOverlay();
       }
+      _lastCoverflowCollection = collection;
       final overlay = Overlay.of(context, rootOverlay: true);
       _coverflowOverlayEntry = OverlayEntry(
         builder: (_) => CoverflowOverlay(
           onDismiss: _dismissCoverflow,
-          collection: widget.controller.selectedIndex == 1
-              ? _coverflowCollections.active
-              : null,
+          collection: collection,
         ),
       );
       overlay.insert(_coverflowOverlayEntry!);
@@ -179,12 +188,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   void _dismissCoverflow() {
     _removeCoverflowOverlay();
     ref.read(mobileCoverflowDismissedProvider.notifier).dismiss();
+    ref.read(mobileCoverflowRequestedProvider.notifier).clear();
   }
 
   void _removeCoverflowOverlay() {
     _coverflowOverlayEntry?.remove();
     _coverflowOverlayEntry?.dispose();
     _coverflowOverlayEntry = null;
+    _lastCoverflowCollection = null;
   }
 
   Widget _buildScaffold(BuildContext context) {
