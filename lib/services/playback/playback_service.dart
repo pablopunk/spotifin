@@ -14,6 +14,7 @@ import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 import 'collection_queue.dart';
+import 'mobile_queue.dart';
 import 'playback_history.dart';
 import 'queue_item_identity.dart';
 import 'remote_playback.dart';
@@ -66,6 +67,8 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       StreamController<double>.broadcast();
   final List<StreamSubscription<Object?>> _subscriptions = [];
   Future<void> _reportQueue = Future.value();
+  Future<void> _navigation = Future.value();
+  final Set<String> _pendingHistorySync = {};
   JellyfinSession? _session;
   List<Track> _queue = [];
   List<String> _playlistItemIds = [];
@@ -99,6 +102,18 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Stream<double> get volumeStream => _volumeController.stream;
   List<Track> get queue => UnmodifiableListView(_queue);
   List<Track> get history => _history.items;
+
+  /// Mobile queue view: current track first, then remaining upcoming tracks.
+  ///
+  /// The underlying full [queue] is unchanged (desktop keeps showing it).
+  /// Played entries before [currentIndex] are hidden here; use [history] to
+  /// go back to them.
+  List<Track> get upcomingQueue =>
+      MobileQueueView.upcoming(_queue, currentIndex);
+
+  /// Full-queue index backing `upcomingQueue[0]`.
+  int get upcomingOffset =>
+      MobileQueueView.offsetFor(currentIndex, _queue.length);
   bool get playing => _player.playing;
   bool get shuffle => _shuffle;
   LoopMode get loopMode => _loopMode;
@@ -245,14 +260,73 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     notifyListeners();
   }
 
-  Future<void> playHistoryIndex(int index) async {
+  /// Plays a mobile (upcoming-view) index.
+  ///
+  /// Mobile index 0 is the current track; translation keeps desktop's
+  /// full-queue indices untouched.
+  Future<void> playUpcomingIndex(int mobileIndex) async {
+    final full = MobileQueueView.toFullIndex(
+      mobileIndex,
+      currentIndex,
+      _queue.length,
+    );
+    if (full < 0) return;
+    await playQueueIndex(full);
+  }
+
+  /// Removes a mobile (upcoming-view) index.
+  Future<void> removeUpcomingAt(int mobileIndex) async {
+    final full = MobileQueueView.toFullIndex(
+      mobileIndex,
+      currentIndex,
+      _queue.length,
+    );
+    if (full < 0) return;
+    await removeAt(full);
+  }
+
+  /// Reorders within the mobile (upcoming-view) list.
+  ///
+  /// The current track stays pinned at mobile index 0: moves involving it
+  /// are ignored so the mobile queue always keeps current first and only
+  /// the remaining upcoming order changes.
+  Future<void> reorderUpcoming(int oldMobileIndex, int newMobileIndex) async {
+    final translated = MobileQueueView.reorderFullIndices(
+      oldMobileIndex,
+      newMobileIndex,
+      currentIndex,
+      _queue.length,
+    );
+    if (translated == null) return;
+    await reorder(translated.$1, translated.$2);
+  }
+
+  Future<void> playHistoryIndex(int index) =>
+      _serializeNavigation(() => _playHistoryNow(index));
+
+  Future<void> _playHistoryNow(int index) async {
     final session = _session;
     if (session == null || index < 0 || index >= _history.items.length) {
       return;
     }
     final track = _history.items[index];
+    final found =
+        _findInQueueBeforeCurrent(track.id) ??
+        _queue.indexWhere((item) => item.id == track.id);
+    if (found >= 0) {
+      await _playQueueIndexNow(found);
+      return;
+    }
+    // History track is no longer queued: drop it (and newer entries) from
+    // history, queue it next, then advance to it. The current track is
+    // recorded as history by [_playQueueIndexNow] forward handling, so the
+    // upcoming list never duplicates entries.
+    _history.removeThrough(index);
     await addNextToQueue([track]);
-    await playQueueIndex((currentIndex == null ? -1 : currentIndex!) + 1);
+    final next = currentIndex == null ? -1 : currentIndex! + 1;
+    if (next >= 0 && next < _queue.length) {
+      await _playQueueIndexNow(next);
+    }
   }
 
   @override
@@ -287,23 +361,120 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   @override
-  Future<void> next() => _player.seekToNext();
+  Future<void> next() => _serializeNavigation(_nextNow);
 
-  Future<void> playQueueIndex(int index) async {
+  Future<void> _nextNow() async {
+    final index = currentIndex;
+    if (index == null || _queue.isEmpty) return;
+    final next = index + 1;
+    if (next >= _queue.length) {
+      // Queue exhaustion (or loop wrap handled by the player): keep the
+      // previous just_audio behavior without manufacturing history.
+      await _player.seekToNext();
+      return;
+    }
+    _history.record(_queue[index]);
+    _pendingHistorySync.add(_playlistItemIds[next]);
+    await _player.seekToNext();
+    await _saveQueue();
+    notifyListeners();
+  }
+
+  Future<void> playQueueIndex(int index) =>
+      _serializeNavigation(() => _playQueueIndexNow(index));
+
+  Future<void> _playQueueIndexNow(int index) async {
     if (index < 0 || index >= _queue.length) return;
+    final current = currentIndex;
+    if (current != null && index == current) {
+      await _player.seek(Duration.zero, index: index);
+      unawaited(_player.play());
+      unawaited(_reportProgress(force: true));
+      return;
+    }
+    final target = _queue[index];
+    if (current != null && index > current) {
+      // Forward jump: the track being left was played.
+      if (current >= 0 && current < _queue.length) {
+        _history.record(_queue[current]);
+      }
+    } else {
+      // Backward jump: the target (and newer history) becomes
+      // current/upcoming again, so unwind history instead of pushing.
+      // Direction-first keeps duplicate track ids correct: a forward jump
+      // onto a duplicate id still records, a backward jump never pushes.
+      if (_history.containsId(target.id)) {
+        _history.removeUpToId(target.id);
+      }
+    }
+    _pendingHistorySync.add(_playlistItemIds[index]);
     await _player.seek(Duration.zero, index: index);
     unawaited(_player.play());
     unawaited(_reportProgress(force: true));
+    await _saveQueue();
+    notifyListeners();
   }
 
   @override
-  Future<void> previous() async {
+  Future<void> previous() => _serializeNavigation(_previousNow);
+
+  Future<void> _previousNow() async {
+    if (_queue.isEmpty) return;
     if (_player.position > const Duration(seconds: 4)) {
       await _player.seek(Duration.zero);
       unawaited(_reportProgress(force: true));
-    } else {
-      await _player.seekToPrevious();
+      return;
     }
+    if (_history.isEmpty) {
+      // No recorded history: preserve the old seekToPrevious fallback but
+      // suppress the automatic history push so the upcoming list and
+      // history stay distinct.
+      final index = currentIndex;
+      if (index != null && index - 1 >= 0) {
+        _pendingHistorySync.add(_playlistItemIds[index - 1]);
+      }
+      await _player.seekToPrevious();
+      return;
+    }
+    final target = _history.mostRecent;
+    if (target == null) {
+      await _player.seekToPrevious();
+      return;
+    }
+    final found =
+        _findInQueueBeforeCurrent(target.id) ??
+        _queue.indexWhere((item) => item.id == target.id);
+    if (found < 0) {
+      // History entry is no longer queued: drop it instead of stalling,
+      // then fall back to the player behavior.
+      _history.takeFirst();
+      await _saveQueue();
+      notifyListeners();
+      await _player.seekToPrevious();
+      return;
+    }
+    _history.takeFirst();
+    _pendingHistorySync.add(_playlistItemIds[found]);
+    await _player.seek(Duration.zero, index: found);
+    unawaited(_player.play());
+    unawaited(_reportProgress(force: true));
+    await _saveQueue();
+    notifyListeners();
+  }
+
+  int? _findInQueueBeforeCurrent(String trackId) {
+    final current = currentIndex;
+    if (current == null) return null;
+    for (var i = current - 1; i >= 0; i--) {
+      if (_queue[i].id == trackId) return i;
+    }
+    return null;
+  }
+
+  Future<void> _serializeNavigation(Future<void> Function() task) {
+    final result = _navigation.then((_) => task());
+    _navigation = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
   }
 
   @override
@@ -567,7 +738,15 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
             playlistItemId == _reportedPlaylistItemId) {
       return;
     }
-    _recordHistory();
+    // Manual navigations (next/previous/direct selection/history replay)
+    // already keep history in sync synchronously and register the target
+    // playlist item here. Skipping the automatic record keeps queue display
+    // and history distinct: going back never duplicates the upcoming list.
+    if (playlistItemId != null && _pendingHistorySync.remove(playlistItemId)) {
+      // History already updated by the navigation itself.
+    } else {
+      _recordHistory();
+    }
     unawaited(_extendQueueIfNeeded());
     await _applyGain(track);
     unawaited(_reportStop());
