@@ -86,12 +86,12 @@ class _ResponsivePanelSections extends StatelessWidget {
   final bool useQuadrants;
 
   @override
-  Widget build(BuildContext context) => useQuadrants
-      ? _QuadrantPanelSections(
-          top: _activeSections([PlayerPanel.player, PlayerPanel.lyrics]),
-          bottom: _activeSections([PlayerPanel.queue, PlayerPanel.history]),
-        )
-      : _VerticalPanelSections(sections: _activeSections(panels.openPanels));
+  Widget build(BuildContext context) {
+    final sections = _activeSections(panels.displayPanels);
+    return useQuadrants
+        ? _QuadrantPanelSections(sections: sections)
+        : _VerticalPanelSections(sections: sections);
+  }
 
   List<Widget> _activeSections(Iterable<PlayerPanel> candidates) => candidates
       .where(panels.openPanels.contains)
@@ -144,22 +144,17 @@ class _VerticalPanelSections extends StatelessWidget {
 }
 
 class _QuadrantPanelSections extends StatelessWidget {
-  const _QuadrantPanelSections({required this.top, required this.bottom});
+  const _QuadrantPanelSections({required this.sections});
 
-  final List<Widget> top;
-  final List<Widget> bottom;
+  final List<Widget> sections;
 
   @override
   Widget build(BuildContext context) {
-    if (top.isEmpty && bottom.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    if (top.isEmpty) {
-      return _QuadrantRow(sections: bottom);
-    }
-    if (bottom.isEmpty) {
-      return _QuadrantRow(sections: top);
-    }
+    if (sections.isEmpty) return const SizedBox.shrink();
+    if (sections.length == 1) return _PanelCard(child: sections.single);
+    if (sections.length == 2) return _QuadrantRow(sections: sections);
+    final top = sections.take(2).toList(growable: false);
+    final bottom = sections.skip(2).toList(growable: false);
     return Column(
       children: [
         Expanded(child: _QuadrantRow(sections: top)),

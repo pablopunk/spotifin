@@ -50,6 +50,29 @@ void main() {
     expect(panels.history, isTrue);
   });
 
+  test('display order does not depend on activation order', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(_provider.notifier);
+
+    controller.togglePlayer();
+    controller.toggleQueue();
+    controller.toggleHistory();
+    controller.toggleLyrics();
+    controller.toggleQueue();
+
+    expect(container.read(_provider).openPanels, [
+      PlayerPanel.history,
+      PlayerPanel.lyrics,
+      PlayerPanel.queue,
+    ]);
+    expect(container.read(_provider).displayPanels, [
+      PlayerPanel.lyrics,
+      PlayerPanel.queue,
+      PlayerPanel.history,
+    ]);
+  });
+
   test('resizing narrow retains the most recent sections', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

@@ -14,6 +14,8 @@ class PlayerPanelState {
   bool get queue => openPanels.contains(PlayerPanel.queue);
   bool get history => openPanels.contains(PlayerPanel.history);
   bool get isEmpty => openPanels.isEmpty;
+  List<PlayerPanel> get displayPanels =>
+      PlayerPanel.values.where(openPanels.contains).toList(growable: false);
 
   PlayerPanelState copyWith({required List<PlayerPanel> openPanels}) =>
       PlayerPanelState(openPanels: List.unmodifiable(openPanels));
