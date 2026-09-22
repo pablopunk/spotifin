@@ -1,33 +1,53 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+enum PlayerPanel { player, lyrics, queue, history }
+
 class PlayerPanelState {
   const PlayerPanelState({
-    this.player = true,
-    this.queue = true,
-    this.lyrics = false,
+    this.openPanels = const [PlayerPanel.player, PlayerPanel.queue],
   });
 
-  final bool player;
-  final bool queue;
-  final bool lyrics;
+  final List<PlayerPanel> openPanels;
 
-  bool get isEmpty => !player && !queue && !lyrics;
+  bool get player => openPanels.contains(PlayerPanel.player);
+  bool get lyrics => openPanels.contains(PlayerPanel.lyrics);
+  bool get queue => openPanels.contains(PlayerPanel.queue);
+  bool get history => openPanels.contains(PlayerPanel.history);
+  bool get isEmpty => openPanels.isEmpty;
 
-  PlayerPanelState copyWith({bool? player, bool? queue, bool? lyrics}) =>
-      PlayerPanelState(
-        player: player ?? this.player,
-        queue: queue ?? this.queue,
-        lyrics: lyrics ?? this.lyrics,
-      );
+  PlayerPanelState copyWith({required List<PlayerPanel> openPanels}) =>
+      PlayerPanelState(openPanels: List.unmodifiable(openPanels));
 }
 
 class PlayerPanelController extends Notifier<PlayerPanelState> {
   @override
   PlayerPanelState build() => const PlayerPanelState();
 
-  void togglePlayer() => state = state.copyWith(player: !state.player);
+  void togglePlayer({int? maxOpen}) => _toggle(PlayerPanel.player, maxOpen);
 
-  void toggleQueue() => state = state.copyWith(queue: !state.queue);
+  void toggleQueue({int? maxOpen}) => _toggle(PlayerPanel.queue, maxOpen);
 
-  void toggleLyrics() => state = state.copyWith(lyrics: !state.lyrics);
+  void toggleLyrics({int? maxOpen}) => _toggle(PlayerPanel.lyrics, maxOpen);
+
+  void toggleHistory({int? maxOpen}) => _toggle(PlayerPanel.history, maxOpen);
+
+  void constrainTo(int maxOpen) {
+    if (state.openPanels.length <= maxOpen) return;
+    state = state.copyWith(
+      openPanels: state.openPanels.sublist(state.openPanels.length - maxOpen),
+    );
+  }
+
+  void _toggle(PlayerPanel panel, int? maxOpen) {
+    final openPanels = [...state.openPanels];
+    if (openPanels.remove(panel)) {
+      state = state.copyWith(openPanels: openPanels);
+      return;
+    }
+    openPanels.add(panel);
+    if (maxOpen != null && openPanels.length > maxOpen) {
+      openPanels.removeRange(0, openPanels.length - maxOpen);
+    }
+    state = state.copyWith(openPanels: openPanels);
+  }
 }

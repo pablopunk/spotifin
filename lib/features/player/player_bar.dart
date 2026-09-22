@@ -40,10 +40,22 @@ class PlayerBar extends ConsumerWidget {
 
         void showQueue() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleQueue()
-            : _showNowPlaying(context, playback, glassEffects, glassOpacity);
+            : _showNowPlaying(
+                context,
+                playback,
+                glassEffects,
+                glassOpacity,
+                initialDetailsTab: 1,
+              );
         void showLyrics() => useSidePanel
             ? ref.read(playerPanelProvider.notifier).toggleLyrics()
-            : _showLyrics(context, track, playback, glassEffects, glassOpacity);
+            : _showNowPlaying(
+                context,
+                playback,
+                glassEffects,
+                glassOpacity,
+                initialDetailsTab: 0,
+              );
         return LayoutBuilder(
           builder: (context, constraints) =>
               constraints.maxWidth >= SpotifinBreakpoints.rail
@@ -74,8 +86,9 @@ void _showNowPlaying(
   BuildContext context,
   PlaybackService playback,
   bool glass,
-  double glassOpacity,
-) {
+  double glassOpacity, {
+  int initialDetailsTab = 1,
+}) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -86,28 +99,7 @@ void _showNowPlaying(
       playback: playback,
       glass: glass,
       glassOpacity: glassOpacity,
-    ),
-  );
-}
-
-void _showLyrics(
-  BuildContext context,
-  Track track,
-  PlaybackService playback,
-  bool glass,
-  double glassOpacity,
-) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    constraints: const BoxConstraints(maxWidth: 720),
-    backgroundColor: glass ? Colors.transparent : null,
-    builder: (_) => _LyricsSheet(
-      track: track,
-      playback: playback,
-      glass: glass,
-      glassOpacity: glassOpacity,
+      initialDetailsTab: initialDetailsTab,
     ),
   );
 }
@@ -117,18 +109,19 @@ class _NowPlaying extends ConsumerStatefulWidget {
     required this.playback,
     required this.glass,
     required this.glassOpacity,
+    required this.initialDetailsTab,
   });
   final PlaybackService playback;
   final bool glass;
   final double glassOpacity;
+  final int initialDetailsTab;
 
   @override
   ConsumerState<_NowPlaying> createState() => _NowPlayingState();
 }
 
 class _NowPlayingState extends ConsumerState<_NowPlaying> {
-  var _showLyrics = false;
-  var _queueTab = 0;
+  late int _detailsTab = widget.initialDetailsTab;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -147,7 +140,8 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
           glass: widget.glass,
           glassOpacity: widget.glassOpacity,
           child: DefaultTabController(
-            length: 2,
+            initialIndex: _detailsTab,
+            length: 3,
             child: CustomScrollView(
               controller: controller,
               slivers: [
@@ -281,68 +275,26 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () =>
-                                  setState(() => _showLyrics = !_showLyrics),
-                              style: _showLyrics
-                                  ? OutlinedButton.styleFrom(
-                                      foregroundColor: SpotifinColors.accent,
-                                      backgroundColor: SpotifinColors.accent
-                                          .withValues(alpha: .12),
-                                      side: const BorderSide(
-                                        color: SpotifinColors.accent,
-                                      ),
-                                    )
-                                  : null,
-                              icon: Icon(
-                                _showLyrics
-                                    ? Icons.lyrics_rounded
-                                    : Icons.lyrics_outlined,
-                              ),
-                              label: const Text('Lyrics'),
-                            ),
-                          ),
+                          const Spacer(),
                           if (AirPlayControl.isSupported) ...[
-                            const SizedBox(width: SpotifinSpacing.sm),
                             const AirPlayControl(),
+                            const SizedBox(width: SpotifinSpacing.sm),
                           ],
-                          const SizedBox(width: SpotifinSpacing.sm),
                           const RemoteDeviceButton(),
+                          const Spacer(),
                         ],
                       ),
-                      if (_showLyrics) ...[
-                        const SizedBox(height: SpotifinSpacing.md),
-                        Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 520),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                SpotifinRadii.card,
-                              ),
-                              child: ColoredBox(
-                                color: SpotifinColors.raised,
-                                child: _LyricsContent(
-                                  track: track,
-                                  playback: playback,
-                                  embedded: true,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 18),
                       Row(
                         children: [
                           Expanded(
                             child: SpotifinTabBar(
-                              labels: const ['Queue', 'History'],
+                              labels: const ['Lyrics', 'Queue', 'History'],
                               onTap: (index) =>
-                                  setState(() => _queueTab = index),
+                                  setState(() => _detailsTab = index),
                             ),
                           ),
-                          if (_queueTab == 1 && history.isNotEmpty)
+                          if (_detailsTab == 2 && history.isNotEmpty)
                             IconButton(
                               tooltip: 'Clear history',
                               onPressed: playback.clearHistory,
@@ -354,7 +306,26 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                     ],
                   ),
                 ),
-                if (_queueTab == 0)
+                if (_detailsTab == 0)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpotifinSpacing.sm,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(SpotifinRadii.card),
+                        child: ColoredBox(
+                          color: SpotifinColors.raised,
+                          child: _LyricsContent(
+                            track: track,
+                            playback: playback,
+                            embedded: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_detailsTab == 1)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: SpotifinSpacing.sm,
@@ -465,31 +436,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
     final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
-}
-
-class _LyricsSheet extends ConsumerWidget {
-  const _LyricsSheet({
-    required this.track,
-    required this.playback,
-    required this.glass,
-    required this.glassOpacity,
-  });
-  final Track track;
-  final PlaybackService playback;
-  final bool glass;
-  final double glassOpacity;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => _SheetSurface(
-    glass: glass,
-    glassOpacity: glassOpacity,
-    child: SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .82,
-        child: _LyricsContent(track: track, playback: playback),
-      ),
-    ),
-  );
 }
 
 class _LyricsContent extends ConsumerStatefulWidget {
@@ -624,23 +570,6 @@ class _NowPlayingSurface extends StatelessWidget {
       child: child,
     );
   }
-}
-
-class _SheetSurface extends StatelessWidget {
-  const _SheetSurface({
-    required this.glass,
-    required this.glassOpacity,
-    required this.child,
-  });
-
-  final bool glass;
-  final double glassOpacity;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => glass
-      ? _glassSheet(child, glassOpacity)
-      : ColoredBox(color: SpotifinColors.surface, child: child);
 }
 
 Widget _glassSheet(Widget child, double opacity) => GlassContainer(

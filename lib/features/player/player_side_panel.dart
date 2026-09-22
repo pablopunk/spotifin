@@ -17,73 +17,112 @@ import 'remote_devices.dart';
 class PlayerSidePanel extends ConsumerWidget {
   const PlayerSidePanel({super.key});
 
+  static const _narrowWidth = 560.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
     final panels = ref.watch(playerPanelProvider);
     final panelController = ref.read(playerPanelProvider.notifier);
-    return Material(
-      color: SpotifinColors.surface,
-      child: Column(
-        children: [
-          _PanelHeader(panels: panels),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: playback,
-              builder: (context, _) {
-                final track = playback.currentTrack;
-                if (track == null) {
-                  return const SpotifinEmptyState(
-                    icon: Icons.music_note_rounded,
-                    title: 'Nothing playing',
-                  );
-                }
-                return Column(
-                  children: [
-                    if (panels.player)
-                      Expanded(
-                        flex: panels.queue && panels.lyrics ? 2 : 1,
-                        child: _PanelSection(
-                          title: 'Now playing',
-                          onClose: panelController.togglePlayer,
-                          child: _PlayerPanel(track: track, playback: playback),
-                        ),
-                      ),
-                    if (panels.lyrics) ...[
-                      if (panels.player) const Divider(height: 1),
-                      Expanded(
-                        child: _PanelSection(
-                          title: 'Lyrics',
-                          onClose: panelController.toggleLyrics,
-                          child: _LyricsPanel(track: track, playback: playback),
-                        ),
-                      ),
-                    ],
-                    if (panels.queue) ...[
-                      if (panels.player || panels.lyrics)
-                        const Divider(height: 1),
-                      Expanded(
-                        child: _QueueHistoryPanel(
-                          playback: playback,
-                          onClose: panelController.toggleQueue,
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxOpen = constraints.maxWidth < _narrowWidth ? 2 : 4;
+        if (panels.openPanels.length > maxOpen) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => panelController.constrainTo(maxOpen),
+          );
+        }
+        return Material(
+          color: SpotifinColors.surface,
+          child: Column(
+            children: [
+              _PanelHeader(
+                panels: panels,
+                maxOpen: maxOpen,
+                compact: constraints.maxWidth < 480,
+              ),
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: playback,
+                  builder: (context, _) {
+                    final track = playback.currentTrack;
+                    if (track == null) {
+                      return const SpotifinEmptyState(
+                        icon: Icons.music_note_rounded,
+                        title: 'Nothing playing',
+                      );
+                    }
+                    return Column(
+                      children: [
+                        if (panels.player)
+                          Expanded(
+                            child: _PanelSection(
+                              title: 'Now playing',
+                              onClose: panelController.togglePlayer,
+                              child: _PlayerPanel(
+                                track: track,
+                                playback: playback,
+                              ),
+                            ),
+                          ),
+                        if (panels.lyrics) ...[
+                          if (panels.player) const Divider(height: 1),
+                          Expanded(
+                            child: _PanelSection(
+                              title: 'Lyrics',
+                              onClose: panelController.toggleLyrics,
+                              child: _LyricsPanel(
+                                track: track,
+                                playback: playback,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (panels.queue) ...[
+                          if (panels.player || panels.lyrics)
+                            const Divider(height: 1),
+                          Expanded(
+                            child: _PanelSection(
+                              title: 'Queue',
+                              onClose: panelController.toggleQueue,
+                              child: _QueuePanel(playback: playback),
+                            ),
+                          ),
+                        ],
+                        if (panels.history) ...[
+                          if (panels.player || panels.lyrics || panels.queue)
+                            const Divider(height: 1),
+                          Expanded(
+                            child: _PanelSection(
+                              title: 'History',
+                              onClose: panelController.toggleHistory,
+                              child: _HistoryPanel(playback: playback),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _PanelHeader extends ConsumerWidget {
-  const _PanelHeader({required this.panels});
+  const _PanelHeader({
+    required this.panels,
+    required this.maxOpen,
+    required this.compact,
+  });
 
   final PlayerPanelState panels;
+  final int maxOpen;
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Padding(
@@ -94,19 +133,37 @@ class _PanelHeader extends ConsumerWidget {
           label: 'Player',
           icon: Icons.album_rounded,
           selected: panels.player,
-          onPressed: ref.read(playerPanelProvider.notifier).togglePlayer,
+          compact: compact,
+          onPressed: () => ref
+              .read(playerPanelProvider.notifier)
+              .togglePlayer(maxOpen: maxOpen),
         ),
         _PanelTab(
           label: 'Lyrics',
           icon: Icons.lyrics_outlined,
           selected: panels.lyrics,
-          onPressed: ref.read(playerPanelProvider.notifier).toggleLyrics,
+          compact: compact,
+          onPressed: () => ref
+              .read(playerPanelProvider.notifier)
+              .toggleLyrics(maxOpen: maxOpen),
         ),
         _PanelTab(
           label: 'Queue',
           icon: Icons.queue_music_rounded,
           selected: panels.queue,
-          onPressed: ref.read(playerPanelProvider.notifier).toggleQueue,
+          compact: compact,
+          onPressed: () => ref
+              .read(playerPanelProvider.notifier)
+              .toggleQueue(maxOpen: maxOpen),
+        ),
+        _PanelTab(
+          label: 'History',
+          icon: Icons.history_rounded,
+          selected: panels.history,
+          compact: compact,
+          onPressed: () => ref
+              .read(playerPanelProvider.notifier)
+              .toggleHistory(maxOpen: maxOpen),
         ),
         const Spacer(),
         const RemoteDeviceButton(),
@@ -160,29 +217,41 @@ class _PanelTab extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
+    required this.compact,
     required this.onPressed,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
+  final bool compact;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => TextButton.icon(
-    onPressed: onPressed,
-    icon: Icon(icon, size: 18),
-    label: Text(label),
-    style: TextButton.styleFrom(
-      foregroundColor: selected
-          ? SpotifinColors.accent
-          : SpotifinColors.textMuted,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      minimumSize: const Size(0, 36),
-      visualDensity: VisualDensity.compact,
-      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final color = selected ? SpotifinColors.accent : SpotifinColors.textMuted;
+    if (compact) {
+      return IconButton(
+        tooltip: label,
+        onPressed: onPressed,
+        color: color,
+        icon: Icon(icon, size: 19),
+        visualDensity: VisualDensity.compact,
+      );
+    }
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 36),
+        visualDensity: VisualDensity.compact,
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
 }
 
 class _PlayerPanel extends StatelessWidget {
@@ -333,54 +402,6 @@ class _PanelProgress extends StatelessWidget {
         ],
       );
     },
-  );
-}
-
-class _QueueHistoryPanel extends StatelessWidget {
-  const _QueueHistoryPanel({required this.playback, required this.onClose});
-
-  final PlaybackService playback;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) => DefaultTabController(
-    length: 2,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
-          child: Row(
-            children: [
-              const Expanded(
-                child: SpotifinTabBar(labels: ['Queue', 'History']),
-              ),
-              IconButton(
-                tooltip: 'Close Queue and History',
-                onPressed: onClose,
-                icon: const Icon(Icons.close_rounded),
-                iconSize: 17,
-                color: SpotifinColors.textMuted,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            children: [
-              _QueuePanel(playback: playback),
-              _HistoryPanel(playback: playback),
-            ],
-          ),
-        ),
-      ],
-    ),
   );
 }
 
