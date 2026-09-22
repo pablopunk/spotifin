@@ -33,7 +33,7 @@ class PlayerSidePanel extends ConsumerWidget {
           );
         }
         return Material(
-          color: SpotifinColors.surface,
+          color: SpotifinColors.background,
           child: Column(
             children: [
               _PanelHeader(
@@ -52,55 +52,12 @@ class PlayerSidePanel extends ConsumerWidget {
                         title: 'Nothing playing',
                       );
                     }
-                    return Column(
-                      children: [
-                        if (panels.player)
-                          Expanded(
-                            child: _PanelSection(
-                              title: 'Now playing',
-                              onClose: panelController.togglePlayer,
-                              child: _PlayerPanel(
-                                track: track,
-                                playback: playback,
-                              ),
-                            ),
-                          ),
-                        if (panels.lyrics) ...[
-                          if (panels.player) const Divider(height: 1),
-                          Expanded(
-                            child: _PanelSection(
-                              title: 'Lyrics',
-                              onClose: panelController.toggleLyrics,
-                              child: _LyricsPanel(
-                                track: track,
-                                playback: playback,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (panels.queue) ...[
-                          if (panels.player || panels.lyrics)
-                            const Divider(height: 1),
-                          Expanded(
-                            child: _PanelSection(
-                              title: 'Queue',
-                              onClose: panelController.toggleQueue,
-                              child: _QueuePanel(playback: playback),
-                            ),
-                          ),
-                        ],
-                        if (panels.history) ...[
-                          if (panels.player || panels.lyrics || panels.queue)
-                            const Divider(height: 1),
-                          Expanded(
-                            child: _PanelSection(
-                              title: 'History',
-                              onClose: panelController.toggleHistory,
-                              child: _HistoryPanel(playback: playback),
-                            ),
-                          ),
-                        ],
-                      ],
+                    return _ResponsivePanelSections(
+                      panels: panels,
+                      controller: panelController,
+                      track: track,
+                      playback: playback,
+                      useQuadrants: maxOpen == 4,
                     );
                   },
                 ),
@@ -111,6 +68,240 @@ class PlayerSidePanel extends ConsumerWidget {
       },
     );
   }
+}
+
+class _ResponsivePanelSections extends StatelessWidget {
+  const _ResponsivePanelSections({
+    required this.panels,
+    required this.controller,
+    required this.track,
+    required this.playback,
+    required this.useQuadrants,
+  });
+
+  final PlayerPanelState panels;
+  final PlayerPanelController controller;
+  final Track track;
+  final PlaybackService playback;
+  final bool useQuadrants;
+
+  @override
+  Widget build(BuildContext context) => useQuadrants
+      ? _QuadrantPanelSections(
+          top: _activeSections([PlayerPanel.player, PlayerPanel.lyrics]),
+          bottom: _activeSections([PlayerPanel.queue, PlayerPanel.history]),
+        )
+      : _VerticalPanelSections(sections: _activeSections(panels.openPanels));
+
+  List<Widget> _activeSections(Iterable<PlayerPanel> candidates) => candidates
+      .where(panels.openPanels.contains)
+      .map(_section)
+      .toList(growable: false);
+
+  Widget _section(PlayerPanel panel) => switch (panel) {
+    PlayerPanel.player => _PanelSection(
+      title: 'Now playing',
+      onClose: controller.togglePlayer,
+      child: _PlayerPanel(track: track, playback: playback),
+    ),
+    PlayerPanel.lyrics => _PanelSection(
+      title: 'Lyrics',
+      onClose: controller.toggleLyrics,
+      child: _LyricsPanel(track: track, playback: playback),
+    ),
+    PlayerPanel.queue => _PanelSection(
+      title: 'Queue',
+      onClose: controller.toggleQueue,
+      child: _QueuePanel(playback: playback),
+    ),
+    PlayerPanel.history => _PanelSection(
+      title: 'History',
+      onClose: controller.toggleHistory,
+      child: _HistoryPanel(playback: playback),
+    ),
+  };
+}
+
+class _VerticalPanelSections extends StatefulWidget {
+  const _VerticalPanelSections({required this.sections});
+
+  final List<Widget> sections;
+
+  @override
+  State<_VerticalPanelSections> createState() => _VerticalPanelSectionsState();
+}
+
+class _VerticalPanelSectionsState extends State<_VerticalPanelSections> {
+  var _split = .5;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.sections.isEmpty) return const SizedBox.shrink();
+    if (widget.sections.length < 2) {
+      return _PanelCard(child: widget.sections.single);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxHeight - _PanelResizeHandle.extent;
+        return Column(
+          children: [
+            SizedBox(
+              height: available * _split,
+              child: _PanelCard(child: widget.sections.first),
+            ),
+            _PanelResizeHandle.horizontal(
+              onDrag: (delta) => setState(
+                () => _split = (_split + delta / available).clamp(.25, .75),
+              ),
+            ),
+            Expanded(child: _PanelCard(child: widget.sections.last)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuadrantPanelSections extends StatefulWidget {
+  const _QuadrantPanelSections({required this.top, required this.bottom});
+
+  final List<Widget> top;
+  final List<Widget> bottom;
+
+  @override
+  State<_QuadrantPanelSections> createState() => _QuadrantPanelSectionsState();
+}
+
+class _QuadrantPanelSectionsState extends State<_QuadrantPanelSections> {
+  var _split = .5;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.top.isEmpty && widget.bottom.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (widget.top.isEmpty) {
+      return _QuadrantRow(sections: widget.bottom);
+    }
+    if (widget.bottom.isEmpty) {
+      return _QuadrantRow(sections: widget.top);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxHeight - _PanelResizeHandle.extent;
+        return Column(
+          children: [
+            SizedBox(
+              height: available * _split,
+              child: _QuadrantRow(sections: widget.top),
+            ),
+            _PanelResizeHandle.horizontal(
+              onDrag: (delta) => setState(
+                () => _split = (_split + delta / available).clamp(.25, .75),
+              ),
+            ),
+            Expanded(child: _QuadrantRow(sections: widget.bottom)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuadrantRow extends StatefulWidget {
+  const _QuadrantRow({required this.sections});
+
+  final List<Widget> sections;
+
+  @override
+  State<_QuadrantRow> createState() => _QuadrantRowState();
+}
+
+class _QuadrantRowState extends State<_QuadrantRow> {
+  var _split = .5;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.sections.isEmpty) return const SizedBox.shrink();
+    if (widget.sections.length < 2) {
+      return _PanelCard(child: widget.sections.single);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth - _PanelResizeHandle.extent;
+        return Row(
+          children: [
+            SizedBox(
+              width: available * _split,
+              child: _PanelCard(child: widget.sections.first),
+            ),
+            _PanelResizeHandle.vertical(
+              onDrag: (delta) => setState(
+                () => _split = (_split + delta / available).clamp(.25, .75),
+              ),
+            ),
+            Expanded(child: _PanelCard(child: widget.sections.last)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PanelCard extends StatelessWidget {
+  const _PanelCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(SpotifinRadii.card),
+    child: ColoredBox(color: SpotifinColors.surface, child: child),
+  );
+}
+
+class _PanelResizeHandle extends StatelessWidget {
+  const _PanelResizeHandle.horizontal({required this.onDrag})
+    : vertical = false;
+
+  const _PanelResizeHandle.vertical({required this.onDrag}) : vertical = true;
+
+  static const extent = 8.0;
+
+  final ValueChanged<double> onDrag;
+  final bool vertical;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: vertical
+        ? SystemMouseCursors.resizeColumn
+        : SystemMouseCursors.resizeRow,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragUpdate: vertical
+          ? (details) => onDrag(details.delta.dx)
+          : null,
+      onVerticalDragUpdate: vertical
+          ? null
+          : (details) => onDrag(details.delta.dy),
+      child: SizedBox(
+        width: vertical ? extent : double.infinity,
+        height: vertical ? double.infinity : extent,
+        child: Center(
+          child: SizedBox(
+            width: vertical ? 2 : 40,
+            height: vertical ? 40 : 2,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: SpotifinColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _PanelHeader extends ConsumerWidget {
