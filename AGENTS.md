@@ -3,7 +3,7 @@
 * After checkout: run `mise trust` once, then invoke the toolchain only via `mise exec --`.
 * Before the first commit/push: ensure worktree-scoped git identity (`git config --worktree user.name`/`user.email`) is set and run `gh auth setup-git` once so `git push` uses the authenticated helper. If a push fails with `could not read Username`, re-run `setup-git` before trying other fixes.
 * When integrating work from a branch based on an older `main`: check `git merge-base --is-ancestor <commit> origin/main`. If not an ancestor and `main` moved ahead, cherry-pick/rebase onto current `origin/main` and confirm the final diff touches only the fix's files.
-* Verification honesty: if the full suite fails on files you did not touch (pre-existing `main` breakage), verify the touched boundary (`flutter analyze <files>`, focused tests, format) and name the pre-existing failure in the handoff. Never move to `in_review` with verification silently skipped because the toolchain was unavailable — report `toolchain blocked, unverified` instead.
+* Verification honesty: if the full suite fails on files you did not touch (pre-existing `main` breakage), verify the touched boundary (`mise exec -- flutter analyze <files>`, focused tests, format) and name the pre-existing failure in the handoff. Never move to `in_review` with verification silently skipped because the toolchain was unavailable — report `toolchain blocked, unverified` instead.
 
 ### Verification
 
