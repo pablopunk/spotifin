@@ -122,128 +122,71 @@ class _ResponsivePanelSections extends StatelessWidget {
   };
 }
 
-class _VerticalPanelSections extends StatefulWidget {
+class _VerticalPanelSections extends StatelessWidget {
   const _VerticalPanelSections({required this.sections});
 
   final List<Widget> sections;
 
   @override
-  State<_VerticalPanelSections> createState() => _VerticalPanelSectionsState();
-}
-
-class _VerticalPanelSectionsState extends State<_VerticalPanelSections> {
-  var _split = .5;
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.sections.isEmpty) return const SizedBox.shrink();
-    if (widget.sections.length < 2) {
-      return _PanelCard(child: widget.sections.single);
+    if (sections.isEmpty) return const SizedBox.shrink();
+    if (sections.length < 2) {
+      return _PanelCard(child: sections.single);
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final available = constraints.maxHeight - _PanelResizeHandle.extent;
-        return Column(
-          children: [
-            SizedBox(
-              height: available * _split,
-              child: _PanelCard(child: widget.sections.first),
-            ),
-            _PanelResizeHandle.horizontal(
-              onDrag: (delta) => setState(
-                () => _split = (_split + delta / available).clamp(.25, .75),
-              ),
-            ),
-            Expanded(child: _PanelCard(child: widget.sections.last)),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        Expanded(child: _PanelCard(child: sections.first)),
+        const SizedBox(height: SpotifinSpacing.xs),
+        Expanded(child: _PanelCard(child: sections.last)),
+      ],
     );
   }
 }
 
-class _QuadrantPanelSections extends StatefulWidget {
+class _QuadrantPanelSections extends StatelessWidget {
   const _QuadrantPanelSections({required this.top, required this.bottom});
 
   final List<Widget> top;
   final List<Widget> bottom;
 
   @override
-  State<_QuadrantPanelSections> createState() => _QuadrantPanelSectionsState();
-}
-
-class _QuadrantPanelSectionsState extends State<_QuadrantPanelSections> {
-  var _split = .5;
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.top.isEmpty && widget.bottom.isEmpty) {
+    if (top.isEmpty && bottom.isEmpty) {
       return const SizedBox.shrink();
     }
-    if (widget.top.isEmpty) {
-      return _QuadrantRow(sections: widget.bottom);
+    if (top.isEmpty) {
+      return _QuadrantRow(sections: bottom);
     }
-    if (widget.bottom.isEmpty) {
-      return _QuadrantRow(sections: widget.top);
+    if (bottom.isEmpty) {
+      return _QuadrantRow(sections: top);
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final available = constraints.maxHeight - _PanelResizeHandle.extent;
-        return Column(
-          children: [
-            SizedBox(
-              height: available * _split,
-              child: _QuadrantRow(sections: widget.top),
-            ),
-            _PanelResizeHandle.horizontal(
-              onDrag: (delta) => setState(
-                () => _split = (_split + delta / available).clamp(.25, .75),
-              ),
-            ),
-            Expanded(child: _QuadrantRow(sections: widget.bottom)),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        Expanded(child: _QuadrantRow(sections: top)),
+        const SizedBox(height: SpotifinSpacing.xs),
+        Expanded(child: _QuadrantRow(sections: bottom)),
+      ],
     );
   }
 }
 
-class _QuadrantRow extends StatefulWidget {
+class _QuadrantRow extends StatelessWidget {
   const _QuadrantRow({required this.sections});
 
   final List<Widget> sections;
 
   @override
-  State<_QuadrantRow> createState() => _QuadrantRowState();
-}
-
-class _QuadrantRowState extends State<_QuadrantRow> {
-  var _split = .5;
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.sections.isEmpty) return const SizedBox.shrink();
-    if (widget.sections.length < 2) {
-      return _PanelCard(child: widget.sections.single);
+    if (sections.isEmpty) return const SizedBox.shrink();
+    if (sections.length < 2) {
+      return _PanelCard(child: sections.single);
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final available = constraints.maxWidth - _PanelResizeHandle.extent;
-        return Row(
-          children: [
-            SizedBox(
-              width: available * _split,
-              child: _PanelCard(child: widget.sections.first),
-            ),
-            _PanelResizeHandle.vertical(
-              onDrag: (delta) => setState(
-                () => _split = (_split + delta / available).clamp(.25, .75),
-              ),
-            ),
-            Expanded(child: _PanelCard(child: widget.sections.last)),
-          ],
-        );
-      },
+    return Row(
+      children: [
+        Expanded(child: _PanelCard(child: sections.first)),
+        const SizedBox(width: SpotifinSpacing.xs),
+        Expanded(child: _PanelCard(child: sections.last)),
+      ],
     );
   }
 }
@@ -257,50 +200,6 @@ class _PanelCard extends StatelessWidget {
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(SpotifinRadii.card),
     child: ColoredBox(color: SpotifinColors.surface, child: child),
-  );
-}
-
-class _PanelResizeHandle extends StatelessWidget {
-  const _PanelResizeHandle.horizontal({required this.onDrag})
-    : vertical = false;
-
-  const _PanelResizeHandle.vertical({required this.onDrag}) : vertical = true;
-
-  static const extent = 8.0;
-
-  final ValueChanged<double> onDrag;
-  final bool vertical;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: vertical
-        ? SystemMouseCursors.resizeColumn
-        : SystemMouseCursors.resizeRow,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: vertical
-          ? (details) => onDrag(details.delta.dx)
-          : null,
-      onVerticalDragUpdate: vertical
-          ? null
-          : (details) => onDrag(details.delta.dy),
-      child: SizedBox(
-        width: vertical ? extent : double.infinity,
-        height: vertical ? double.infinity : extent,
-        child: Center(
-          child: SizedBox(
-            width: vertical ? 2 : 40,
-            height: vertical ? 40 : 2,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: SpotifinColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
   );
 }
 
