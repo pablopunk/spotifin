@@ -14,6 +14,7 @@ import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 import 'collection_queue.dart';
+import 'playback_history.dart';
 import 'queue_item_identity.dart';
 import 'remote_playback.dart';
 
@@ -69,6 +70,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   List<Track> _queue = [];
   List<String> _playlistItemIds = [];
   final Map<String, Track> _tracksById = {};
+  final PlaybackHistory _history = PlaybackHistory();
   bool _loadingSources = false;
   bool _smallStreaming = false;
   bool _normalization = false;
@@ -96,6 +98,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   double get volume => _userVolume;
   Stream<double> get volumeStream => _volumeController.stream;
   List<Track> get queue => UnmodifiableListView(_queue);
+  List<Track> get history => _history.items;
   bool get playing => _player.playing;
   bool get shuffle => _shuffle;
   LoopMode get loopMode => _loopMode;
@@ -211,6 +214,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       await _player.removeAudioSourceAt(index);
     }
     _tracksById.remove(trackId);
+    _history.removeTrack(trackId);
     await _saveQueue();
     unawaited(_reportProgress(force: true));
     notifyListeners();
@@ -232,6 +236,23 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     await _saveQueue();
     unawaited(_reportProgress(force: true));
     notifyListeners();
+  }
+
+  Future<void> clearHistory() async {
+    if (_history.isEmpty) return;
+    _history.clear();
+    await _saveQueue();
+    notifyListeners();
+  }
+
+  Future<void> playHistoryIndex(int index) async {
+    final session = _session;
+    if (session == null || index < 0 || index >= _history.items.length) {
+      return;
+    }
+    final track = _history.items[index];
+    await addNextToQueue([track]);
+    await playQueueIndex((currentIndex == null ? -1 : currentIndex!) + 1);
   }
 
   @override
@@ -423,9 +444,17 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final byId = {for (final track in catalog) track.id: track};
     _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
     if (_queue.isEmpty) return;
+    final historyIds = (snapshot['history'] as List<dynamic>? ?? const [])
+        .cast<String>();
+    final restoredHistory = historyIds
+        .map((id) => byId[id])
+        .whereType<Track>()
+        .toList();
+    _history.load(restoredHistory);
     _shuffle = snapshot['shuffle'] as bool? ?? false;
     _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
     _rememberTracks(_queue);
+    _rememberTracks(restoredHistory);
     _context = List.of(_queue);
     _contextStart = 0;
     _contextEnd = _context.length;
@@ -445,6 +474,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     await _player.stop();
     _queue = [];
     _playlistItemIds = [];
+    _history.clear();
     _tracksById.clear();
     _context = const [];
     _contextStart = 0;
@@ -519,6 +549,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         'index': currentIndex ?? 0,
         'positionMilliseconds': position.inMilliseconds,
         'shuffle': _shuffle,
+        'history': _history.toIds(),
       }),
     );
   }
@@ -536,6 +567,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
             playlistItemId == _reportedPlaylistItemId) {
       return;
     }
+    _recordHistory();
     unawaited(_extendQueueIfNeeded());
     await _applyGain(track);
     unawaited(_reportStop());
@@ -706,9 +738,19 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     });
   }
 
+  void _recordHistory() {
+    final previousId = _reportedTrackId;
+    if (previousId == null) return;
+    final previous = _tracksById[previousId];
+    if (previous == null) return;
+    _history.record(previous);
+  }
+
   Future<void> _finishCompletedQueue() async {
+    _recordHistory();
     unawaited(_reportStop());
     await _player.stop();
+    await _saveQueue();
     notifyListeners();
   }
 
