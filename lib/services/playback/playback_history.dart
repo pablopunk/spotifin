@@ -2,10 +2,18 @@ import 'dart:collection';
 
 import '../../storage/database.dart';
 
-/// In-memory play history, most-recent-first.
+/// Transient session overlay for Jellyfin Recently Played history.
 ///
-/// The service records the previously playing track every time the current
-/// track changes, so history survives queue replacements and restores.
+/// Jellyfin is the durable source of truth (see
+/// `JellyfinClient.fetchRecentlyPlayed` and `AppDatabase.watchRecentlyPlayed`):
+/// the server records every playback the app reports and the library sync
+/// caches `UserData.LastPlayedDate` locally. This class holds *only* the
+/// tracks played in the current session since the last server confirmation,
+/// most-recent-first, so the History UI can show a just-finished track
+/// instantly. It is in-memory, capped, never persisted, and merged on top of
+/// the server list with [mergeRecentlyPlayed] (session copy wins, deduped by
+/// id). There is intentionally no "clear server history" operation: Jellyfin
+/// exposes no such endpoint, so History is not locally clearable.
 class PlaybackHistory {
   PlaybackHistory({this.limit = 100});
 

@@ -325,6 +325,24 @@ class AppController extends Notifier<AppState> {
   Future<List<Track>> _tracksByRecency() =>
       ref.read(databaseProvider).allTracksByDateAdded();
 
+  /// Refreshes only the Recently Played cache without a full library sync.
+  ///
+  /// Calls Jellyfin's Recently Played endpoint ([fetchRecentlyPlayed]) and
+  /// upserts the rows so `watchRecentlyPlayed` reflects the server order.
+  /// Best-effort and silent: on failure the cached order (and the session
+  /// overlay) stays on screen, which is the explicit offline fallback.
+  Future<void> refreshHistory({int limit = 100}) async {
+    final session = state.session;
+    if (session == null) return;
+    try {
+      final rows = await ref
+          .read(jellyfinClientProvider)
+          .fetchRecentlyPlayed(session, limit: limit);
+      if (rows.isEmpty) return;
+      await ref.read(databaseProvider).upsertTracks(rows);
+    } catch (_) {}
+  }
+
   DateTime? _readLastSyncedAt(
     SharedPreferences preferences,
     JellyfinSession session,

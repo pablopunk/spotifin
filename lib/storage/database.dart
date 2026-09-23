@@ -195,6 +195,39 @@ class AppDatabase extends _$AppDatabase {
           ]))
           .watch();
 
+  /// Cached Jellyfin Recently Played list.
+  ///
+  /// Mirrors the server semantics of `fetchRecentlyPlayed` (`Filters=IsPlayed`
+  /// ordered by `DatePlayed` descending): only tracks with a non-null
+  /// `lastPlayed` (populated from Jellyfin `UserData.LastPlayedDate` during
+  /// sync), most-recent-first. The local database is a cache of that server
+  /// truth, so this stream stays available offline and updates on every
+  /// library sync. Plays made since the last sync are *not* here yet; the UI
+  /// merges a transient in-memory session overlay on top (see
+  /// `mergeRecentlyPlayed`) instead of maintaining a second persisted
+  /// history.
+  Stream<List<Track>> watchRecentlyPlayed({int limit = 100}) =>
+      (select(tracks)
+            ..where((row) => row.lastPlayed.isNotNull())
+            ..orderBy([
+              (row) => OrderingTerm.desc(row.lastPlayed),
+              (row) => OrderingTerm.asc(row.name),
+              (row) => OrderingTerm.asc(row.id),
+            ])
+            ..limit(limit))
+          .watch();
+
+  Future<List<Track>> recentlyPlayed({int limit = 100}) =>
+      (select(tracks)
+            ..where((row) => row.lastPlayed.isNotNull())
+            ..orderBy([
+              (row) => OrderingTerm.desc(row.lastPlayed),
+              (row) => OrderingTerm.asc(row.name),
+              (row) => OrderingTerm.asc(row.id),
+            ])
+            ..limit(limit))
+          .get();
+
   Future<List<Track>> allTracks() => select(tracks).get();
 
   Future<List<Track>> allTracksByDateAdded() =>

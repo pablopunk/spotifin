@@ -113,6 +113,46 @@ class JellyfinClient {
     return items;
   }
 
+  /// Jellyfin's Recently Played list for audio.
+  ///
+  /// This is the source of truth for Spotifin's History list. Jellyfin
+  /// derives it server-side from playback reports (`/Sessions/Playing`,
+  /// `/Sessions/Playing/Progress`, `/Sessions/Playing/Stopped`, which this
+  /// app already sends): each report updates the item's `UserData`
+  /// (`LastPlayedDate`/`PlayCount`).
+  ///
+  /// Semantics: played audio items only (`Filters=IsPlayed`), ordered
+  /// most-recent-first (`SortBy=DatePlayed`, `SortOrder=Descending`).
+  /// `/Users/{userId}/Items/Latest` is *not* used here: it returns recently
+  /// *added* media, not recently *played* media.
+  ///
+  /// Presentation-only transformations applied by callers: mapping each item
+  /// with the same [_trackFromJson] mapping as [fetchTracks] (so fields and
+  /// fallbacks match the library), and an optional [limit] cap. No local
+  /// history is maintained alongside this: callers must not duplicate
+  /// tracking or persist a second history copy.
+  Future<List<TracksCompanion>> fetchRecentlyPlayed(
+    JellyfinSession session, {
+    int limit = 100,
+  }) async {
+    final body = await _getJson(
+      session,
+      _uri(session, '/Users/${session.userId}/Items', {
+        'IncludeItemTypes': 'Audio',
+        'Recursive': 'true',
+        'Filters': 'IsPlayed',
+        'SortBy': 'DatePlayed',
+        'SortOrder': 'Descending',
+        'Limit': '$limit',
+        'Fields': 'Genres,Tags,DateCreated,UserData,AlbumId,ArtistItems,ImageTags,NormalizationGain',
+        'EnableUserData': 'true',
+      }),
+    );
+    final items = (body['Items'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    return items.map(_trackFromJson).toList(growable: false);
+  }
+
   Future<List<PlaylistsCompanion>> fetchPlaylists(
     JellyfinSession session,
   ) async {

@@ -11,6 +11,7 @@ import '../../services/playback/playback_service.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'history_list.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
 
@@ -117,7 +118,7 @@ class _ResponsivePanelSections extends StatelessWidget {
     PlayerPanel.history => _PanelSection(
       title: 'History',
       onClose: controller.toggleHistory,
-      child: _HistoryPanel(playback: playback),
+      child: const HistoryList(),
     ),
   };
 }
@@ -514,59 +515,6 @@ class _QueuePanel extends StatelessWidget {
   );
 }
 
-class _HistoryPanel extends StatelessWidget {
-  const _HistoryPanel({required this.playback});
-
-  final PlaybackService playback;
-
-  @override
-  Widget build(BuildContext context) {
-    final history = playback.history;
-    if (history.isEmpty) {
-      return const SpotifinEmptyState(
-        icon: Icons.history_rounded,
-        title: 'No history yet',
-        message: 'Tracks you finish will show up here.',
-      );
-    }
-    return Column(
-      children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: playback.clearHistory,
-              icon: const Icon(Icons.delete_outline_rounded, size: 16),
-              label: const Text('Clear'),
-              style: TextButton.styleFrom(
-                foregroundColor: SpotifinColors.textMuted,
-                visualDensity: VisualDensity.compact,
-                textStyle: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 112),
-            itemCount: history.length,
-            itemBuilder: (context, index) => _HistoryItem(
-              key: ValueKey('$index-${history[index].id}'),
-              track: history[index],
-              index: index,
-              playback: playback,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _QueueItem extends StatefulWidget {
   const _QueueItem({
     required this.track,
@@ -652,76 +600,6 @@ class _QueueItemState extends State<_QueueItem> {
         tooltip: 'Remove from queue',
         onPressed: () => widget.playback.removeAt(widget.index),
         icon: const Icon(Icons.close_rounded),
-      ),
-    ),
-  );
-}
-
-class _HistoryItem extends StatefulWidget {
-  const _HistoryItem({
-    required this.track,
-    required this.index,
-    required this.playback,
-    super.key,
-  });
-
-  final Track track;
-  final int index;
-  final PlaybackService playback;
-
-  @override
-  State<_HistoryItem> createState() => _HistoryItemState();
-}
-
-class _HistoryItemState extends State<_HistoryItem> {
-  var _hovered = false;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.click,
-    onEnter: (_) => setState(() => _hovered = true),
-    onExit: (_) => setState(() => _hovered = false),
-    child: ListTile(
-      hoverColor: SpotifinColors.hover,
-      onTap: () => widget.playback.playHistoryIndex(widget.index),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(SpotifinRadii.small),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Artwork(
-              itemId: widget.track.albumId ?? widget.track.id,
-              size: 44,
-              borderRadius: 0,
-            ),
-            AnimatedOpacity(
-              opacity: _hovered ? 1 : 0,
-              duration: const Duration(milliseconds: 120),
-              child: const ColoredBox(
-                color: Color(0x99000000),
-                child: SizedBox.square(
-                  dimension: 44,
-                  child: Icon(Icons.play_arrow_rounded, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      title: Text(
-        widget.track.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        widget.track.artist,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: const Icon(
-        Icons.history_rounded,
-        size: 18,
-        color: SpotifinColors.textMuted,
       ),
     ),
   );
