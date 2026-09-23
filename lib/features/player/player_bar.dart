@@ -132,8 +132,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
       final track = playback.currentTrack;
       if (track == null) return const SizedBox.shrink();
       final fullQueue = playback.queue;
-      // Mobile queue shows current first, then remaining upcoming tracks.
-      // Played entries stay in the full queue (desktop) and in history.
       final queue = playback.upcomingQueue;
       return DraggableScrollableSheet(
         expand: false,

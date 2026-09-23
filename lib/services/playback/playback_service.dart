@@ -110,11 +110,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   /// this service already sends.
   List<Track> get history => _history.items;
 
-  /// Mobile queue view: current track first, then remaining upcoming tracks.
+  /// Visible queue: current track first, then remaining upcoming tracks.
   ///
-  /// The underlying full [queue] is unchanged (desktop keeps showing it).
-  /// Played entries before [currentIndex] are hidden here; use [history] to
-  /// go back to them.
+  /// The underlying full [queue] is unchanged. Played entries before
+  /// [currentIndex] are hidden here; use [history] to go back to them.
   List<Track> get upcomingQueue =>
       MobileQueueView.upcoming(_queue, currentIndex);
 

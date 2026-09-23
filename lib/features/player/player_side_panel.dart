@@ -195,7 +195,7 @@ class _PanelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(SpotifinRadii.card),
-    child: ColoredBox(color: SpotifinColors.surface, child: child),
+    child: Material(color: SpotifinColors.surface, child: child),
   );
 }
 
@@ -497,22 +497,25 @@ class _QueuePanel extends StatelessWidget {
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => ReorderableListView.builder(
-    padding: const EdgeInsets.fromLTRB(8, 8, 8, 112),
-    buildDefaultDragHandles: false,
-    itemCount: playback.queue.length,
-    onReorderItem: playback.reorder,
-    itemBuilder: (context, index) {
-      final track = playback.queue[index];
-      return _QueueItem(
-        key: ValueKey('$index-${track.id}'),
-        track: track,
-        index: index,
-        selected: index == playback.currentIndex,
-        playback: playback,
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    final queue = playback.upcomingQueue;
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 112),
+      buildDefaultDragHandles: false,
+      itemCount: queue.length,
+      onReorderItem: playback.reorderUpcoming,
+      itemBuilder: (context, index) {
+        final track = queue[index];
+        return _QueueItem(
+          key: ValueKey('$index-${track.id}'),
+          track: track,
+          index: index,
+          selected: index == 0 && playback.currentIndex != null,
+          playback: playback,
+        );
+      },
+    );
+  }
 }
 
 class _QueueItem extends StatefulWidget {
@@ -546,7 +549,7 @@ class _QueueItemState extends State<_QueueItem> {
       selectedColor: SpotifinColors.accent,
       selectedTileColor: SpotifinColors.interactive,
       hoverColor: SpotifinColors.hover,
-      onTap: () => widget.playback.playQueueIndex(widget.index),
+      onTap: () => widget.playback.playUpcomingIndex(widget.index),
       leading: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -598,7 +601,7 @@ class _QueueItemState extends State<_QueueItem> {
       ),
       trailing: IconButton(
         tooltip: 'Remove from queue',
-        onPressed: () => widget.playback.removeAt(widget.index),
+        onPressed: () => widget.playback.removeUpcomingAt(widget.index),
         icon: const Icon(Icons.close_rounded),
       ),
     ),

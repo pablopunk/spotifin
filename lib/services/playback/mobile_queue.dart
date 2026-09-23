@@ -1,10 +1,8 @@
 /// Mobile queue view helpers.
 ///
-/// The full playback queue keeps every queued track (desktop shows the whole
-/// list with the current track highlighted). The mobile queue is a focused
-/// view on top of it: the currently playing track is always first, followed
-/// by the remaining upcoming tracks. Played tracks stay reachable through
-/// playback history, not by remaining in the mobile list.
+/// The full playback queue keeps every queued track. The visible queue is a
+/// focused view on top of it: the currently playing track is first, followed
+/// by the remaining upcoming tracks. Played tracks remain in playback history.
 class MobileQueueView {
   const MobileQueueView._();
 
