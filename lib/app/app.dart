@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/login_screen.dart';
 import '../features/car/car_bootstrap.dart';
+import '../features/car/carplay_shuffle.dart';
 import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
@@ -25,11 +26,13 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _shellController = ShellController();
+  late final CarPlayShuffle _carPlayShuffle;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _carPlayShuffle = CarPlayShuffle(ref.read(playbackProvider))..start();
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
     Future.microtask(() => initCarListeners(ref));
     Future.microtask(() => configurePlayLibraryShortcut(ref));
@@ -41,6 +44,7 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _carPlayShuffle.dispose();
     _shellController.dispose();
     super.dispose();
   }

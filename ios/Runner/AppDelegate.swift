@@ -1,5 +1,6 @@
 import Flutter
 import AVKit
+import CarPlay
 import UIKit
 
 @main
@@ -25,6 +26,32 @@ import UIKit
         binaryMessenger: registrar.messenger()
       )
       DeepLinkStore.attach(channel: channel)
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "SpotifinCarPlayShuffle"
+    ) {
+      let channel = FlutterMethodChannel(
+        name: "spotifin/carplay_shuffle",
+        binaryMessenger: registrar.messenger()
+      )
+      CarPlayShuffle.attach(channel: channel)
+    }
+  }
+}
+
+private enum CarPlayShuffle {
+  static func attach(channel: FlutterMethodChannel) {
+    let button = CPNowPlayingShuffleButton { _ in
+      channel.invokeMethod("toggleShuffle", arguments: nil)
+    }
+    CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "setShuffle", let enabled = call.arguments as? Bool else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      button.isSelected = enabled
+      result(nil)
     }
   }
 }
