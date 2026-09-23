@@ -50,6 +50,7 @@ class LibraryScreen extends ConsumerWidget {
                     title: 'Your library',
                     tracks: tracks,
                     kind: CollectionKind.library,
+                    sortAction: const LibrarySortAction(),
                     coverflowToggle: CoverflowHeaderToggle(
                       viewIds: [
                         for (final source in CoverflowSource.values)
@@ -111,31 +112,14 @@ class _TrackList extends ConsumerWidget {
         items: items,
         onCenterTap: (item) =>
             ref.read(playbackProvider).playTrack(item.tracks.single, sorted),
-        list: Column(
-          children: [
-            SortByDropdown<TrackSort>(
-              value: sort,
-              values: TrackSort.values,
-              labelOf: (option) => option.label,
-              tooltip: 'Sort songs',
-              onChanged: (option) {
-                if (option != null) {
-                  ref.read(libraryTrackSortProvider.notifier).set(option);
-                }
-              },
-            ),
-            Expanded(
-              child: ListView.builder(
-                key: const PageStorageKey('library-songs'),
-                padding: EdgeInsets.only(
-                  bottom: SpotifinChromeInsets.bottomOf(context),
-                ),
-                itemCount: sorted.length,
-                itemBuilder: (context, index) =>
-                    TrackTile(track: sorted[index], contextTracks: sorted),
-              ),
-            ),
-          ],
+        list: ListView.builder(
+          key: const PageStorageKey('library-songs'),
+          padding: EdgeInsets.only(
+            bottom: SpotifinChromeInsets.bottomOf(context),
+          ),
+          itemCount: sorted.length,
+          itemBuilder: (context, index) =>
+              TrackTile(track: sorted[index], contextTracks: sorted),
         ),
       ),
     );
@@ -167,22 +151,7 @@ class _AlbumList extends ConsumerWidget {
             : ref
                   .read(playbackProvider)
                   .replaceQueue(item.tracks, shuffle: false),
-        list: Column(
-          children: [
-            SortByDropdown<CollectionSort>(
-              value: sort,
-              values: CollectionSort.values,
-              labelOf: (option) => option.label,
-              tooltip: 'Sort albums',
-              onChanged: (option) {
-                if (option != null) {
-                  ref.read(libraryAlbumSortProvider.notifier).set(option);
-                }
-              },
-            ),
-            Expanded(child: _CollectionGrid(entries: entries)),
-          ],
-        ),
+        list: _CollectionGrid(entries: entries),
       ),
     );
   }
@@ -233,22 +202,7 @@ class _ArtistList extends ConsumerWidget {
             : ref
                   .read(playbackProvider)
                   .replaceQueue(item.tracks, shuffle: false),
-        list: Column(
-          children: [
-            SortByDropdown<CollectionSort>(
-              value: sort,
-              values: CollectionSort.values,
-              labelOf: (option) => option.label,
-              tooltip: 'Sort artists',
-              onChanged: (option) {
-                if (option != null) {
-                  ref.read(libraryArtistSortProvider.notifier).set(option);
-                }
-              },
-            ),
-            Expanded(child: _CollectionGrid(entries: entries, artist: true)),
-          ],
-        ),
+        list: _CollectionGrid(entries: entries, artist: true),
       ),
     );
   }
@@ -269,9 +223,11 @@ class _CollectionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) {
-      return const SpotifinEmptyState(
-        icon: Icons.library_music_outlined,
-        title: 'Nothing here yet',
+      return const SingleChildScrollView(
+        child: SpotifinEmptyState(
+          icon: Icons.library_music_outlined,
+          title: 'Nothing here yet',
+        ),
       );
     }
     return spotifinGrid(
@@ -352,9 +308,11 @@ class _ArtistAlbumsTab extends ConsumerWidget {
           sort,
         );
         if (albums.isEmpty) {
-          return const SpotifinEmptyState(
-            icon: Icons.library_music_outlined,
-            title: 'Nothing here yet',
+          return const SingleChildScrollView(
+            child: SpotifinEmptyState(
+              icon: Icons.library_music_outlined,
+              title: 'Nothing here yet',
+            ),
           );
         }
         final items = albumCoverflowItems(tracks);
@@ -514,10 +472,12 @@ class _PlaylistsTab extends ConsumerWidget {
         final stored = snapshot.data ?? const <Playlist>[];
         final byId = {for (final track in tracks) track.id: track};
         if (stored.isEmpty) {
-          return const SpotifinEmptyState(
-            icon: Icons.queue_music_rounded,
-            title: 'No playlists yet',
-            message: 'Save your current queue to create one.',
+          return const SingleChildScrollView(
+            child: SpotifinEmptyState(
+              icon: Icons.queue_music_rounded,
+              title: 'No playlists yet',
+              message: 'Save your current queue to create one.',
+            ),
           );
         }
         final tracksByPlaylistId = {
@@ -555,66 +515,47 @@ class _PlaylistsTab extends ConsumerWidget {
                 : ref
                       .read(playbackProvider)
                       .replaceQueue(item.tracks, shuffle: false),
-            list: Column(
-              children: [
-                SortByDropdown<CollectionSort>(
-                  value: sort,
-                  values: CollectionSort.values,
-                  labelOf: (option) => option.label,
-                  tooltip: 'Sort playlists',
-                  onChanged: (option) {
-                    if (option != null) {
-                      ref
-                          .read(libraryPlaylistSortProvider.notifier)
-                          .set(option);
-                    }
-                  },
-                ),
-                Expanded(
-                  child: spotifinGrid(
-                    itemCount: playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = playlists[index];
-                      final playlistTracks =
-                          tracksByPlaylistId[playlist.id] ?? const [];
-                      return PlaylistContextMenu(
-                        playlist: playlist,
+            list: spotifinGrid(
+              itemCount: playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = playlists[index];
+                final playlistTracks =
+                    tracksByPlaylistId[playlist.id] ?? const [];
+                return PlaylistContextMenu(
+                  playlist: playlist,
+                  tracks: playlistTracks,
+                  child: SpotifinCollectionCard(
+                    artwork: LayoutBuilder(
+                      builder: (context, constraints) => PlaylistArtwork(
                         tracks: playlistTracks,
-                        child: SpotifinCollectionCard(
-                          artwork: LayoutBuilder(
-                            builder: (context, constraints) => PlaylistArtwork(
-                              tracks: playlistTracks,
-                              size: constraints.biggest.shortestSide,
-                              borderRadius: SpotifinRadii.small,
-                            ),
-                          ),
+                        size: constraints.biggest.shortestSide,
+                        borderRadius: SpotifinRadii.small,
+                      ),
+                    ),
+                    title: playlist.name,
+                    subtitle: '${playlistTracks.length} songs',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => CollectionScreen(
                           title: playlist.name,
-                          subtitle: '${playlistTracks.length} songs',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => CollectionScreen(
-                                title: playlist.name,
-                                tracks: playlistTracks,
-                                kind: CollectionKind.playlist,
-                                artwork: PlaylistArtwork(
-                                  tracks: playlistTracks,
-                                  size: 160,
-                                  borderRadius: SpotifinRadii.card,
-                                ),
-                              ),
-                            ),
+                          tracks: playlistTracks,
+                          kind: CollectionKind.playlist,
+                          artwork: PlaylistArtwork(
+                            tracks: playlistTracks,
+                            size: 160,
+                            borderRadius: SpotifinRadii.card,
                           ),
-                          onPlay: playlistTracks.isEmpty
-                              ? null
-                              : () => ref
-                                    .read(playbackProvider)
-                                    .replaceQueue(playlistTracks),
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                    onPlay: playlistTracks.isEmpty
+                        ? null
+                        : () => ref
+                              .read(playbackProvider)
+                              .replaceQueue(playlistTracks),
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         );
@@ -980,12 +921,14 @@ class _CollectionHeader extends ConsumerWidget {
     required this.tracks,
     required this.kind,
     this.artwork,
+    this.sortAction,
     this.coverflowToggle,
   });
   final String title;
   final List<Track> tracks;
   final CollectionKind kind;
   final Widget? artwork;
+  final Widget? sortAction;
   final Widget? coverflowToggle;
 
   @override
@@ -1100,6 +1043,7 @@ class _CollectionHeader extends ConsumerWidget {
                         icon: const Icon(Icons.shuffle_rounded),
                       ),
                       CollectionDownloadButton(tracks: tracks),
+                      ?sortAction,
                       ?coverflowToggle,
                     ],
                   ),

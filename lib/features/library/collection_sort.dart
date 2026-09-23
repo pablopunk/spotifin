@@ -247,6 +247,167 @@ List<Playlist> sortPlaylists(
   return sorted;
 }
 
+/// Compact icon-based sort control for the library toolbar.
+///
+/// Sits alongside the Coverflow toggle and other toolbar actions, using the
+/// same [IconButton]-based sizing, spacing, color, and interaction states.
+/// The current option is marked with a check in the menu; sort behaviour and
+/// providers are unchanged.
+class SortMenuButton<T extends Enum> extends StatelessWidget {
+  const SortMenuButton({
+    required this.value,
+    required this.values,
+    required this.labelOf,
+    required this.onChanged,
+    this.tooltip = 'Sort by',
+    super.key,
+  });
+
+  final T value;
+  final List<T> values;
+  final String Function(T) labelOf;
+  final ValueChanged<T?> onChanged;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<T>(
+      icon: const Icon(Icons.sort_rounded),
+      iconColor: SpotifinColors.textMuted,
+      tooltip: tooltip,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final option in values)
+          PopupMenuItem<T>(
+            value: option,
+            child: Row(
+              children: [
+                if (option == value)
+                  const Icon(
+                    Icons.check_rounded,
+                    size: 18,
+                    color: SpotifinColors.accent,
+                  )
+                else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(labelOf(option), overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Tab-aware sort action for the top library toolbar.
+///
+/// Reads the surrounding DefaultTabController (same as the coverflow header
+/// toggle) so the menu always edits the sort of the visible
+/// library tab while living alongside the Coverflow control in the header.
+class LibrarySortAction extends StatelessWidget {
+  const LibrarySortAction({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = DefaultTabController.of(context);
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final index = controller.index.clamp(0, 3);
+        return switch (index) {
+          0 => const _LibraryTrackSortButton(),
+          1 => const _LibraryAlbumSortButton(),
+          2 => const _LibraryArtistSortButton(),
+          _ => const _LibraryPlaylistSortButton(),
+        };
+      },
+    );
+  }
+}
+
+class _LibraryTrackSortButton extends ConsumerWidget {
+  const _LibraryTrackSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(libraryTrackSortProvider);
+    return SortMenuButton<TrackSort>(
+      value: sort,
+      values: TrackSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort songs',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(libraryTrackSortProvider.notifier).set(option);
+        }
+      },
+    );
+  }
+}
+
+class _LibraryAlbumSortButton extends ConsumerWidget {
+  const _LibraryAlbumSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(libraryAlbumSortProvider);
+    return SortMenuButton<CollectionSort>(
+      value: sort,
+      values: CollectionSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort albums',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(libraryAlbumSortProvider.notifier).set(option);
+        }
+      },
+    );
+  }
+}
+
+class _LibraryArtistSortButton extends ConsumerWidget {
+  const _LibraryArtistSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(libraryArtistSortProvider);
+    return SortMenuButton<CollectionSort>(
+      value: sort,
+      values: CollectionSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort artists',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(libraryArtistSortProvider.notifier).set(option);
+        }
+      },
+    );
+  }
+}
+
+class _LibraryPlaylistSortButton extends ConsumerWidget {
+  const _LibraryPlaylistSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(libraryPlaylistSortProvider);
+    return SortMenuButton<CollectionSort>(
+      value: sort,
+      values: CollectionSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort playlists',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(libraryPlaylistSortProvider.notifier).set(option);
+        }
+      },
+    );
+  }
+}
+
 /// Compact "Sort by" dropdown used above collection grids and song lists.
 class SortByDropdown<T extends Enum> extends StatelessWidget {
   const SortByDropdown({
