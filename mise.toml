@@ -6,4 +6,4 @@ vercel = { version = "latest", allow_builds = ["esbuild"] }
 
 [tasks.dev]
 description = "Run the local web app with development auto-login"
-run = "flutter run -d chrome --web-hostname 0.0.0.0 --web-port 8080 --web-launch-url http://localhost:8080 --dart-define-from-file=.env"
+run = "flutter run -d chrome --dart-define-from-file=.env"
