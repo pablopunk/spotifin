@@ -8,6 +8,7 @@ import 'artist_links.dart';
 import 'artwork.dart';
 import 'context_menu.dart';
 import 'design_system.dart';
+import 'mobile_track_queue_actions.dart';
 
 class TrackTile extends ConsumerStatefulWidget {
   const TrackTile({
@@ -58,11 +59,14 @@ class _TrackTileState extends ConsumerState<TrackTile> {
         },
       ),
     );
-    return TrackContextMenu(
+    final trackWithMenu = TrackContextMenu(
       track: widget.track,
       contextTracks: widget.contextTracks,
       child: DraggableTrack(track: widget.track, child: tile),
     );
+    return MediaQuery.sizeOf(context).width < SpotifinBreakpoints.mobile
+        ? MobileTrackQueueActions(track: widget.track, child: trackWithMenu)
+        : trackWithMenu;
   }
 }
 
@@ -230,6 +234,16 @@ class TrackContextMenu extends ConsumerWidget {
       contextTracks,
       details.globalPosition,
     ),
+    onLongPressStart:
+        MediaQuery.sizeOf(context).width < SpotifinBreakpoints.mobile
+        ? (details) => _showTrackMenu(
+            context,
+            ref,
+            track,
+            contextTracks,
+            details.globalPosition,
+          )
+        : null,
     child: child,
   );
 }

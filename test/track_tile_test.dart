@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/track_tile.dart';
+import 'package:spotifin/features/common/mobile_track_queue_actions.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
 import 'package:spotifin/storage/database.dart';
 
@@ -267,6 +268,95 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => playback.addNextToQueue([track])).called(1);
+  });
+
+  testWidgets('phone hold opens the track menu', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = await makeDatabase();
+    final playback = _MockPlayback();
+    final track = makeTrack();
+    when(() => playback.addListener(any())).thenReturn(null);
+    when(() => playback.removeListener(any())).thenReturn(null);
+    when(() => playback.currentTrack).thenReturn(null);
+    when(() => playback.playing).thenReturn(false);
+    when(() => playback.addNextToQueue(any())).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          playbackProvider.overrideWithValue(playback),
+        ],
+        child: MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(
+              body: TrackTile(track: track, contextTracks: [track]),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(MobileTrackQueueActions), findsOneWidget);
+    await tester.longPress(find.text('Song'));
+    await tester.pumpAndSettle();
+    expect(find.text('Play next'), findsNWidgets(2));
+    expect(find.text('Add to queue'), findsNWidgets(2));
+    await tester.tap(find.text('Play next').last);
+    await tester.pumpAndSettle();
+    verify(() => playback.addNextToQueue([track])).called(1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('phone swipe right reveals both queue actions', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = await makeDatabase();
+    final playback = _MockPlayback();
+    final track = makeTrack();
+    when(() => playback.addListener(any())).thenReturn(null);
+    when(() => playback.removeListener(any())).thenReturn(null);
+    when(() => playback.currentTrack).thenReturn(null);
+    when(() => playback.playing).thenReturn(false);
+    when(() => playback.addNextToQueue(any())).thenAnswer((_) async {});
+    when(() => playback.addToQueue(any())).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          playbackProvider.overrideWithValue(playback),
+        ],
+        child: MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(
+              body: TrackTile(track: track, contextTracks: [track]),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(MobileTrackQueueActions), findsOneWidget);
+    await tester.drag(find.text('Song'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Play next'));
+    await tester.pumpAndSettle();
+    verify(() => playback.addNextToQueue([track])).called(1);
+
+    await tester.drag(find.text('Song'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to queue'));
+    await tester.pumpAndSettle();
+    verify(() => playback.addToQueue(track)).called(1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
   });
 
   testWidgets('inactive tile artwork starts that track', (tester) async {
