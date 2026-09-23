@@ -237,6 +237,46 @@ void main() {
     expect(find.text('First'), findsOneWidget);
   });
 
+  testWidgets('a long drag can traverse multiple covers', (tester) async {
+    // Cover Flow intentionally retains multi-item scrolling in a single
+    // gesture, unlike the mobile vertical player which is limited to one
+    // track per swipe.
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 600,
+              child: CoverflowStage(
+                items: trackCoverflowItems([
+                  for (var index = 0; index < 6; index++)
+                    _track('$index', 'Song $index'),
+                ]),
+                initialIndex: 0,
+                onCenterTap: (_) {},
+                onFocus: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Song 0'), findsOneWidget);
+
+    await tester.drag(find.byType(CoverflowStage), const Offset(-800, 0));
+    await tester.pumpAndSettle();
+
+    // A single long Cover Flow gesture moves more than one item.
+    expect(find.text('Song 0'), findsNothing);
+    expect(
+      find.text('Song 5'),
+      findsOneWidget,
+      reason: 'Cover Flow must keep multi-item navigation in one gesture',
+    );
+  });
+
   testWidgets('a new drag continues from an active settle animation', (
     tester,
   ) async {
