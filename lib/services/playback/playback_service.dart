@@ -86,6 +86,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   String? _playSessionId;
   int _lastReportedSecond = -1;
   int _lastSavedSecond = -1;
+  bool _castingActive = false;
   List<Track> _context = const [];
   int _contextStart = 0;
   int _contextEnd = 0;
@@ -101,6 +102,17 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   double get volume => _userVolume;
   Stream<double> get volumeStream => _volumeController.stream;
   List<Track> get queue => UnmodifiableListView(_queue);
+
+  /// Whether a Chromecast receiver currently owns playback.
+  ///
+  /// While true, local Jellyfin progress/playing reports are suppressed so
+  /// the receiver is the single reporting session. The local queue, history,
+  /// and saved position are left intact for resume on disconnect.
+  bool get isCastingActive => _castingActive;
+
+  void setCastingActive(bool active) {
+    _castingActive = active;
+  }
 
   /// Tracks played this session since the last server confirmation.
   ///
@@ -736,6 +748,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
     _playSessionId = playSessionId;
     _lastReportedSecond = -1;
+    if (_castingActive) return;
     unawaited(
       _serializeReport(() async {
         try {
@@ -834,6 +847,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final playSessionId = _playSessionId;
     final second = _player.position.inSeconds;
     if (session == null || trackId == null || playSessionId == null) return;
+    // While a Chromecast receiver owns playback, the receiver reports as its
+    // own Jellyfin session; the phone stays silent to avoid double sessions.
+    if (_castingActive) return;
     if (!force && second == _lastReportedSecond) return;
     _lastReportedSecond = second;
     try {

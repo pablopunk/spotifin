@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   auto_updater_windows
   flutter_secure_storage_windows
   media_kit_libs_windows_audio
+  permission_handler_windows
   url_launcher_windows
 )
 

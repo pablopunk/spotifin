@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../platform/airplay_control.dart';
 import '../../services/playback/playback_service.dart';
@@ -9,6 +11,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import 'cast_button.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
 import 'volume_scale.dart';
@@ -88,7 +91,7 @@ class DesktopPlayerBar extends StatelessWidget {
   }
 }
 
-class MobilePlayerBar extends StatelessWidget {
+class MobilePlayerBar extends ConsumerWidget {
   const MobilePlayerBar({
     required this.track,
     required this.playback,
@@ -107,80 +110,96 @@ class MobilePlayerBar extends StatelessWidget {
   final bool integrated;
 
   @override
-  Widget build(BuildContext context) {
-    final content = Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        onTap: onOpenPlayer,
-        child: SafeArea(
-          top: false,
-          bottom: !glass,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MobileProgress(playback: playback),
-              ListTile(
-                minTileHeight: 72,
-                leading: Artwork(
-                  itemId: track.albumId ?? track.id,
-                  size: 48,
-                  borderRadius: SpotifinRadii.small,
-                ),
-                title: Text(
-                  track.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                subtitle: Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: SpotifinColors.textMuted),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const RemoteDeviceButton(),
-                    IconButton(
-                      tooltip: 'Previous',
-                      onPressed: playback.previous,
-                      icon: const Icon(Icons.skip_previous_rounded),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        final casting = cast.isCasting;
+        final content = Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onOpenPlayer,
+            child: SafeArea(
+              top: false,
+              bottom: !glass,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MobileProgress(playback: playback),
+                  ListTile(
+                    minTileHeight: 72,
+                    leading: Artwork(
+                      itemId: track.albumId ?? track.id,
+                      size: 48,
+                      borderRadius: SpotifinRadii.small,
                     ),
-                    SpotifinPlayButton(
-                      onPressed: playback.toggle,
-                      playing: playback.playing,
+                    title: Text(
+                      casting
+                          ? (cast.remoteTrack?.name ?? track.name)
+                          : track.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    IconButton(
-                      tooltip: 'Next',
-                      onPressed: playback.next,
-                      icon: const Icon(Icons.skip_next_rounded),
+                    subtitle: Text(
+                      casting && cast.connectedDeviceName != null
+                          ? 'Casting to ${cast.connectedDeviceName} · ${cast.remoteTrack?.artist ?? track.artist}'
+                          : track.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: SpotifinColors.textMuted),
                     ),
-                  ],
-                ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CastButton(),
+                        const RemoteDeviceButton(),
+                        IconButton(
+                          tooltip: 'Previous',
+                          onPressed: casting
+                              ? cast.previous
+                              : playback.previous,
+                          icon: const Icon(Icons.skip_previous_rounded),
+                        ),
+                        SpotifinPlayButton(
+                          onPressed: casting ? cast.toggle : playback.toggle,
+                          playing: casting
+                              ? cast.remotePlaying
+                              : playback.playing,
+                        ),
+                        IconButton(
+                          tooltip: 'Next',
+                          onPressed: casting ? cast.next : playback.next,
+                          icon: const Icon(Icons.skip_next_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-    if (integrated) return content;
-    if (!glass) {
-      return Material(
-        color: SpotifinColors.surface,
-        elevation: 16,
-        shadowColor: Colors.black,
-        child: content,
-      );
-    }
-    return GlassContainer(
-      useOwnLayer: true,
-      quality: GlassQuality.premium,
-      settings: SpotifinGlass.settings(glassOpacity),
-      shape: const LiquidRoundedSuperellipse(borderRadius: 16),
-      clipBehavior: Clip.antiAlias,
-      child: content,
+        );
+        if (integrated) return content;
+        if (!glass) {
+          return Material(
+            color: SpotifinColors.surface,
+            elevation: 16,
+            shadowColor: Colors.black,
+            child: content,
+          );
+        }
+        return GlassContainer(
+          useOwnLayer: true,
+          quality: GlassQuality.premium,
+          settings: SpotifinGlass.settings(glassOpacity),
+          shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+          clipBehavior: Clip.antiAlias,
+          child: content,
+        );
+      },
     );
   }
 }
@@ -231,74 +250,97 @@ class _TrackSummary extends StatelessWidget {
   );
 }
 
-class _DesktopTransport extends StatelessWidget {
+class _DesktopTransport extends ConsumerWidget {
   const _DesktopTransport({required this.playback});
 
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      SizedBox(
-        height: 40,
-        child: Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        final casting = cast.isCasting;
+        return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _ToggleButton(
-              tooltip: 'Shuffle',
-              active: playback.shuffle,
-              onPressed: playback.toggleShuffle,
-              icon: Icons.shuffle_rounded,
+            SizedBox(
+              height: 40,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _ToggleButton(
+                    tooltip: casting
+                        ? 'Stop casting to change shuffle'
+                        : 'Shuffle',
+                    active: playback.shuffle,
+                    onPressed: casting ? () {} : playback.toggleShuffle,
+                    icon: Icons.shuffle_rounded,
+                  ),
+                  IconButton(
+                    tooltip: 'Previous',
+                    onPressed: casting ? cast.previous : playback.previous,
+                    icon: const Icon(Icons.skip_previous_rounded),
+                  ),
+                  _CastAwarePlayButton(playback: playback),
+                  IconButton(
+                    tooltip: 'Next',
+                    onPressed: casting ? cast.next : playback.next,
+                    icon: const Icon(Icons.skip_next_rounded),
+                  ),
+                  _ToggleButton(
+                    tooltip: casting
+                        ? 'Stop casting to change repeat'
+                        : 'Repeat',
+                    active: playback.loopMode != LoopMode.off,
+                    onPressed: casting ? () {} : playback.cycleRepeat,
+                    icon: playback.loopMode == LoopMode.one
+                        ? Icons.repeat_one_rounded
+                        : Icons.repeat_rounded,
+                  ),
+                ],
+              ),
             ),
-            IconButton(
-              tooltip: 'Previous',
-              onPressed: playback.previous,
-              icon: const Icon(Icons.skip_previous_rounded),
-            ),
-            _PlayButton(playback: playback),
-            IconButton(
-              tooltip: 'Next',
-              onPressed: playback.next,
-              icon: const Icon(Icons.skip_next_rounded),
-            ),
-            _ToggleButton(
-              tooltip: 'Repeat',
-              active: playback.loopMode != LoopMode.off,
-              onPressed: playback.cycleRepeat,
-              icon: playback.loopMode == LoopMode.one
-                  ? Icons.repeat_one_rounded
-                  : Icons.repeat_rounded,
-            ),
+            _ProgressSlider(playback: playback),
           ],
-        ),
-      ),
-      _ProgressSlider(playback: playback),
-    ],
-  );
+        );
+      },
+    );
+  }
 }
 
-class _PlayButton extends StatelessWidget {
-  const _PlayButton({required this.playback});
+class _CastAwarePlayButton extends ConsumerWidget {
+  const _CastAwarePlayButton({required this.playback});
 
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => IconButton.filled(
-    tooltip: playback.playing ? 'Pause' : 'Play',
-    style: IconButton.styleFrom(
-      backgroundColor: SpotifinColors.text,
-      foregroundColor: Colors.black,
-      minimumSize: const Size.square(32),
-      maximumSize: const Size.square(32),
-      padding: EdgeInsets.zero,
-    ),
-    onPressed: playback.toggle,
-    icon: Icon(
-      playback.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-      size: 22,
-    ),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        final casting = cast.isCasting;
+        final playing = casting ? cast.remotePlaying : playback.playing;
+        return IconButton.filled(
+          tooltip: playing ? 'Pause' : 'Play',
+          style: IconButton.styleFrom(
+            backgroundColor: SpotifinColors.text,
+            foregroundColor: Colors.black,
+            minimumSize: const Size.square(32),
+            maximumSize: const Size.square(32),
+            padding: EdgeInsets.zero,
+          ),
+          onPressed: casting ? cast.toggle : playback.toggle,
+          icon: Icon(
+            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            size: 22,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ToggleButton extends StatelessWidget {
@@ -323,44 +365,95 @@ class _ToggleButton extends StatelessWidget {
   );
 }
 
-class _ProgressSlider extends StatelessWidget {
+class _ProgressSlider extends ConsumerWidget {
   const _ProgressSlider({required this.playback});
 
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<Duration>(
-    stream: playback.player.positionStream,
-    builder: (context, snapshot) {
-      final position = snapshot.data ?? Duration.zero;
-      final duration = playback.player.duration ?? Duration.zero;
-      final maximum = duration.inMilliseconds.toDouble().clamp(
-        1.0,
-        double.infinity,
-      );
-      return Row(
-        children: [
-          _TimeLabel(position),
-          Expanded(
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 4,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        if (cast.isCasting) {
+          final position = cast.remotePosition;
+          final duration = cast.remoteDuration ?? Duration.zero;
+          final maximum = duration.inMilliseconds.toDouble().clamp(
+            1.0,
+            double.infinity,
+          );
+          return Row(
+            children: [
+              _TimeLabel(position),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 5,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 12,
+                    ),
+                  ),
+                  child: Slider(
+                    value: position.inMilliseconds.toDouble().clamp(
+                      0.0,
+                      maximum,
+                    ),
+                    max: maximum,
+                    onChanged: (value) =>
+                        cast.seek(Duration(milliseconds: value.round())),
+                  ),
+                ),
               ),
-              child: Slider(
-                value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
-                max: maximum,
-                onChanged: (value) =>
-                    playback.seek(Duration(milliseconds: value.round())),
-              ),
-            ),
-          ),
-          _TimeLabel(duration),
-        ],
-      );
-    },
-  );
+              _TimeLabel(duration),
+            ],
+          );
+        }
+        return StreamBuilder<Duration>(
+          stream: playback.player.positionStream,
+          builder: (context, snapshot) {
+            final position = snapshot.data ?? Duration.zero;
+            final duration = playback.player.duration ?? Duration.zero;
+            final maximum = duration.inMilliseconds.toDouble().clamp(
+              1.0,
+              double.infinity,
+            );
+            return Row(
+              children: [
+                _TimeLabel(position),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 5,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
+                    ),
+                    child: Slider(
+                      value: position.inMilliseconds.toDouble().clamp(
+                        0.0,
+                        maximum,
+                      ),
+                      max: maximum,
+                      onChanged: (value) =>
+                          playback.seek(Duration(milliseconds: value.round())),
+                    ),
+                  ),
+                ),
+                _TimeLabel(duration),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 class _TimeLabel extends StatelessWidget {
@@ -380,7 +473,7 @@ class _TimeLabel extends StatelessWidget {
   );
 }
 
-class _DesktopUtilities extends StatelessWidget {
+class _DesktopUtilities extends ConsumerWidget {
   const _DesktopUtilities({
     required this.playback,
     required this.onOpenQueue,
@@ -392,55 +485,87 @@ class _DesktopUtilities extends StatelessWidget {
   final VoidCallback onOpenLyrics;
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const RemoteDeviceButton(),
-      IconButton(
-        tooltip: 'Lyrics',
-        onPressed: onOpenLyrics,
-        icon: const Icon(Icons.lyrics_outlined, size: 19),
-      ),
-      IconButton(
-        tooltip: 'Queue',
-        onPressed: onOpenQueue,
-        icon: const Icon(Icons.queue_music_rounded, size: 20),
-      ),
-      const SizedBox(width: SpotifinSpacing.sm),
-      if (AirPlayControl.isSupported) const AirPlayControl(),
-      const Icon(Icons.volume_up_rounded, size: 20),
-      SizedBox(
-        width: 144,
-        child: StreamBuilder<double>(
-          stream: playback.volumeStream,
-          initialData: playback.volume,
-          builder: (context, snapshot) => Slider(
-            value: sliderFromVolume(snapshot.data ?? 1),
-            onChanged: (position) =>
-                playback.setVolume(volumeFromSlider(position)),
-          ),
-        ),
-      ),
-    ],
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        final casting = cast.isCasting;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CastButton(),
+            const RemoteDeviceButton(),
+            IconButton(
+              tooltip: 'Lyrics',
+              onPressed: onOpenLyrics,
+              icon: const Icon(Icons.lyrics_outlined, size: 19),
+            ),
+            IconButton(
+              tooltip: 'Queue',
+              onPressed: onOpenQueue,
+              icon: const Icon(Icons.queue_music_rounded, size: 20),
+            ),
+            const SizedBox(width: SpotifinSpacing.sm),
+            if (AirPlayControl.isSupported) const AirPlayControl(),
+            const Icon(Icons.volume_up_rounded, size: 20),
+            SizedBox(
+              width: 144,
+              child: casting
+                  ? Slider(
+                      value: cast.remoteVolume.clamp(0.0, 1.0),
+                      onChanged: (value) => cast.setVolume(value),
+                    )
+                  : StreamBuilder<double>(
+                      stream: playback.volumeStream,
+                      initialData: playback.volume,
+                      builder: (context, snapshot) => Slider(
+                        value: sliderFromVolume(snapshot.data ?? 1),
+                        onChanged: (position) =>
+                            playback.setVolume(volumeFromSlider(position)),
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
-class _MobileProgress extends StatelessWidget {
+class _MobileProgress extends ConsumerWidget {
   const _MobileProgress({required this.playback});
 
   final PlaybackService playback;
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<Duration>(
-    stream: playback.player.positionStream,
-    builder: (context, snapshot) {
-      final maximum = playback.player.duration?.inMilliseconds.toDouble() ?? 1;
-      return LinearProgressIndicator(
-        value: (snapshot.data?.inMilliseconds ?? 0).clamp(0, maximum) / maximum,
-        minHeight: 2,
-      );
-    },
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cast = ref.watch(castControllerProvider);
+    return ListenableBuilder(
+      listenable: cast,
+      builder: (context, _) {
+        if (cast.isCasting) {
+          final duration = cast.remoteDuration?.inMilliseconds.toDouble() ?? 1;
+          final value =
+              cast.remotePosition.inMilliseconds.clamp(0, duration) / duration;
+          return LinearProgressIndicator(value: value, minHeight: 2);
+        }
+        return StreamBuilder<Duration>(
+          stream: playback.player.positionStream,
+          builder: (context, snapshot) {
+            final maximum =
+                playback.player.duration?.inMilliseconds.toDouble() ?? 1;
+            return LinearProgressIndicator(
+              value:
+                  (snapshot.data?.inMilliseconds ?? 0).clamp(0, maximum) /
+                  maximum,
+              minHeight: 2,
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 String _formatTime(Duration value) {

@@ -11,6 +11,10 @@ import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/remote_session_service.dart';
+import '../services/cast/cast_controller.dart';
+import '../services/cast/chrome_cast_sender.dart';
+import '../services/cast/jellyfin_cast_adapter.dart';
+import '../services/cast/playback_service_cast_source.dart';
 import '../services/updates/update_controller.dart';
 import '../services/updates/update_service.dart';
 import '../features/car/car_controller.dart';
@@ -128,6 +132,16 @@ final remoteSessionProvider = Provider<RemoteSessionService>((ref) {
   );
   ref.onDispose(service.dispose);
   return service;
+});
+
+final castControllerProvider = Provider<CastController>((ref) {
+  final controller = CastController(
+    playback: PlaybackServiceCastSource(ref.watch(playbackProvider)),
+    adapter: JellyfinCastAdapter(ref.watch(jellyfinClientProvider)),
+    sender: ChromeCastSender(),
+  );
+  ref.onDispose(controller.dispose);
+  return controller;
 });
 
 final appControllerProvider = NotifierProvider<AppController, AppState>(

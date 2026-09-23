@@ -167,6 +167,9 @@ class AppController extends Notifier<AppState> {
             smallStreaming: smallStreaming,
             normalization: normalization,
           );
+      try {
+        ref.read(castControllerProvider).configure(session);
+      } catch (_) {}
       ref.read(carControllerProvider.notifier).setSignedIn(true);
       final cached = await ref.read(databaseProvider).allTracks();
       if (cached.isEmpty) return;
@@ -194,6 +197,9 @@ class AppController extends Notifier<AppState> {
             smallStreaming: state.smallStreaming,
             normalization: state.normalization,
           );
+      try {
+        ref.read(castControllerProvider).configure(session);
+      } catch (_) {}
       _sessionGeneration++;
       _remoteAccountId = null;
       state = state.copyWith(
@@ -285,6 +291,9 @@ class AppController extends Notifier<AppState> {
         _remoteAccountId = accountId;
         unawaited(ref.read(remoteSessionProvider).configure(session));
       }
+      try {
+        ref.read(castControllerProvider).configure(session);
+      } catch (_) {}
       final syncedAt = DateTime.now();
       _refreshRetryAttempt = 0;
       final preferences = await SharedPreferences.getInstance();
@@ -448,6 +457,9 @@ class AppController extends Notifier<AppState> {
     _remoteAccountId = null;
     final session = state.session;
     await ref.read(remoteSessionProvider).clear();
+    try {
+      ref.read(castControllerProvider).configure(null);
+    } catch (_) {}
     if (session != null) {
       try {
         await ref.read(jellyfinClientProvider).logout(session);
@@ -492,6 +504,9 @@ class AppController extends Notifier<AppState> {
     _remoteAccountId = null;
     await ref.read(downloadProvider).suspend();
     await ref.read(remoteSessionProvider).clear();
+    try {
+      ref.read(castControllerProvider).configure(null);
+    } catch (_) {}
     await ref.read(playbackProvider).clear();
     await ref.read(sessionStoreProvider).clear();
     ref.read(carControllerProvider.notifier).setSignedIn(false);
