@@ -171,6 +171,7 @@ class TrackTileContent extends StatelessWidget {
 enum _TrackAction {
   favorite,
   playlist,
+  playNext,
   queue,
   download,
   removeDownload,
@@ -279,6 +280,14 @@ List<PopupMenuEntry<_TrackAction>> _trackMenuItems(
   ),
   const PopupMenuItem(
     height: 40,
+    value: _TrackAction.playNext,
+    child: SpotifinMenuLabel(
+      icon: Icons.queue_play_next_rounded,
+      label: 'Play next',
+    ),
+  ),
+  const PopupMenuItem(
+    height: 40,
     value: _TrackAction.queue,
     child: SpotifinMenuLabel(
       icon: Icons.playlist_add_rounded,
@@ -344,6 +353,8 @@ Future<void> _handleTrackAction(
         .toggleFavorite(track.id, !track.favorite);
   } else if (action == _TrackAction.queue) {
     await ref.read(playbackProvider).addToQueue(track);
+  } else if (action == _TrackAction.playNext) {
+    await ref.read(playbackProvider).addNextToQueue([track]);
   } else if (action == _TrackAction.download) {
     final app = ref.read(appControllerProvider);
     if (app.session != null) {

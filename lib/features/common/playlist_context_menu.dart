@@ -35,6 +35,14 @@ class PlaylistContextMenu extends ConsumerWidget {
     ),
     PopupMenuItem(
       height: 40,
+      value: _PlaylistAction.playNext,
+      child: SpotifinMenuLabel(
+        icon: Icons.queue_play_next_rounded,
+        label: 'Play next',
+      ),
+    ),
+    PopupMenuItem(
+      height: 40,
       value: _PlaylistAction.queue,
       child: SpotifinMenuLabel(
         icon: Icons.playlist_add_rounded,
@@ -82,6 +90,8 @@ class PlaylistContextMenu extends ConsumerWidget {
     switch (action) {
       case _PlaylistAction.play:
         await ref.read(playbackProvider).replaceQueue(tracks);
+      case _PlaylistAction.playNext:
+        await ref.read(playbackProvider).addNextToQueue(tracks);
       case _PlaylistAction.queue:
         for (final track in tracks) {
           await ref.read(playbackProvider).addToQueue(track);
@@ -104,4 +114,4 @@ class PlaylistContextMenu extends ConsumerWidget {
   }
 }
 
-enum _PlaylistAction { play, queue, download, rename, remove }
+enum _PlaylistAction { play, playNext, queue, download, rename, remove }

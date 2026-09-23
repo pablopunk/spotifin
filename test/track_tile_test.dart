@@ -200,6 +200,7 @@ void main() {
     await tester.tap(find.byTooltip('More options'));
     await tester.pumpAndSettle();
     expect(find.text('Favorite'), findsOneWidget);
+    expect(find.text('Play next'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(database.close);
   });
@@ -239,6 +240,33 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
+  });
+
+  testWidgets('track menu queues the selected track next', (tester) async {
+    final playback = _MockPlayback();
+    final track = makeTrack();
+    when(() => playback.addNextToQueue(any())).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [playbackProvider.overrideWithValue(playback)],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TrackMenuButton(
+              track: track,
+              contextTracks: [track],
+              downloadStatus: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Play next'));
+    await tester.pumpAndSettle();
+
+    verify(() => playback.addNextToQueue([track])).called(1);
   });
 
   testWidgets('inactive tile artwork starts that track', (tester) async {

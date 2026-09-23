@@ -34,6 +34,14 @@ class AlbumContextMenu extends ConsumerWidget {
     ),
     PopupMenuItem(
       height: 40,
+      value: 'playNext',
+      child: SpotifinMenuLabel(
+        icon: Icons.queue_play_next_rounded,
+        label: 'Play next',
+      ),
+    ),
+    PopupMenuItem(
+      height: 40,
       value: 'queue',
       child: SpotifinMenuLabel(
         icon: Icons.playlist_add_rounded,
@@ -72,6 +80,8 @@ class AlbumContextMenu extends ConsumerWidget {
     if (action == null || !context.mounted) return;
     if (action == 'play') {
       await ref.read(playbackProvider).replaceQueue(tracks);
+    } else if (action == 'playNext') {
+      await ref.read(playbackProvider).addNextToQueue(tracks);
     } else if (action == 'queue') {
       for (final track in tracks) {
         await ref.read(playbackProvider).addToQueue(track);
