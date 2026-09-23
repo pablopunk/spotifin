@@ -36,6 +36,15 @@ import UIKit
       )
       CarPlayShuffle.attach(channel: channel)
     }
+    if let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "SpotifinCarPlayUpNext"
+    ) {
+      let channel = FlutterMethodChannel(
+        name: "spotifin/carplay_up_next",
+        binaryMessenger: registrar.messenger()
+      )
+      CarPlayUpNext.attach(channel: channel)
+    }
   }
 }
 
@@ -53,6 +62,35 @@ private enum CarPlayShuffle {
       button.isSelected = enabled
       result(nil)
     }
+  }
+}
+
+private final class CarPlayUpNext: NSObject, CPNowPlayingTemplateObserver {
+  private let channel: FlutterMethodChannel
+  private static var observer: CarPlayUpNext?
+
+  private init(channel: FlutterMethodChannel) {
+    self.channel = channel
+  }
+
+  static func attach(channel: FlutterMethodChannel) {
+    if let observer { CPNowPlayingTemplate.shared.remove(observer) }
+    let observer = CarPlayUpNext(channel: channel)
+    self.observer = observer
+    CPNowPlayingTemplate.shared.upNextTitle = "Up Next"
+    CPNowPlayingTemplate.shared.add(observer)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "setUpNextEnabled", let enabled = call.arguments as? Bool else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      CPNowPlayingTemplate.shared.isUpNextButtonEnabled = enabled
+      result(nil)
+    }
+  }
+
+  func nowPlayingTemplateUpNextButtonTapped(_ nowPlayingTemplate: CPNowPlayingTemplate) {
+    channel.invokeMethod("showUpNext", arguments: nil)
   }
 }
 
