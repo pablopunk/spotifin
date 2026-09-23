@@ -131,7 +131,10 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
       final playback = widget.playback;
       final track = playback.currentTrack;
       if (track == null) return const SizedBox.shrink();
-      final queue = playback.queue;
+      final fullQueue = playback.queue;
+      // Mobile queue shows current first, then remaining upcoming tracks.
+      // Played entries stay in the full queue (desktop) and in history.
+      final queue = playback.upcomingQueue;
       return DraggableScrollableSheet(
         expand: false,
         initialChildSize: .92,
@@ -167,7 +170,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                             builder: (context, constraints) => SizedBox(
                               height: constraints.maxWidth.clamp(0, 420),
                               child: PlayerArtworkCarousel(
-                                tracks: queue,
+                                tracks: fullQueue,
                                 currentIndex: playback.currentIndex,
                                 onTrackChanged: playback.playQueueIndex,
                               ),
@@ -326,7 +329,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                     ),
                     sliver: SliverReorderableList(
                       itemCount: queue.length,
-                      onReorderItem: playback.reorder,
+                      onReorderItem: playback.reorderUpcoming,
                       itemBuilder: (context, index) {
                         final item = queue[index];
                         return ReorderableDelayedDragStartListener(
@@ -335,11 +338,12 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                           child: ListTile(
                             contentPadding: EdgeInsets.zero,
                             horizontalTitleGap: SpotifinSpacing.sm,
-                            selected: index == playback.currentIndex,
+                            selected:
+                                playback.currentIndex != null && index == 0,
                             selectedTileColor: SpotifinColors.interactive,
                             selectedColor: SpotifinColors.accent,
                             hoverColor: SpotifinColors.hover,
-                            onTap: () => playback.playQueueIndex(index),
+                            onTap: () => playback.playUpcomingIndex(index),
                             leading: Artwork(
                               itemId: item.albumId ?? item.id,
                               size: 42,
@@ -362,7 +366,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                 width: 40,
                                 height: 40,
                               ),
-                              onPressed: () => playback.removeAt(index),
+                              onPressed: () => playback.removeUpcomingAt(index),
                               icon: const Icon(Icons.close_rounded),
                             ),
                           ),

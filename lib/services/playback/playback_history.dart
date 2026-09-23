@@ -24,6 +24,38 @@ class PlaybackHistory {
 
   bool get isEmpty => _items.isEmpty;
 
+  /// Most recently played track, or null when history is empty.
+  Track? get mostRecent => isEmpty ? null : _items.first;
+
+  /// Removes and returns the most recently played track.
+  ///
+  /// Returns null when history is empty. Used by Back/Previous navigation so
+  /// returning to a played track does not leave it duplicated in history.
+  Track? takeFirst() => isEmpty ? null : _items.removeAt(0);
+
+  bool containsId(String id) => _items.any((track) => track.id == id);
+
+  /// Removes history entries down to and including the first occurrence of
+  /// [id] (most-recent-first). No-op when [id] is absent.
+  ///
+  /// Used when playback jumps back to a track that is already in history:
+  /// that track becomes current again, and every entry up to it stops being
+  /// history because those tracks are current or upcoming now.
+  void removeUpToId(String id) {
+    final index = _items.indexWhere((track) => track.id == id);
+    if (index >= 0) _items.removeRange(0, index + 1);
+  }
+
+  /// Removes history entries through [index] (inclusive, most-recent-first).
+  ///
+  /// Used when playing a history entry directly: entries up to the tapped
+  /// one become current/upcoming and must not linger as history.
+  void removeThrough(int index) {
+    if (index < 0 || _items.isEmpty) return;
+    final end = (index + 1).clamp(0, _items.length);
+    _items.removeRange(0, end);
+  }
+
   void record(Track track) {
     _items.insert(0, track);
     if (_items.length > limit) {
