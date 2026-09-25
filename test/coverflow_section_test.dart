@@ -237,6 +237,50 @@ void main() {
     expect(find.text('First'), findsOneWidget);
   });
 
+  testWidgets(
+    'discs keep their artwork elements when their stack order changes',
+    (tester) async {
+      final items = trackCoverflowItems([
+        _track('0', 'Zero'),
+        _track('1', 'One'),
+        _track('2', 'Two'),
+      ]);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: CoverflowStage(items: items, onCenterTap: (_) {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final discs = {
+        for (final item in items)
+          item.id: tester.element(find.byKey(ValueKey('cover:${item.id}'))),
+      };
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(CoverflowStage)),
+      );
+      await gesture.moveBy(const Offset(-250, 0));
+      await tester.pump();
+
+      for (final item in items) {
+        expect(
+          tester.element(find.byKey(ValueKey('cover:${item.id}'))),
+          same(discs[item.id]),
+        );
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('a long drag can traverse multiple covers', (tester) async {
     // Cover Flow intentionally retains multi-item scrolling in a single
     // gesture, unlike the mobile vertical player which is limited to one

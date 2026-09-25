@@ -76,86 +76,60 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
           constraints.maxWidth * (wide ? .55 : .64),
         );
         final neighborSize = constraints.maxWidth * .28;
-        final currentTrack = widget.tracks[_lastSyncedIndex];
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context)
-                    .copyWith(dragDevices: _dragDevices),
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _handleScrollNotification,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    physics: _SingleStepPageScrollPhysics(anchor: _swipeAnchor),
-                    clipBehavior: Clip.none,
-                    itemCount: widget.tracks.length,
-                    pageSnapping: true,
-                    padEnds: true,
-                    onPageChanged: _handlePageChanged,
-                    itemBuilder: (context, index) {
-                      final track = widget.tracks[index];
-                      return AnimatedBuilder(
-                        animation: _pageController,
-                        builder: (context, child) {
-                          final page = _pageController.hasClients
-                              ? _pageController.page
-                              : null;
-                          final delta = page == null
-                              ? (index == _lastSyncedIndex ? 0.0 : 1.0)
-                              : (page - index).abs().clamp(0.0, 1.0).toDouble();
-                          final size =
-                              currentSize -
-                              delta * (currentSize - neighborSize);
-                          return OverflowBox(
-                            minWidth: 0,
-                            minHeight: 0,
-                            maxWidth: currentSize,
-                            maxHeight: currentSize,
-                            child: Opacity(
-                              opacity: 1.0 - delta * _neighborFade,
-                              child: SizedBox.square(
-                                dimension: size,
-                                child: FittedBox(
-                                  fit: BoxFit.contain,
-                                  child: child,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        child: Semantics(
-                          image: true,
-                          label: 'Artwork for ${track.name}',
-                          child: Artwork(
-                            key: ValueKey(track.id),
-                            itemId: track.albumId ?? track.id,
-                            size: currentSize,
-                            borderRadius: SpotifinRadii.card,
-                          ),
+        return ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context)
+              .copyWith(dragDevices: _dragDevices),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: PageView.builder(
+              controller: _pageController,
+              physics: _SingleStepPageScrollPhysics(anchor: _swipeAnchor),
+              clipBehavior: Clip.none,
+              itemCount: widget.tracks.length,
+              pageSnapping: true,
+              padEnds: true,
+              onPageChanged: _handlePageChanged,
+              itemBuilder: (context, index) {
+                final track = widget.tracks[index];
+                return AnimatedBuilder(
+                  animation: _pageController,
+                  builder: (context, child) {
+                    final page = _pageController.hasClients
+                        ? _pageController.page
+                        : null;
+                    final delta = page == null
+                        ? (index == _lastSyncedIndex ? 0.0 : 1.0)
+                        : (page - index).abs().clamp(0.0, 1.0).toDouble();
+                    final size =
+                        currentSize - delta * (currentSize - neighborSize);
+                    return OverflowBox(
+                      minWidth: 0,
+                      minHeight: 0,
+                      maxWidth: currentSize,
+                      maxHeight: currentSize,
+                      child: Opacity(
+                        opacity: 1.0 - delta * _neighborFade,
+                        child: SizedBox.square(
+                          dimension: size,
+                          child: FittedBox(fit: BoxFit.contain, child: child),
                         ),
-                      );
-                    },
+                      ),
+                    );
+                  },
+                  child: Semantics(
+                    image: true,
+                    label: 'Artwork for ${track.name}',
+                    child: Artwork(
+                      key: ValueKey(track.id),
+                      itemId: track.albumId ?? track.id,
+                      size: currentSize,
+                      borderRadius: SpotifinRadii.card,
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
-            IgnorePointer(
-              child: Center(
-                child: Semantics(
-                  image: true,
-                  label: 'Artwork for ${currentTrack.name}',
-                  child: Artwork(
-                    key: ValueKey('foreground-${currentTrack.id}'),
-                    itemId: currentTrack.albumId ?? currentTrack.id,
-                    size: currentSize,
-                    borderRadius: SpotifinRadii.card,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         );
       },
     );

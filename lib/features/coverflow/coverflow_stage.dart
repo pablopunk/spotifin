@@ -111,6 +111,7 @@ class _CoverflowStageState extends State<CoverflowStage>
                         children: [
                           for (final index in visible)
                             Positioned.fill(
+                              key: ValueKey(widget.items[index].id),
                               child: _Cover(
                                 item: widget.items[index],
                                 coverSize: coverSize,

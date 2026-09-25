@@ -147,6 +147,42 @@ void main() {
     expect(current.width, greaterThan(next.width));
   });
 
+  testWidgets('a swipe does not replace artwork with a fixed foreground', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 390,
+              child: PlayerArtworkCarousel(
+                tracks: [_track('one'), _track('two'), _track('three')],
+                currentIndex: 1,
+                onTrackChanged: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final currentArt = tester.element(find.byKey(const ValueKey('two')));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(PageView)),
+    );
+    await gesture.moveBy(const Offset(-60, 0));
+    await tester.pump();
+
+    expect(tester.element(find.byKey(const ValueKey('two'))), same(currentArt));
+    expect(find.byKey(const ValueKey('foreground-two')), findsNothing);
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a long drag advances only one track', (tester) async {
     final tracks = [
       _track('zero'),
