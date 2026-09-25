@@ -288,8 +288,8 @@ class _NowCasting extends StatelessWidget {
                 const Icon(Icons.volume_up_rounded, size: 20),
               ],
             ),
-            Wrap(
-              spacing: SpotifinSpacing.sm,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 OutlinedButton.icon(
                   onPressed: controller.busy
@@ -298,6 +298,7 @@ class _NowCasting extends StatelessWidget {
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: const Text('Reconnect'),
                 ),
+                const SizedBox(height: SpotifinSpacing.sm),
                 FilledButton.icon(
                   onPressed: controller.busy
                       ? null

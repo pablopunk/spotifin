@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'cast_device.dart';
 import 'cast_media.dart';
 
@@ -93,6 +95,7 @@ abstract interface class CastSender {
 /// Google Cast sender SDKs ship for iOS and Android only. Other platforms
 /// (Linux/macOS/Windows/web) keep local playback and show guidance.
 bool get isCastPlatformSupported {
+  if (kIsWeb) return false;
   if (Platform.isIOS || Platform.isAndroid) return true;
   return false;
 }

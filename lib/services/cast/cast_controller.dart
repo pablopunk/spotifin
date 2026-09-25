@@ -225,6 +225,7 @@ class CastController extends ChangeNotifier {
     }
     await initialize();
     await _sender.connect(device);
+    await _waitForConnection();
     _connection = _sender.connectionState;
     _connectedDevice = _sender.connectedDevice ?? device;
     _lastDevice = device;
@@ -237,6 +238,17 @@ class CastController extends ChangeNotifier {
       await _castCurrentNow();
     }
   });
+
+  Future<void> _waitForConnection() async {
+    if (_sender.connectionState == CastConnectionState.connected) return;
+    try {
+      await _sender.connectionStateStream
+          .firstWhere((state) => state == CastConnectionState.connected)
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw const CastException('Chromecast did not finish connecting.');
+    }
+  }
 
   /// Hands the current track to Chromecast at the current position.
   ///
@@ -434,6 +446,7 @@ class CastController extends ChangeNotifier {
     }
     await initialize();
     await _sender.connect(device);
+    await _waitForConnection();
     _connection = _sender.connectionState;
     _connectedDevice = _sender.connectedDevice ?? device;
     await _loadWithFallback(
@@ -458,9 +471,7 @@ class CastController extends ChangeNotifier {
     final playing = _remote.isPlaying;
     final index = _remoteIndex;
     final hadRemote = _remoteTrack != null;
-    try {
-      await _sender.disconnect(stopReceiver: false);
-    } catch (_) {}
+    await _sender.disconnect(stopReceiver: true);
     _connection = CastConnectionState.disconnected;
     _connectedDevice = null;
     _casting = false;

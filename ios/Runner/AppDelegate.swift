@@ -45,6 +45,11 @@ import UIKit
       )
       CarPlayUpNext.attach(channel: channel)
     }
+    if let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "SpotifinCastVolume"
+    ) {
+      CastVolumeBridge.attach(messenger: registrar.messenger())
+    }
   }
 }
 

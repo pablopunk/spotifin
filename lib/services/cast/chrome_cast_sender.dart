@@ -47,6 +47,7 @@ class ChromeCastSender implements CastSender {
   StreamSubscription<GoogleCastSession?>? _sessionSub;
   StreamSubscription<GoggleCastMediaStatus?>? _mediaSub;
   StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<dynamic>? _volumeSub;
 
   @override
   List<CastDevice> get devices => _devices;
@@ -132,13 +133,20 @@ class ChromeCastSender implements CastSender {
               session?.connectionState ??
               GoogleCastSessionManager.instance.connectionState;
           _applyConnection(state, session?.device);
+          if (session != null) _updateVolume(session.currentDeviceVolume);
         });
+    if (Platform.isIOS) {
+      _volumeSub ??= const EventChannel('spotifin/cast_volume')
+          .receiveBroadcastStream()
+          .listen((volume) {
+            if (volume is num) _updateVolume(volume.toDouble());
+          });
+    }
     _mediaSub ??= GoogleCastRemoteMediaClient.instance.mediaStatusStream.listen(
       (status) {
         if (status == null) return;
         _remote = _remote.copyWith(
           playerState: _mapPlayer(status.playerState),
-          volume: status.volume.toDouble().clamp(0.0, 1.0),
           duration: status.mediaInformation?.duration,
         );
         if (!_remoteController.isClosed) _remoteController.add(_remote);
@@ -156,6 +164,11 @@ class ChromeCastSender implements CastSender {
         GoogleCastSessionManager.instance.currentSession?.device,
       );
     } catch (_) {}
+  }
+
+  void _updateVolume(double volume) {
+    _remote = _remote.copyWith(volume: volume.clamp(0.0, 1.0));
+    if (!_remoteController.isClosed) _remoteController.add(_remote);
   }
 
   void _applyConnection(
@@ -265,16 +278,17 @@ class ChromeCastSender implements CastSender {
       return;
     }
     try {
-      if (stopReceiver) {
-        await GoogleCastSessionManager.instance.endSessionAndStopCasting();
-      } else {
-        await GoogleCastSessionManager.instance.endSession();
+      final ended = stopReceiver
+          ? await GoogleCastSessionManager.instance.endSessionAndStopCasting()
+          : await GoogleCastSessionManager.instance.endSession();
+      if (!ended && GoogleCastSessionManager.instance.hasConnectedSession) {
+        throw const CastException('Could not stop Chromecast playback.');
       }
     } catch (error) {
+      if (error is CastException) rethrow;
       throw CastException(_friendly(error));
-    } finally {
-      _applyConnection(GoogleCastConnectState.disconnected, null);
     }
+    _applyConnection(GoogleCastConnectState.disconnected, null);
   }
 
   @override
@@ -421,6 +435,7 @@ class ChromeCastSender implements CastSender {
     _sessionSub?.cancel();
     _mediaSub?.cancel();
     _positionSub?.cancel();
+    _volumeSub?.cancel();
     _devicesController.close();
     _connectionController.close();
     _remoteController.close();

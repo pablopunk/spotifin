@@ -58,6 +58,9 @@ class FakeSender implements CastSender {
   CastRemoteState _remote = const CastRemoteState();
   String? initializedAppId;
   int failLoadCount = 0;
+  bool delayConnection = false;
+  bool? stoppedReceiver;
+  bool failDisconnect = false;
   final loads = <CastTrackPayload>[];
   final loadPositions = <Duration>[];
   final calls = <String>[];
@@ -118,6 +121,11 @@ class FakeSender implements CastSender {
   Future<void> connect(CastDevice device) async {
     calls.add('connect:${device.id}');
     _connectedDevice = device;
+    if (delayConnection) {
+      _connection = CastConnectionState.connecting;
+      connectionController.add(_connection);
+      return;
+    }
     _connection = CastConnectionState.connected;
     connectionController.add(_connection);
   }
@@ -125,6 +133,8 @@ class FakeSender implements CastSender {
   @override
   Future<void> disconnect({bool stopReceiver = false}) async {
     calls.add('disconnect');
+    stoppedReceiver = stopReceiver;
+    if (failDisconnect) throw const CastException('Could not stop receiver.');
     _connectedDevice = null;
     _connection = CastConnectionState.disconnected;
     _remote = const CastRemoteState();
@@ -326,6 +336,57 @@ void main() {
     expect(payload.contentUrl.toString(), isNot(contains('password')));
   });
 
+  test('waits for the receiver before handing off playback', () async {
+    final playback = FakePlayback(queue: [track('a')]);
+    final sender = FakeSender(devices: [livingRoom])..delayConnection = true;
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    final connecting = cast.connect(livingRoom);
+    await pump();
+    expect(cast.connectionState, CastConnectionState.connecting);
+    expect(sender.loads, isEmpty);
+    expect(playback.stopForCastCalls, 0);
+
+    sender.emitConnection(CastConnectionState.connected, livingRoom);
+    await connecting;
+    expect(cast.isCasting, isTrue);
+    expect(sender.loads, hasLength(1));
+    expect(playback.stopForCastCalls, 1);
+  });
+
+  test('follows receiver volume instead of starting at full volume', () async {
+    final playback = FakePlayback(queue: [track('a')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    sender.emitRemote(const CastRemoteState(volume: 0.3));
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    expect(cast.remoteVolume, 0.3);
+
+    sender.emitRemote(const CastRemoteState(volume: 0.6));
+    await pump();
+    expect(cast.remoteVolume, 0.6);
+  });
+
+  test('does not resume local playback if stopping receiver fails', () async {
+    final playback = FakePlayback(queue: [track('a')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    sender.failDisconnect = true;
+    await expectLater(cast.disconnect(), throwsA(isA<CastException>()));
+    expect(cast.isCasting, isTrue);
+    expect(playback.playCalls, 0);
+    expect(sender.stoppedReceiver, isTrue);
+  });
+
   test('transport controls drive the receiver', () async {
     final playback = FakePlayback(
       queue: [track('a'), track('b'), track('c')],
@@ -456,6 +517,7 @@ void main() {
     // Disconnect resumes the untouched local queue where remote left off.
     await cast.disconnect();
     await pump();
+    expect(sender.stoppedReceiver, isTrue);
     expect(cast.isCasting, isFalse);
     expect(playback.castingActive, isFalse);
     expect(playback.playIndexCalls, [1]);
