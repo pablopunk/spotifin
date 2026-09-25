@@ -39,6 +39,7 @@ dependencies:
   http: ^1.6.0
   drift: ^2.35.0
   drift_flutter: ^0.3.1
+  sqlite3: ^3.6.0
   sqlite3_flutter_libs: ^0.6.0+eol
   flutter_secure_storage: ^11.1.0
   shared_preferences: ^2.5.5
@@ -77,6 +78,16 @@ dev_dependencies:
   mocktail: ^1.0.5
   flutter_launcher_icons: ^0.14.4
   image: ^4.9.2
+
+# Use the OS-bundled SQLite on iOS so `flutter build ios` does not try to
+# download a prebuilt libsqlite3 dylib from GitHub inside the Xcode sandbox
+# (no network there). All other platforms keep the default bundled binaries.
+hooks:
+  user_defines:
+    sqlite3:
+      source:
+        ios: system
+        default: sqlite3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
