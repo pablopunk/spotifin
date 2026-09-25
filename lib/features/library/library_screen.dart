@@ -332,30 +332,13 @@ class _ArtistAlbumsTab extends ConsumerWidget {
                 : ref
                       .read(playbackProvider)
                       .replaceQueue(item.tracks, shuffle: false),
-            list: Column(
-              children: [
-                SortByDropdown<ArtistAlbumSort>(
-                  value: sort,
-                  values: ArtistAlbumSort.values,
-                  labelOf: (option) => option.label,
-                  tooltip: 'Sort artist albums',
-                  onChanged: (option) {
-                    if (option != null) {
-                      ref.read(artistAlbumsSortProvider.notifier).set(option);
-                    }
-                  },
-                ),
-                Expanded(
-                  child: spotifinGrid(
-                    itemCount: albums.length,
-                    itemBuilder: (context, index) => _CollectionCard(
-                      title: albums[index].name,
-                      tracks: albums[index].tracks,
-                      menu: true,
-                    ),
-                  ),
-                ),
-              ],
+            list: spotifinGrid(
+              itemCount: albums.length,
+              itemBuilder: (context, index) => _CollectionCard(
+                title: albums[index].name,
+                tracks: albums[index].tracks,
+                menu: true,
+              ),
             ),
           ),
         );
@@ -722,22 +705,12 @@ class CollectionScreen extends ConsumerWidget {
         : null;
     final trackSort = ref.watch(collectionTrackSortProvider);
     final sortedTracks = sortTracks(tracks, trackSort);
-    final sortControl = SortByDropdown<TrackSort>(
-      value: trackSort,
-      values: TrackSort.values,
-      labelOf: (option) => option.label,
-      tooltip: 'Sort collection songs',
-      onChanged: (option) {
-        if (option != null) {
-          ref.read(collectionTrackSortProvider.notifier).set(option);
-        }
-      },
-    );
     final header = _CollectionHeader(
       title: title,
       tracks: tracks,
       kind: kind,
       artwork: artwork,
+      sortAction: CollectionSortAction(artistTabs: kind.hasArtistTabs),
       coverflowToggle: kind.hasArtistTabs
           ? CoverflowHeaderToggle(
               viewIds: [
@@ -806,7 +779,6 @@ class CollectionScreen extends ConsumerWidget {
                   child: CustomScrollView(
                     slivers: [
                       SliverToBoxAdapter(child: header),
-                      SliverToBoxAdapter(child: sortControl),
                       SliverList.builder(
                         itemCount: sortedTracks.length,
                         itemBuilder: (context, index) => TrackTile(
@@ -861,7 +833,6 @@ class CollectionScreen extends ConsumerWidget {
                       .playTrack(item.tracks.single, sortedTracks),
                   list: Column(
                     children: [
-                      sortControl,
                       Expanded(
                         child: ListView.builder(
                           key: const PageStorageKey('artist-songs'),
@@ -1020,31 +991,46 @@ class _CollectionHeader extends ConsumerWidget {
                     ),
                   ],
                   const SizedBox(height: SpotifinSpacing.md),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: SpotifinSpacing.sm,
-                    runSpacing: SpotifinSpacing.sm,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SpotifinPlayButton(
-                        onPressed: tracks.isEmpty
-                            ? null
-                            : () =>
-                                  playback.replaceQueue(tracks, shuffle: false),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SpotifinPlayButton(
+                            onPressed: tracks.isEmpty
+                                ? null
+                                : () => playback.replaceQueue(
+                                    tracks,
+                                    shuffle: false,
+                                  ),
+                          ),
+                          const SizedBox(width: SpotifinSpacing.sm),
+                          IconButton(
+                            tooltip: 'Shuffle',
+                            color: playback.shuffle
+                                ? SpotifinColors.accent
+                                : SpotifinColors.textMuted,
+                            onPressed: tracks.isEmpty
+                                ? null
+                                : () => playback.replaceQueue(
+                                    tracks,
+                                    shuffle: true,
+                                  ),
+                            icon: const Icon(Icons.shuffle_rounded),
+                          ),
+                          if (coverflowToggle != null) ...[
+                            const SizedBox(width: SpotifinSpacing.sm),
+                            coverflowToggle!,
+                          ],
+                          if (sortAction != null) ...[
+                            const SizedBox(width: SpotifinSpacing.sm),
+                            sortAction!,
+                          ],
+                        ],
                       ),
-                      IconButton(
-                        tooltip: 'Shuffle',
-                        color: playback.shuffle
-                            ? SpotifinColors.accent
-                            : SpotifinColors.textMuted,
-                        onPressed: tracks.isEmpty
-                            ? null
-                            : () =>
-                                  playback.replaceQueue(tracks, shuffle: true),
-                        icon: const Icon(Icons.shuffle_rounded),
-                      ),
+                      const SizedBox(height: SpotifinSpacing.sm),
                       CollectionDownloadButton(tracks: tracks),
-                      ?sortAction,
-                      ?coverflowToggle,
                     ],
                   ),
                 ],

@@ -9,6 +9,7 @@ import 'package:spotifin/app/theme.dart';
 import 'package:spotifin/features/common/artwork.dart';
 import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/common/playlist_artwork.dart';
+import 'package:spotifin/features/library/collection_sort.dart';
 import 'package:spotifin/features/library/library_screen.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
 import 'package:spotifin/storage/database.dart';
@@ -246,6 +247,81 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PlaylistArtwork), findsOneWidget);
+    await _dispose(tester, tracks.database);
+  });
+
+  testWidgets('playlist order is an icon beside the other header controls', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final tracks = await _tracks();
+    await tester.pumpWidget(
+      _app(
+        CollectionScreen(
+          title: 'Mix',
+          kind: CollectionKind.playlist,
+          tracks: tracks.list,
+        ),
+        tracks.database,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final playY = tester.getCenter(find.byType(SpotifinPlayButton)).dy;
+    expect(tester.getCenter(find.byTooltip('Shuffle')).dy, playY);
+    expect(tester.getCenter(find.byTooltip('Sort collection songs')).dy, playY);
+    final controls = find
+        .ancestor(
+          of: find.byTooltip('Sort collection songs'),
+          matching: find.byType(Row),
+        )
+        .first;
+    expect(
+      tester
+          .getCenter(
+            find.descendant(
+              of: controls,
+              matching: find.byTooltip('Coverflow'),
+            ),
+          )
+          .dy,
+      playY,
+    );
+    expect(find.text('Sort by'), findsNothing);
+
+    await tester.tap(find.byTooltip('Sort collection songs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Title A–Z').last);
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CollectionScreen)),
+    );
+    expect(container.read(collectionTrackSortProvider), TrackSort.nameAsc);
+    await _dispose(tester, tracks.database);
+  });
+
+  testWidgets('artist order icon follows the selected tab', (tester) async {
+    final tracks = await _tracks();
+    await tester.pumpWidget(
+      _app(
+        CollectionScreen(
+          title: 'Artist',
+          kind: CollectionKind.artist,
+          tracks: tracks.list,
+        ),
+        tracks.database,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Sort collection songs'), findsOneWidget);
+    await tester.tap(find.widgetWithText(Tab, 'Albums'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Sort artist albums'), findsOneWidget);
+    expect(find.byTooltip('Sort collection songs'), findsNothing);
+    expect(find.text('Sort by'), findsNothing);
+
     await _dispose(tester, tracks.database);
   });
 

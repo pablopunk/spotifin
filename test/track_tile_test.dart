@@ -359,6 +359,70 @@ void main() {
     await tester.runAsync(database.close);
   });
 
+  testWidgets('opening another phone track closes the prior queue actions', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = await makeDatabase();
+    final playback = _MockPlayback();
+    final first = makeTrack();
+    final second = first.copyWith(id: 'second', name: 'Other song');
+    when(() => playback.addListener(any())).thenReturn(null);
+    when(() => playback.removeListener(any())).thenReturn(null);
+    when(() => playback.currentTrack).thenReturn(null);
+    when(() => playback.playing).thenReturn(false);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          playbackProvider.overrideWithValue(playback),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(
+              body: Column(
+                children: [
+                  TrackTile(track: first, contextTracks: [first, second]),
+                  TrackTile(track: second, contextTracks: [first, second]),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    double offsetFor(String name) {
+      final tile = find.ancestor(
+        of: find.text(name),
+        matching: find.byType(MobileTrackQueueActions),
+      );
+      final container = tester.widget<AnimatedContainer>(
+        find.descendant(of: tile, matching: find.byType(AnimatedContainer)),
+      );
+      return container.transform!.storage[12];
+    }
+
+    await tester.drag(find.text('Song'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+    expect(offsetFor('Song'), 160);
+    expect(offsetFor('Other song'), 0);
+
+    await tester.drag(find.text('Other song'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+    expect(offsetFor('Song'), 0);
+    expect(offsetFor('Other song'), 160);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+
   testWidgets('inactive tile artwork starts that track', (tester) async {
     final database = await makeDatabase();
     final playback = _MockPlayback();

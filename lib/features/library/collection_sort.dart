@@ -408,72 +408,60 @@ class _LibraryPlaylistSortButton extends ConsumerWidget {
   }
 }
 
-/// Compact "Sort by" dropdown used above collection grids and song lists.
-class SortByDropdown<T extends Enum> extends StatelessWidget {
-  const SortByDropdown({
-    required this.value,
-    required this.values,
-    required this.labelOf,
-    required this.onChanged,
-    this.tooltip = 'Sort by',
-    super.key,
-  });
+class CollectionSortAction extends StatelessWidget {
+  const CollectionSortAction({required this.artistTabs, super.key});
 
-  final T value;
-  final List<T> values;
-  final String Function(T) labelOf;
-  final ValueChanged<T?> onChanged;
-  final String tooltip;
+  final bool artistTabs;
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = Theme.of(context).textTheme.bodySmall
-        ?.copyWith(color: SpotifinColors.textMuted);
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.sort_rounded,
-              size: 18,
-              color: SpotifinColors.textMuted,
-            ),
-            const SizedBox(width: 8),
-            Text('Sort by', style: textStyle),
-            const SizedBox(width: 8),
-            Flexible(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
-                child: Tooltip(
-                  message: tooltip,
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<T>(
-                      value: value,
-                      isDense: true,
-                      isExpanded: true,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      items: [
-                        for (final option in values)
-                          DropdownMenuItem<T>(
-                            value: option,
-                            child: Text(
-                              labelOf(option),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: onChanged,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    if (!artistTabs) return const _CollectionTrackSortButton();
+    final controller = DefaultTabController.of(context);
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => controller.index == 0
+          ? const _CollectionTrackSortButton()
+          : const _ArtistAlbumSortButton(),
+    );
+  }
+}
+
+class _CollectionTrackSortButton extends ConsumerWidget {
+  const _CollectionTrackSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(collectionTrackSortProvider);
+    return SortMenuButton<TrackSort>(
+      value: sort,
+      values: TrackSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort collection songs',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(collectionTrackSortProvider.notifier).set(option);
+        }
+      },
+    );
+  }
+}
+
+class _ArtistAlbumSortButton extends ConsumerWidget {
+  const _ArtistAlbumSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(artistAlbumsSortProvider);
+    return SortMenuButton<ArtistAlbumSort>(
+      value: sort,
+      values: ArtistAlbumSort.values,
+      labelOf: (option) => option.label,
+      tooltip: 'Sort artist albums',
+      onChanged: (option) {
+        if (option != null) {
+          ref.read(artistAlbumsSortProvider.notifier).set(option);
+        }
+      },
     );
   }
 }

@@ -320,17 +320,17 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          const Row(
+                          Row(
                             children: [
-                              Spacer(),
+                              const Spacer(),
                               if (AirPlayControl.isSupported) ...[
-                                AirPlayControl(),
-                                SizedBox(width: SpotifinSpacing.sm),
+                                const AirPlayControl(),
+                                const SizedBox(width: SpotifinSpacing.sm),
                               ],
-                              CastButton(),
-                              SizedBox(width: SpotifinSpacing.sm),
-                              RemoteDeviceButton(),
-                              Spacer(),
+                              const CastButton(),
+                              const SizedBox(width: SpotifinSpacing.sm),
+                              const RemoteDeviceButton(),
+                              const Spacer(),
                             ],
                           ),
                           const SizedBox(height: 18),

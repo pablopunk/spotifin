@@ -64,6 +64,8 @@ void main() {
   testWidgets('library shows the library header above its tabs', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     await database.upsertTracks([
       TracksCompanion.insert(
@@ -95,6 +97,17 @@ void main() {
       find.widgetWithIcon(IconButton, Icons.shuffle_rounded),
     );
     expect(shuffle.onPressed, isNotNull);
+
+    final playY = tester.getCenter(find.byType(SpotifinPlayButton)).dy;
+    final shuffleY = tester
+        .getCenter(find.widgetWithIcon(IconButton, Icons.shuffle_rounded))
+        .dy;
+    final sortY = tester.getCenter(find.byTooltip('Sort songs')).dy;
+    final coverflowY = tester.getCenter(find.byTooltip('Coverflow')).dy;
+    expect(shuffleY, playY);
+    expect(sortY, playY);
+    expect(coverflowY, playY);
+    expect(tester.getCenter(find.text('Download all')).dy, greaterThan(playY));
 
     for (final label in ['Songs', 'Albums', 'Artists', 'Playlists']) {
       expect(find.widgetWithText(Tab, label), findsOneWidget);
