@@ -20,7 +20,18 @@ import 'queue_item_identity.dart';
 import 'remote_playback.dart';
 
 class PlaybackService extends ChangeNotifier implements RemotePlayback {
-  PlaybackService(this._client, this._downloads) {
+  PlaybackService(
+    this._client,
+    this._downloads, {
+    AudioPlayer? player,
+    PlaybackStateStore? stateStore,
+    Future<void> Function()? configureAudioSession,
+    math.Random? random,
+  }) : _player = player ?? AudioPlayer(),
+       _stateStore = stateStore ?? PlaybackStateStore(),
+       _configureAudioSession =
+           configureAudioSession ?? _defaultConfigureAudioSession,
+       _random = random ?? math.Random() {
     _subscriptions.add(
       _player.playerStateStream.listen((playerState) {
         if (playerState.processingState == ProcessingState.completed) {
@@ -60,8 +71,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   final JellyfinClient _client;
   final DownloadService _downloads;
-  final PlaybackStateStore _stateStore = PlaybackStateStore();
-  final AudioPlayer _player = AudioPlayer();
+  final PlaybackStateStore _stateStore;
+  final AudioPlayer _player;
+  final Future<void> Function() _configureAudioSession;
   final QueueItemIdentity _queueItemIdentity = QueueItemIdentity();
   final StreamController<double> _volumeController =
       StreamController<double>.broadcast();
@@ -91,7 +103,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   int _contextStart = 0;
   int _contextEnd = 0;
   bool _extendingQueue = false;
-  final math.Random _random = math.Random();
+  final math.Random _random;
 
   static const _initialQueueSize = 100;
   static const _queueLookBehind = 20;
@@ -156,10 +168,14 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _session = session;
     _smallStreaming = smallStreaming;
     _normalization = normalization;
-    final audioSession = await AudioSession.instance;
-    await audioSession.configure(const AudioSessionConfiguration.music());
+    await _configureAudioSession();
     final track = currentTrack;
     if (track != null) await _applyGain(track);
+  }
+
+  static Future<void> _defaultConfigureAudioSession() async {
+    final audioSession = await AudioSession.instance;
+    await audioSession.configure(const AudioSessionConfiguration.music());
   }
 
   Future<void> replaceQueue(
