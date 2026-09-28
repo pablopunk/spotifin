@@ -14,7 +14,9 @@ class CarTemplateCoordinator {
   CarTemplateCoordinator({
     required Future<void> Function(CarState state) render,
     void Function(Object error)? onError,
+    // ignore: prefer_initializing_formals
   }) : _render = render,
+       // ignore: prefer_initializing_formals
        _onError = onError;
 
   final Future<void> Function(CarState state) _render;

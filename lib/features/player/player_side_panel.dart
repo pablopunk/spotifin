@@ -8,7 +8,6 @@ import '../../app/state/player_panel_controller.dart';
 import '../../app/theme.dart';
 import '../../services/lyrics/lyric_line.dart';
 import '../../services/playback/active_playback.dart';
-import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';

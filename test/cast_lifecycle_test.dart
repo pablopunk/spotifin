@@ -211,14 +211,12 @@ class LifecycleSender implements CastSender {
 }
 
 class _FakePlayback implements CastPlaybackSource {
-  _FakePlayback({required List<Track> queue, int index = 0})
-    : _queue = List.of(queue),
-      _index = index;
+  _FakePlayback({required List<Track> queue}) : _queue = List.of(queue);
 
-  List<Track> _queue;
-  int _index;
-  Duration _position = const Duration(seconds: 12);
-  bool _playing = true;
+  final List<Track> _queue;
+  final int _index = 0;
+  final Duration _position = const Duration(seconds: 12);
+  final bool _playing = true;
   bool castingActive = false;
   final restoredSnapshots = <PlaybackSnapshot>[];
   int reportCalls = 0;

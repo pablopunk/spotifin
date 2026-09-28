@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
 
 import '../../services/playback/active_playback.dart';
-import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 
 class CarPlayUpNext {

@@ -5,7 +5,6 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../app/theme.dart';
 import '../../platform/airplay_control.dart';
 import '../../services/playback/active_playback.dart';
-import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';

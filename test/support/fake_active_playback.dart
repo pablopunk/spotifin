@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:spotifin/services/playback/active_playback.dart';
-import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
 /// Notifying fake [ActivePlayback] for widget and routing tests.

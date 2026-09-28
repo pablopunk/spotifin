@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/playback/active_playback.dart';
-import '../../services/playback/active_playback_state.dart';
 
 class CarPlayShuffle {
   CarPlayShuffle(this.active, {MethodChannel? channel, bool? enabled})

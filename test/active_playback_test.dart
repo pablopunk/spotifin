@@ -9,7 +9,6 @@ import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_sender.dart';
 import 'package:spotifin/services/playback/active_playback.dart';
-import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
 import 'support/playback_harness.dart';

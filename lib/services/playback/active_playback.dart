@@ -33,9 +33,13 @@ class PlaybackActionUnavailable implements Exception {
 /// starts discovery or native audio; the owner keeps only its own
 /// listeners and subscriptions and never disposes the borrowed adapters.
 class ActivePlayback extends ChangeNotifier {
-  ActivePlayback({required PlaybackService local, required CastController cast})
-    : _local = local,
-      _cast = cast {
+  ActivePlayback({
+    required PlaybackService local,
+    required CastController cast,
+    // ignore: prefer_initializing_formals
+  }) : _local = local,
+       // ignore: prefer_initializing_formals
+       _cast = cast {
     _localPosition = _local.player.position;
     _remotePosition = _cast.remotePosition;
     _local.addListener(_rebuild);
