@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../services/downtify/downtify_models.dart';
+import '../../services/downtify/import_policy.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 
@@ -131,16 +132,8 @@ class _ImportAction extends ConsumerWidget {
         icon: Icon(Icons.check_circle_rounded),
       );
     }
-    final active =
-        item != null &&
-        const {
-          'submitting',
-          'queued',
-          'downloading',
-          'requestingScan',
-          'waitingForJellyfin',
-          'scanDenied',
-        }.contains(item!.status);
+    final status = item == null ? null : parseImportStatus(item!.status);
+    final active = status != null && isImportActive(status);
     if (active) {
       return SizedBox.square(
         dimension: 38,
@@ -155,9 +148,7 @@ class _ImportAction extends ConsumerWidget {
         ),
       );
     }
-    final failed =
-        item != null &&
-        const {'downloadFailed', 'importTimedOut'}.contains(item!.status);
+    final failed = status != null && canRetryImport(status);
     return IconButton(
       tooltip: failed ? 'Retry server import' : 'Add to Jellyfin library',
       onPressed: () => failed

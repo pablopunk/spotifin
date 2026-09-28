@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../app/state/downtify_controller.dart';
 import '../../services/downtify/downtify_models.dart';
+import '../../services/downtify/import_policy.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import 'external_track_tile.dart';
@@ -22,26 +22,33 @@ class DowntifySettingsScreen extends ConsumerStatefulWidget {
 class _DowntifySettingsScreenState
     extends ConsumerState<DowntifySettingsScreen> {
   final _serverController = TextEditingController();
+  final _searchController = SearchController();
   bool _seededAddress = false;
   bool _saving = false;
-  bool _searching = false;
-  int _searchGeneration = 0;
-  Timer? _searchTimer;
-  List<DowntifySong> _results = const [];
 
   @override
   void dispose() {
-    _searchTimer?.cancel();
     _serverController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(downtifyControllerProvider);
-    final downloadQueue = state.imports.where(_isDownloadQueueItem).toList();
+    // Clear the query view whenever configuration or account identity
+    // changes underneath the search.
+    ref.listen(
+      downtifyControllerProvider.select((value) => value.searchNonce),
+      (_, _) {
+        if (_searchController.text.isNotEmpty) _searchController.clear();
+      },
+    );
+    final downloadQueue = state.imports
+        .where((item) => isDownloadQueueRow(parseImportStatus(item.status)))
+        .toList();
     final libraryImports = state.imports
-        .where((item) => !_isDownloadQueueItem(item))
+        .where((item) => !isDownloadQueueRow(parseImportStatus(item.status)))
         .toList();
     if (!_seededAddress && state.serverUrl != null) {
       _seededAddress = true;
@@ -127,17 +134,20 @@ class _DowntifySettingsScreenState
                 Padding(
                   padding: const EdgeInsets.all(SpotifinSpacing.md),
                   child: SearchBar(
+                    controller: _searchController,
                     hintText: 'Search YouTube Music',
                     leading: const Icon(Icons.search_rounded),
-                    onChanged: _search,
+                    onChanged: (value) => ref
+                        .read(downtifyControllerProvider.notifier)
+                        .search(value),
                   ),
                 ),
-                if (_searching)
+                if (state.searching)
                   const Padding(
                     padding: EdgeInsets.all(SpotifinSpacing.md),
                     child: LinearProgressIndicator(),
                   ),
-                for (final song in _results) ExternalTrackTile(song: song),
+                for (final song in state.results) ExternalTrackTile(song: song),
               ],
             ),
             if (downloadQueue.isNotEmpty)
@@ -175,40 +185,6 @@ class _DowntifySettingsScreenState
       if (mounted) setState(() => _saving = false);
     }
   }
-
-  void _search(String value) {
-    _searchTimer?.cancel();
-    final query = value.trim();
-    final generation = ++_searchGeneration;
-    if (query.length < 2) {
-      setState(() {
-        _searching = false;
-        _results = const [];
-      });
-      return;
-    }
-    setState(() => _searching = true);
-    _searchTimer = Timer(const Duration(milliseconds: 300), () async {
-      try {
-        final serverUrl = ref.read(downtifyControllerProvider).serverUrl;
-        if (serverUrl == null) return;
-        final results = await ref
-            .read(downtifyClientProvider)
-            .search(serverUrl, query);
-        if (!mounted || generation != _searchGeneration) return;
-        setState(() {
-          _searching = false;
-          _results = results;
-        });
-      } catch (_) {
-        if (!mounted || generation != _searchGeneration) return;
-        setState(() {
-          _searching = false;
-          _results = const [];
-        });
-      }
-    });
-  }
 }
 
 class _ImportTile extends ConsumerWidget {
@@ -222,19 +198,27 @@ class _ImportTile extends ConsumerWidget {
     final song = DowntifySong.fromJson(
       jsonDecode(item.songJson) as Map<String, dynamic>,
     );
-    final failed = const {
-      'downloadFailed',
-      'importTimedOut',
-    }.contains(item.status);
+    final status = parseImportStatus(item.status);
+    final origin = ref.watch(
+      downtifyControllerProvider.select((state) => state.serverUrl),
+    );
+    // Imports from another origin stay stored and visible with their
+    // original source, marked paused: no automatic or manual work runs on
+    // them until that original URL is selected again.
+    final foreign = origin != null && item.downtifyUrl != origin;
     return ListTile(
       leading: Icon(_importIcon(item.status)),
       title: Text(song.name),
-      subtitle: Text(_importLabel(item)),
-      trailing: queueItem
+      subtitle: Text(
+        foreign ? 'Paused · ${_importLabel(item)}' : _importLabel(item),
+      ),
+      trailing: foreign
+          ? null
+          : queueItem
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (failed)
+                if (canRetryImport(status))
                   IconButton(
                     tooltip: 'Retry import',
                     onPressed: () => ref
@@ -243,7 +227,9 @@ class _ImportTile extends ConsumerWidget {
                     icon: const Icon(Icons.refresh_rounded),
                   ),
                 IconButton(
-                  tooltip: failed ? 'Remove from queue' : 'Stop download',
+                  tooltip: canRetryImport(status)
+                      ? 'Remove from queue'
+                      : 'Stop download',
                   onPressed: () => ref
                       .read(downtifyControllerProvider.notifier)
                       .removeFromQueue(item),
@@ -258,18 +244,17 @@ class _ImportTile extends ConsumerWidget {
                   ref.read(downtifyControllerProvider.notifier).dismiss(item),
               icon: const Icon(Icons.close_rounded),
             )
+          : canRetryImport(status)
+          ? IconButton(
+              tooltip: 'Retry import',
+              onPressed: () =>
+                  ref.read(downtifyControllerProvider.notifier).retry(item),
+              icon: const Icon(Icons.refresh_rounded),
+            )
           : null,
     );
   }
 }
-
-bool _isDownloadQueueItem(DowntifyImport item) => const {
-  'submitting',
-  'queued',
-  'downloading',
-  'retrying',
-  'downloadFailed',
-}.contains(item.status);
 
 IconData _availabilityIcon(DowntifyAvailability value) => switch (value) {
   DowntifyAvailability.loading => Icons.sync_rounded,

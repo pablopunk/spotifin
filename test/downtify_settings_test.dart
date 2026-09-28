@@ -126,12 +126,130 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    ProviderScope.containerOf(
+          tester.element(find.byType(DowntifySettingsScreen)),
+        )
+        .read(accountScopeProvider)
+        .activate(
+          const JellyfinSession(
+            serverUrl: 'https://jellyfin.example.com',
+            serverId: 'server',
+            deviceId: 'device',
+            userId: 'user',
+            userName: 'Pablo',
+            accessToken: 'token',
+          ),
+        );
+    await tester.pumpAndSettle();
 
     expect(find.text('DOWNLOAD QUEUE'), findsOneWidget);
     expect(find.text('Queued Song'), findsOneWidget);
     await tester.tap(find.byTooltip('Stop download'));
     await tester.pumpAndSettle();
     expect(find.text('Queued Song'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.runAsync(database.close);
+  });
+  testWidgets('import rows expose policy actions and pause foreign origins', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({
+      'downtifyServerUrl': 'https://downtify.example.com',
+    });
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final now = DateTime(2026);
+    Future<void> seed(
+      String id,
+      String status, {
+      String origin = 'https://downtify.example.com',
+    }) => database.putDowntifyImport(
+      DowntifyImportsCompanion.insert(
+        id: 'server:user:$id',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        downtifyUrl: origin,
+        externalSongId: id,
+        songJson: jsonEncode({
+          'song_id': id,
+          'name': 'Song $id',
+          'artists': ['Artist'],
+        }),
+        status: status,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await seed('timed-out', 'importTimedOut');
+    await seed('done', 'imported');
+    await seed('old', 'queued', origin: 'https://other.example.com');
+    await seed('failed', 'downloadFailed');
+    await seed('busy', 'downloading');
+    final client = DowntifyClient(
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/api/version') {
+          return http.Response(jsonEncode('2.10.2'), 200);
+        }
+        if (request.url.path == '/api/download/batch') {
+          return http.Response(
+            jsonEncode({
+              'job_ids': ['job-new'],
+              'count': 1,
+            }),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      }),
+    );
+    addTearDown(client.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          downtifyClientProvider.overrideWithValue(client),
+          appControllerProvider.overrideWith(_AuthenticatedAppController.new),
+        ],
+        child: const MaterialApp(home: DowntifySettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    ProviderScope.containerOf(
+          tester.element(find.byType(DowntifySettingsScreen)),
+        )
+        .read(accountScopeProvider)
+        .activate(
+          const JellyfinSession(
+            serverUrl: 'https://jellyfin.example.com',
+            serverId: 'server',
+            deviceId: 'device',
+            userId: 'user',
+            userName: 'Pablo',
+            accessToken: 'token',
+          ),
+        );
+    await tester.pumpAndSettle();
+
+    // Both terminal errors expose manual retry, including importTimedOut
+    // outside the download section.
+    expect(find.byTooltip('Retry import'), findsNWidgets(2));
+    // Only download-queue rows expose remote removal; only imported rows
+    // expose local dismissal.
+    expect(find.byTooltip('Stop download'), findsOneWidget);
+    expect(find.byTooltip('Remove from queue'), findsOneWidget);
+    expect(find.byTooltip('Dismiss'), findsOneWidget);
+    // The foreign row stays visible with its original source, paused.
+    expect(find.textContaining('Paused'), findsOneWidget);
+
+    // Retrying the timed-out row creates a fresh attempt at the current
+    // origin without touching the foreign row.
+    await tester.tap(find.byTooltip('Retry import').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Paused'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

@@ -7,6 +7,7 @@ import '../services/jellyfin/jellyfin_client.dart';
 import '../services/jellyfin/library/jellyfin_library.dart';
 import '../services/downtify/downtify_client.dart';
 import '../services/downtify/downtify_store.dart';
+import '../services/downtify/import_scheduler.dart';
 import '../services/jellyfin/library_cache_owner_store.dart';
 import '../services/jellyfin/secure_storage_config.dart';
 import '../services/jellyfin/session_store.dart';
@@ -80,6 +81,10 @@ final downtifyClientProvider = Provider<DowntifyClient>((ref) {
 
 final downtifyStoreProvider = Provider<DowntifyStore>(
   (ref) => const DowntifyStore(),
+);
+
+final importSchedulerProvider = Provider<ImportScheduler>(
+  (ref) => TimerImportScheduler(),
 );
 
 final downtifyControllerProvider =

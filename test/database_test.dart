@@ -262,4 +262,93 @@ void main() {
 
     expect(database.downtifyImports.actualTableName, 'downtify_imports');
   });
+
+  test('scoped import updates never insert deleted rows', () async {
+    final now = DateTime(2026);
+    Future<void> seed() => database.putDowntifyImport(
+      DowntifyImportsCompanion.insert(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        downtifyUrl: 'https://downtify.example.com',
+        externalSongId: 'song',
+        songJson: '{}',
+        status: 'queued',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await seed();
+
+    // Missing rows, wrong accounts, and wrong origins all report zero
+    // affected rows instead of recreating anything.
+    expect(
+      await database.updateDowntifyImportWhere(
+        id: 'missing',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        origin: 'https://downtify.example.com',
+        values: DowntifyImportsCompanion(status: const Value('imported')),
+      ),
+      0,
+    );
+    expect(
+      await database.updateDowntifyImportWhere(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'other',
+        origin: 'https://downtify.example.com',
+        values: DowntifyImportsCompanion(status: const Value('imported')),
+      ),
+      0,
+    );
+    expect(
+      await database.updateDowntifyImportWhere(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        origin: 'https://other.example.com',
+        values: DowntifyImportsCompanion(status: const Value('imported')),
+      ),
+      0,
+    );
+    expect(await database.getDowntifyImport('server:user:song'), isNotNull);
+
+    // The matching row updates exactly once.
+    expect(
+      await database.updateDowntifyImportWhere(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        origin: 'https://downtify.example.com',
+        values: DowntifyImportsCompanion(status: const Value('imported')),
+      ),
+      1,
+    );
+    expect(
+      (await database.getDowntifyImport('server:user:song'))!.status,
+      'imported',
+    );
+
+    // Scoped removal honors the same predicates.
+    expect(
+      await database.removeDowntifyImportWhere(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        origin: 'https://other.example.com',
+      ),
+      0,
+    );
+    expect(
+      await database.removeDowntifyImportWhere(
+        id: 'server:user:song',
+        jellyfinServerId: 'server',
+        jellyfinUserId: 'user',
+        origin: 'https://downtify.example.com',
+      ),
+      1,
+    );
+    expect(await database.getDowntifyImport('server:user:song'), isNull);
+  });
 }

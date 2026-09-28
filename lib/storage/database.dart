@@ -709,6 +709,46 @@ class AppDatabase extends _$AppDatabase {
   Future<void> removeDowntifyImport(String id) =>
       (delete(downtifyImports)..where((row) => row.id.equals(id))).go();
 
+  Future<DowntifyImport?> getDowntifyImport(String id) => (select(
+    downtifyImports,
+  )..where((row) => row.id.equals(id))).getSingleOrNull();
+
+  /// Scoped conditional import update: only the row matching id, Jellyfin
+  /// account, and origin is touched. Returns the affected-row count; zero
+  /// rows means stale or removed work, never permission to recreate the
+  /// row. Updates never insert a deleted row.
+  Future<int> updateDowntifyImportWhere({
+    required String id,
+    required String jellyfinServerId,
+    required String jellyfinUserId,
+    required String origin,
+    required DowntifyImportsCompanion values,
+  }) =>
+      (update(downtifyImports)..where(
+            (row) =>
+                row.id.equals(id) &
+                row.jellyfinServerId.equals(jellyfinServerId) &
+                row.jellyfinUserId.equals(jellyfinUserId) &
+                row.downtifyUrl.equals(origin),
+          ))
+          .write(values);
+
+  /// Scoped conditional import removal with the same predicates.
+  Future<int> removeDowntifyImportWhere({
+    required String id,
+    required String jellyfinServerId,
+    required String jellyfinUserId,
+    required String origin,
+  }) =>
+      (delete(downtifyImports)..where(
+            (row) =>
+                row.id.equals(id) &
+                row.jellyfinServerId.equals(jellyfinServerId) &
+                row.jellyfinUserId.equals(jellyfinUserId) &
+                row.downtifyUrl.equals(origin),
+          ))
+          .go();
+
   Future<void> clearAccountData() => transaction(() async {
     await delete(pendingWrites).go();
     await delete(downloads).go();
