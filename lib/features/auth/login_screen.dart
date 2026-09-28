@@ -122,6 +122,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ),
                           ],
+                          if (state.cacheOwnerConflict) ...[
+                            const SizedBox(height: 14),
+                            _CacheConflictCard(
+                              message: state.cacheOwnerMessage ?? 'This device has a saved library from another account.',
+                              onClear: () => _confirmClearSavedLibrary(context),
+                            ),
+                          ],
                           const SizedBox(height: 22),
                           FilledButton.icon(
                             onPressed: state.syncing ? null : _submit,
@@ -158,6 +165,87 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref
         .read(appControllerProvider.notifier)
         .signIn(_server.text, _username.text, _password.text);
+  }
+
+  Future<void> _confirmClearSavedLibrary(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => const _ClearSavedLibraryDialog(),
+    );
+    // Cancellation makes no changes.
+    if (confirmed != true || !context.mounted) return;
+    await ref.read(appControllerProvider.notifier).clearSavedLibrary();
+  }
+}
+
+class _CacheConflictCard extends StatelessWidget {
+  const _CacheConflictCard({required this.message, required this.onClear});
+
+  final String message;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.errorContainer,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(message),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onClear,
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Clear saved library'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ClearSavedLibraryDialog extends ConsumerWidget {
+  const _ClearSavedLibraryDialog();
+
+  @override
+  Widget build(BuildContext context, WidgetRef widgetRef) => AlertDialog(
+    title: const Text('Clear saved library?'),
+    content: FutureBuilder<String>(
+      future: _describeSavedLibrary(widgetRef),
+      builder: (context, snapshot) => Text(
+        snapshot.data ?? 'This removes the saved library and pending edits from this device.',
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(false),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.of(context).pop(true),
+        child: const Text('Clear'),
+      ),
+    ],
+  );
+
+  Future<String> _describeSavedLibrary(WidgetRef widgetRef) async {
+    try {
+      final database = widgetRef.read(databaseProvider);
+      final tracks = await database.allTracks();
+      final pending = await database.pendingOperations();
+      final songWord = tracks.length == 1 ? 'song' : 'songs';
+      final editWord = pending.length == 1 ? 'edit' : 'edits';
+      return 'This removes ${tracks.length} saved $songWord and '
+          '${pending.length} pending $editWord from this device. '
+          'This cannot be undone.';
+    } catch (_) {
+      return 'This removes the saved library and pending edits from '
+          'this device. This cannot be undone.';
+    }
   }
 }
 

@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../services/jellyfin/account_scope.dart';
 import '../services/jellyfin/jellyfin_client.dart';
 import '../services/downtify/downtify_client.dart';
 import '../services/downtify/downtify_store.dart';
+import '../services/jellyfin/library_cache_owner_store.dart';
 import '../services/jellyfin/secure_storage_config.dart';
 import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
@@ -89,6 +91,16 @@ final sessionSecureStorageProvider = Provider<FlutterSecureStorage>(
 
 final sessionStoreProvider = Provider<SessionStore>(
   (ref) => SessionStore(ref.watch(sessionSecureStorageProvider)),
+);
+
+final accountScopeProvider = Provider<AccountScope>((ref) {
+  final scope = AccountScope();
+  ref.onDispose(scope.dispose);
+  return scope;
+});
+
+final libraryCacheOwnerStoreProvider = Provider<LibraryCacheOwnerStore>(
+  (ref) => LibraryCacheOwnerStore(),
 );
 
 final downloadProvider = Provider<DownloadService>((ref) {
