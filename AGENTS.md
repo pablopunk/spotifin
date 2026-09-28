@@ -8,7 +8,7 @@
 ### Verification
 
 * Verify changes with `mise exec -- flutter analyze`, `mise exec -- flutter test`, and `mise exec -- dart format --output=none --set-exit-if-changed lib test`.
-* For web-touching changes, also run `mise exec -- flutter test --platform chrome test/session_store_test.dart`.
+* For web-touching changes, also run `mise exec -- flutter test --platform chrome test/session_store_test.dart test/database_startup_test.dart`.
 
 ### Database
 

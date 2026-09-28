@@ -126,7 +126,7 @@ class AppDatabase extends _$AppDatabase {
   /// would collide and lose operations; this pair stays distinct for every
   /// newly saved operation while already-stored ids are preserved.
   final String _pendingIdPrefix = math.Random()
-      .nextInt(1 << 32)
+      .nextInt(0x100000000)
       .toRadixString(16);
   int _pendingIdCounter = 0;
 
