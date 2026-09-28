@@ -12,6 +12,7 @@ import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
+import '../services/playback/active_playback.dart';
 import '../services/playback/remote_session_service.dart';
 import '../services/cast/cast_controller.dart';
 import '../services/cast/cast_sender.dart';
@@ -161,6 +162,15 @@ final castControllerProvider = Provider<CastController>((ref) {
   );
   ref.onDispose(controller.dispose);
   return controller;
+});
+
+final activePlaybackProvider = Provider<ActivePlayback>((ref) {
+  final owner = ActivePlayback(
+    local: ref.watch(playbackProvider),
+    cast: ref.watch(castControllerProvider),
+  );
+  ref.onDispose(owner.dispose);
+  return owner;
 });
 
 final appControllerProvider = NotifierProvider<AppController, AppState>(

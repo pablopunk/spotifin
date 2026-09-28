@@ -317,19 +317,17 @@ void main() {
       addTearDown(cast.dispose);
       await cast.configure(_session);
 
-      await expectLater(
-        cast.connect(_device),
-        throwsA(isA<CastException>()),
-      );
+      await expectLater(cast.connect(_device), throwsA(isA<CastException>()));
 
       expect(cast.ownership, CastOwnership.local);
       expect(cast.isCasting, isFalse);
       expect(cast.error, isNotNull);
       expect(harness.service.isCastingActive, isFalse);
-      expect(
-        harness.service.queue.map((track) => track.id),
-        ['track-0', 'track-1', 'track-2'],
-      );
+      expect(harness.service.queue.map((track) => track.id), [
+        'track-0',
+        'track-1',
+        'track-2',
+      ]);
       expect(harness.service.currentTrack?.id, 'track-1');
       expect(harness.service.playing, isFalse);
       expect(harness.player.playCalls, 1);
@@ -353,10 +351,7 @@ void main() {
       addTearDown(cast.dispose);
       await cast.configure(_session);
 
-      await expectLater(
-        cast.connect(_device),
-        throwsA(isA<CastException>()),
-      );
+      await expectLater(cast.connect(_device), throwsA(isA<CastException>()));
 
       expect(cast.ownership, CastOwnership.local);
       expect(harness.service.currentTrack?.id, 'track-1');
@@ -483,8 +478,7 @@ void main() {
       await harness.service.replaceQueue(playbackCatalog(3), startIndex: 0);
       await harness.settle();
 
-      final sender = LifecycleSender()
-        ..connectGate = Completer<void>();
+      final sender = LifecycleSender()..connectGate = Completer<void>();
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -540,14 +534,14 @@ void main() {
       expect(harness.service.isCastingActive, isFalse);
       // The old local queue is untouched; no stale snapshot was restored
       // into a signed-out account.
-      expect(
-        harness.service.queue.map((track) => track.id),
-        ['track-0', 'track-1', 'track-2'],
-      );
+      expect(harness.service.queue.map((track) => track.id), [
+        'track-0',
+        'track-1',
+        'track-2',
+      ]);
     });
 
-    test('failed receiver stop retains recovery without local audio',
-        () async {
+    test('failed receiver stop retains recovery without local audio', () async {
       final harness = PlaybackHarness();
       addTearDown(harness.dispose);
       await harness.configure();
@@ -566,53 +560,56 @@ void main() {
       expect(cast.ownership, CastOwnership.remote);
 
       sender.failDisconnect = true;
-      await expectLater(
-        cast.disconnect(),
-        throwsA(isA<CastException>()),
-      );
+      await expectLater(cast.disconnect(), throwsA(isA<CastException>()));
 
       expect(cast.ownership, CastOwnership.recovering);
       expect(cast.isCasting, isTrue);
       expect(harness.service.isCastingActive, isTrue);
       expect(harness.player.playCalls, 1);
-      expect(
-        harness.service.queue.map((track) => track.id),
-        ['track-0', 'track-1', 'track-2'],
-      );
+      expect(harness.service.queue.map((track) => track.id), [
+        'track-0',
+        'track-1',
+        'track-2',
+      ]);
     });
 
-    test('resume restores the handoff snapshot after local replacement',
-        () async {
-      final harness = PlaybackHarness();
-      addTearDown(harness.dispose);
-      await harness.configure();
-      await harness.service.replaceQueue(playbackCatalog(5), startIndex: 0);
-      await harness.settle();
+    test(
+      'resume restores the handoff snapshot after local replacement',
+      () async {
+        final harness = PlaybackHarness();
+        addTearDown(harness.dispose);
+        await harness.configure();
+        await harness.service.replaceQueue(playbackCatalog(5), startIndex: 0);
+        await harness.settle();
 
-      final sender = LifecycleSender();
-      final cast = _controller(
-        playback: PlaybackServiceCastSource(harness.service),
-        sender: sender,
-      );
-      addTearDown(sender.dispose);
-      addTearDown(cast.dispose);
-      await cast.configure(_session);
-      await cast.connect(_device);
-      expect(cast.ownership, CastOwnership.remote);
+        final sender = LifecycleSender();
+        final cast = _controller(
+          playback: PlaybackServiceCastSource(harness.service),
+          sender: sender,
+        );
+        addTearDown(sender.dispose);
+        addTearDown(cast.dispose);
+        await cast.configure(_session);
+        await cast.connect(_device);
+        expect(cast.ownership, CastOwnership.remote);
 
-      await harness.service.replaceQueue(playbackCatalog(2), startIndex: 1);
-      await harness.settle();
+        await harness.service.replaceQueue(playbackCatalog(2), startIndex: 1);
+        await harness.settle();
 
-      await cast.disconnect();
-      await harness.settle();
+        await cast.disconnect();
+        await harness.settle();
 
-      expect(cast.ownership, CastOwnership.local);
-      expect(
-        harness.service.queue.map((track) => track.id),
-        ['track-0', 'track-1', 'track-2', 'track-3', 'track-4'],
-      );
-      expect(harness.service.currentTrack?.id, 'track-0');
-    });
+        expect(cast.ownership, CastOwnership.local);
+        expect(harness.service.queue.map((track) => track.id), [
+          'track-0',
+          'track-1',
+          'track-2',
+          'track-3',
+          'track-4',
+        ]);
+        expect(harness.service.currentTrack?.id, 'track-0');
+      },
+    );
   });
 
   test('disposal during a delayed operation notifies nothing after', () async {

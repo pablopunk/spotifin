@@ -207,6 +207,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   /// Window-relative index of the current entry in the committed state.
   int? get currentIndex => _state.currentIndex;
 
+  /// Occurrence id of the current entry, identifying it among duplicates.
+  String? get currentEntryId => _state.currentEntry?.id;
+
   Track? get currentTrack {
     final tag = _player.sequenceState.currentSource?.tag;
     if (tag is MediaItem) {

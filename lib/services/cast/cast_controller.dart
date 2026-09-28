@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../storage/database.dart';
 import '../jellyfin/session.dart';
@@ -145,6 +146,20 @@ class CastController extends ChangeNotifier {
 
   /// Window-relative index of the current Cast entry.
   int get remoteIndex => _castSnapshot?.queue.currentIndex ?? 0;
+
+  /// Occurrence id of the current Cast entry.
+  String? get remoteEntryId => _castSnapshot?.queue.currentEntry?.id;
+
+  /// Whether the Cast queue is shuffled (current audio never restarts).
+  bool get castShuffle => _castSnapshot?.queue.shuffle ?? false;
+
+  /// Repeat mode retained from local playback for later local restore.
+  /// Repeat stays unavailable while Cast owns playback.
+  LoopMode get castRepeatMode => _castSnapshot?.repeatMode ?? LoopMode.off;
+
+  /// Temporary Cast history overlay (never persisted).
+  List<Track> get castHistory =>
+      List.unmodifiable(_castSnapshot?.history ?? const []);
 
   /// Loaded Cast queue tracks. The local queue is never mutated while
   /// casting; remote selection and edits resolve against this list.
