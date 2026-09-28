@@ -797,7 +797,7 @@ class AppController extends Notifier<AppState> {
     await _enqueueLifecycle(() async {
       await ref.read(remoteSessionProvider).clear();
       try {
-        ref.read(castControllerProvider).configure(null);
+        await ref.read(castControllerProvider).configure(null);
       } catch (_) {}
       try {
         await ref.read(castControllerProvider).disconnect(resumeLocal: false);
@@ -844,7 +844,7 @@ class AppController extends Notifier<AppState> {
         await ref.read(remoteSessionProvider).clear();
       } catch (_) {}
       try {
-        ref.read(castControllerProvider).configure(null);
+        await ref.read(castControllerProvider).configure(null);
       } catch (_) {}
       try {
         await ref.read(castControllerProvider).disconnect(resumeLocal: false);
@@ -967,7 +967,7 @@ class AppController extends Notifier<AppState> {
         await ref.read(remoteSessionProvider).clear();
       } catch (_) {}
       try {
-        ref.read(castControllerProvider).configure(null);
+        await ref.read(castControllerProvider).configure(null);
       } catch (_) {}
       try {
         await ref.read(downloadProvider).suspend();
@@ -1005,7 +1005,7 @@ class AppController extends Notifier<AppState> {
         await ref.read(remoteSessionProvider).clear();
       } catch (_) {}
       try {
-        ref.read(castControllerProvider).configure(null);
+        await ref.read(castControllerProvider).configure(null);
       } catch (_) {}
       try {
         await ref.read(castControllerProvider).disconnect(resumeLocal: false);
