@@ -371,12 +371,14 @@ void main() {
     expect(playback.currentIndex, 1);
     expect(playback.stopForCastCalls, 1);
     expect(playback.castingActive, isTrue);
-    // Handoff payload carries metadata + position, ids only in customData.
+    // Handoff payload carries metadata + position, occurrence ids in
+    // customData alongside the track id.
     final payload = sender.loads.single;
     expect(payload.title, 'Song b');
     expect(payload.artist, 'Artist');
     expect(sender.loadPositions.single, const Duration(seconds: 12));
-    expect(payload.customData, {'itemId': 'b'});
+    expect(payload.customData['itemId'], 'b');
+    expect(payload.customData['playlistItemId'], isNotEmpty);
     expect(payload.contentUrl.toString(), isNot(contains('password')));
   });
 
@@ -567,10 +569,11 @@ void main() {
     expect(playback.castingActive, isFalse);
     expect(playback.restoredSnapshots, hasLength(1));
     final restored = playback.restoredSnapshots.single;
-    expect(
-      restored.queue.loadedEntries.map((entry) => entry.track.id),
-      ['a', 'b', 'c'],
-    );
+    expect(restored.queue.loadedEntries.map((entry) => entry.track.id), [
+      'a',
+      'b',
+      'c',
+    ]);
     expect(restored.queue.currentIndex, 1);
     expect(restored.position, const Duration(seconds: 25));
     expect(restored.playing, isTrue);
