@@ -183,9 +183,7 @@ void main() {
       final sent = <String>[];
       final client = JellyfinClient(
         httpClient: MockClient((request) async {
-          if (request is http.Request) {
-            sent.add('${request.method} ${request.url.path}');
-          }
+          sent.add('${request.method} ${request.url.path}');
           final path = request.url.path;
           final types = request.url.queryParameters['IncludeItemTypes'];
           if (request.method == 'GET' && path.endsWith('/Items')) {
@@ -378,9 +376,7 @@ void main() {
         final sent = <String>[];
         final client = JellyfinClient(
           httpClient: MockClient((request) async {
-            if (request is http.Request) {
-              sent.add('${request.method} ${request.url.path}');
-            }
+            sent.add('${request.method} ${request.url.path}');
             final path = request.url.path;
             final types = request.url.queryParameters['IncludeItemTypes'];
             if (path.endsWith('/Items') && path.contains('/Playlists/p')) {

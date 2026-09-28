@@ -26,15 +26,10 @@ class _LibraryHarness {
     this.playlists = const [],
     this.history = const [],
     this.tracksStatus = 200,
-    this.favoriteStatus = 204,
-    this.playlistAddStatus = 204,
-    this.deleteStatus = 204,
   }) : sent = [] {
     client = JellyfinClient(
       httpClient: MockClient((request) async {
-        if (request is http.Request) {
-          sent.add('${request.method} ${request.url.path}');
-        }
+        sent.add('${request.method} ${request.url.path}');
         final path = request.url.path;
         final query = request.url.queryParameters;
         if (request.method == 'GET' && path.endsWith('/Items')) {
@@ -65,10 +60,10 @@ class _LibraryHarness {
           return _json({'Items': [], 'TotalRecordCount': 0});
         }
         if (path.contains('/FavoriteItems/')) {
-          return http.Response('', favoriteStatus);
+          return http.Response('', 204);
         }
         if (path.contains('/Playlists/') && path.endsWith('/Items')) {
-          return http.Response('', playlistAddStatus);
+          return http.Response('', 204);
         }
         if (request.method == 'POST' && path.endsWith('/Playlists')) {
           return http.Response('{"Id": "new-playlist"}', 200);
@@ -77,7 +72,7 @@ class _LibraryHarness {
           return http.Response('', 200);
         }
         if (request.method == 'DELETE') {
-          return http.Response('', deleteStatus);
+          return http.Response('', 204);
         }
         return http.Response('', 204);
       }),
@@ -100,9 +95,6 @@ class _LibraryHarness {
   final List<Map<String, dynamic>> playlists;
   final List<Map<String, dynamic>> history;
   final int tracksStatus;
-  final int favoriteStatus;
-  final int playlistAddStatus;
-  final int deleteStatus;
   final List<String> sent;
 
   AccountLease activate() => scope.activate(_session);

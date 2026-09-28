@@ -3,8 +3,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotifin/app/providers.dart';
-import 'package:spotifin/features/car/car_controller.dart';
-import 'package:spotifin/services/jellyfin/account_scope.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
 import 'package:spotifin/storage/database.dart';
 

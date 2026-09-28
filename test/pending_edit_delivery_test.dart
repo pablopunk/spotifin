@@ -23,12 +23,11 @@ const _session = JellyfinSession(
 
 /// Recorded mutating request.
 class _SentRequest {
-  _SentRequest(this.method, this.path, this.query, this.body);
+  _SentRequest(this.method, this.path, this.query);
 
   final String method;
   final String path;
   final String query;
-  final String body;
 }
 
 class _LibraryHarness {
@@ -37,16 +36,9 @@ class _LibraryHarness {
   }) : sent = [] {
     client = JellyfinClient(
       httpClient: MockClient((request) async {
-        if (request is http.Request) {
-          sent.add(
-            _SentRequest(
-              request.method,
-              request.url.path,
-              request.url.query,
-              request.body,
-            ),
-          );
-        }
+        sent.add(
+          _SentRequest(request.method, request.url.path, request.url.query),
+        );
         final handler = onRequest;
         if (handler != null) return handler(request);
         return http.Response('', 204);
