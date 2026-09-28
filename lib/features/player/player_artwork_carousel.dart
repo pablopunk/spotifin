@@ -24,8 +24,6 @@ class PlayerArtworkCarousel extends StatefulWidget {
 }
 
 class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
-  static const _viewportFraction = .34;
-  static const _neighborFade = .35;
   static const _pageAnimationDuration = Duration(milliseconds: 220);
   static const _dragDevices = {
     PointerDeviceKind.touch,
@@ -45,7 +43,7 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
     _lastSyncedIndex = _validIndex(widget.currentIndex);
     _pageController = PageController(
       initialPage: _lastSyncedIndex,
-      viewportFraction: _viewportFraction,
+      viewportFraction: _ArtworkCovers.viewportFraction,
     );
   }
 
@@ -75,60 +73,43 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
           0.0,
           constraints.maxWidth * (wide ? .55 : .64),
         );
-        final neighborSize = constraints.maxWidth * .28;
-        return ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context)
-              .copyWith(dragDevices: _dragDevices),
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
-            child: PageView.builder(
-              controller: _pageController,
-              physics: _SingleStepPageScrollPhysics(anchor: _swipeAnchor),
-              clipBehavior: Clip.none,
-              itemCount: widget.tracks.length,
-              pageSnapping: true,
-              padEnds: true,
-              onPageChanged: _handlePageChanged,
-              itemBuilder: (context, index) {
-                final track = widget.tracks[index];
-                return AnimatedBuilder(
-                  animation: _pageController,
-                  builder: (context, child) {
-                    final page = _pageController.hasClients
-                        ? _pageController.page
-                        : null;
-                    final delta = page == null
-                        ? (index == _lastSyncedIndex ? 0.0 : 1.0)
-                        : (page - index).abs().clamp(0.0, 1.0).toDouble();
-                    final size =
-                        currentSize - delta * (currentSize - neighborSize);
-                    return OverflowBox(
-                      minWidth: 0,
-                      minHeight: 0,
-                      maxWidth: currentSize,
-                      maxHeight: currentSize,
-                      child: Opacity(
-                        opacity: 1.0 - delta * _neighborFade,
-                        child: SizedBox.square(
-                          dimension: size,
-                          child: FittedBox(fit: BoxFit.contain, child: child),
-                        ),
+        return SizedBox.expand(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: _ArtworkCovers(
+                  controller: _pageController,
+                  fallbackPage: _lastSyncedIndex,
+                  tracks: widget.tracks,
+                  viewportWidth: constraints.maxWidth,
+                  viewportHeight: constraints.maxHeight,
+                  currentSize: currentSize,
+                  neighborSize: constraints.maxWidth * .28,
+                ),
+              ),
+              Positioned.fill(
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(dragDevices: _dragDevices),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: _SingleStepPageScrollPhysics(
+                        anchor: _swipeAnchor,
                       ),
-                    );
-                  },
-                  child: Semantics(
-                    image: true,
-                    label: 'Artwork for ${track.name}',
-                    child: Artwork(
-                      key: ValueKey(track.id),
-                      itemId: track.albumId ?? track.id,
-                      size: currentSize,
-                      borderRadius: SpotifinRadii.card,
+                      clipBehavior: Clip.none,
+                      itemCount: widget.tracks.length,
+                      pageSnapping: true,
+                      padEnds: true,
+                      onPageChanged: _handlePageChanged,
+                      itemBuilder: (context, index) => const SizedBox.shrink(),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -202,6 +183,93 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   int _validIndex(int? index) {
     if (widget.tracks.isEmpty) return 0;
     return (index ?? 0).clamp(0, widget.tracks.length - 1);
+  }
+}
+
+class _ArtworkCovers extends StatelessWidget {
+  const _ArtworkCovers({
+    required this.controller,
+    required this.fallbackPage,
+    required this.tracks,
+    required this.viewportWidth,
+    required this.viewportHeight,
+    required this.currentSize,
+    required this.neighborSize,
+  });
+
+  static const viewportFraction = .34;
+  static const _neighborFade = .35;
+
+  final PageController controller;
+  final int fallbackPage;
+  final List<Track> tracks;
+  final double viewportWidth;
+  final double viewportHeight;
+  final double currentSize;
+  final double neighborSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final page = controller.hasClients
+            ? controller.page ?? fallbackPage.toDouble()
+            : fallbackPage.toDouble();
+        return Stack(
+          key: const Key('player-artwork-covers'),
+          clipBehavior: Clip.none,
+          children: [
+            for (final index in _visibleIndicesNearestLast(page))
+              _cover(index, page),
+          ],
+        );
+      },
+    );
+  }
+
+  List<int> _visibleIndicesNearestLast(double page) {
+    final reach = 1 / (2 * viewportFraction) + .5;
+    final first = math.max(0, (page - reach).floor() + 1);
+    final last = math.min(tracks.length - 1, (page + reach).ceil() - 1);
+    final indices = [for (var index = first; index <= last; index++) index];
+    indices.sort((a, b) {
+      final distance = (b - page).abs().compareTo((a - page).abs());
+      if (distance != 0) return distance;
+      return a.compareTo(b);
+    });
+    return indices;
+  }
+
+  Widget _cover(int index, double page) {
+    final track = tracks[index];
+    final delta = (page - index).abs().clamp(0.0, 1.0).toDouble();
+    final size = currentSize - delta * (currentSize - neighborSize);
+    return Positioned(
+      key: ValueKey(track.id),
+      left:
+          viewportWidth / 2 +
+          (index - page) * viewportWidth * viewportFraction -
+          size / 2,
+      top: (viewportHeight - size) / 2,
+      width: size,
+      height: size,
+      child: Opacity(
+        opacity: 1.0 - delta * _neighborFade,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: Semantics(
+            image: true,
+            label: 'Artwork for ${track.name}',
+            child: Artwork(
+              itemId: track.albumId ?? track.id,
+              size: currentSize,
+              borderRadius: SpotifinRadii.card,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

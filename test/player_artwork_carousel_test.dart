@@ -147,6 +147,37 @@ void main() {
     expect(current.width, greaterThan(next.width));
   });
 
+  testWidgets('the current artwork paints above its neighbors', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 700,
+              height: 400,
+              child: PlayerArtworkCarousel(
+                tracks: [_track('one'), _track('two'), _track('three')],
+                currentIndex: 1,
+                onTrackChanged: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final covers = tester.widget<Stack>(
+      find.byKey(const Key('player-artwork-covers')),
+    );
+    final keys = [
+      for (final child in covers.children) (child.key! as ValueKey).value,
+    ];
+    expect(keys.last, 'two');
+    expect(keys.toSet(), {'one', 'two', 'three'});
+  });
+
   testWidgets('a swipe does not replace artwork with a fixed foreground', (
     tester,
   ) async {
