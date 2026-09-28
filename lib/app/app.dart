@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,6 +31,7 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   final _shellController = ShellController();
   late final CarPlayShuffle _carPlayShuffle;
   late final CarPlayUpNext _carPlayUpNext;
+  void Function()? _carCleanup;
 
   @override
   void initState() {
@@ -36,8 +39,8 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     WidgetsBinding.instance.addObserver(this);
     _carPlayShuffle = CarPlayShuffle(ref.read(playbackProvider))..start();
     _carPlayUpNext = CarPlayUpNext(ref.read(playbackProvider))..start();
+    _carCleanup = initCarListeners(ref);
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
-    Future.microtask(() => initCarListeners(ref));
     Future.microtask(() => configurePlayLibraryShortcut(ref));
     Future.microtask(
       ref.read(updateControllerProvider.notifier).checkOnStartup,
@@ -47,6 +50,8 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _carCleanup?.call();
+    _carCleanup = null;
     _carPlayShuffle.dispose();
     _carPlayUpNext.dispose();
     _shellController.dispose();
@@ -96,8 +101,9 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   }
 
   void _togglePlayback() {
-    final playback = ref.read(playbackProvider);
-    if (playback.currentTrack != null) playback.toggle();
+    final active = ref.read(activePlaybackProvider);
+    if (active.state.track == null) return;
+    _guard(active.toggle);
   }
 
   Future<void> _showUpdatePrompt(ReleaseInfo release) async {
@@ -112,13 +118,28 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
   }
 
   void _playPrevious() {
-    final playback = ref.read(playbackProvider);
-    if (playback.currentTrack != null) playback.previous();
+    final active = ref.read(activePlaybackProvider);
+    if (active.state.track == null) return;
+    _guard(active.previous);
   }
 
   void _playNext() {
-    final playback = ref.read(playbackProvider);
-    if (playback.currentTrack != null) playback.next();
+    final active = ref.read(activePlaybackProvider);
+    if (active.state.track == null) return;
+    _guard(active.next);
+  }
+
+  /// Runs an owner action from a keyboard shortcut without an unhandled
+  /// future: rejections (frozen handoff, recovery, disabled capability)
+  /// are swallowed here while staying visible on the owner's error state.
+  void _guard(Future<void> Function() action) {
+    Future<void> run() async {
+      try {
+        await action();
+      } catch (_) {}
+    }
+
+    run();
   }
 }
 

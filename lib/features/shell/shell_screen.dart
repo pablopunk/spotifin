@@ -6,7 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
 import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
@@ -37,7 +37,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   static const _defaultPlayerPanelWidth = 420.0;
   static const _minimumPlayerPanelWidth = 320.0;
 
-  late final PlaybackService _playback;
+  late final ActivePlayback _active;
   late final RemoteSessionService _remoteSessions;
   double _playerPanelWidth = _defaultPlayerPanelWidth;
   OverlayEntry? _coverflowOverlayEntry;
@@ -60,14 +60,15 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   @override
   void initState() {
     super.initState();
-    _playback = ref.read(playbackProvider)..addListener(_refreshPlaybackLayout);
+    _active = ref.read(activePlaybackProvider)
+      ..addListener(_refreshPlaybackLayout);
     _remoteSessions = ref.read(remoteSessionProvider)
       ..addListener(_refreshPlaybackLayout);
   }
 
   @override
   void dispose() {
-    _playback.removeListener(_refreshPlaybackLayout);
+    _active.removeListener(_refreshPlaybackLayout);
     _remoteSessions.removeListener(_refreshPlaybackLayout);
     _removeCoverflowOverlay();
     super.dispose();
@@ -202,11 +203,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= SpotifinBreakpoints.rail;
     final playerPanels = ref.watch(playerPanelProvider);
-    final hasLocalTrack = _playback.currentTrack != null;
+    final hasTrack = _active.state.track != null;
     final showPlayerPanel =
         width >= SpotifinBreakpoints.playerPanel &&
         !playerPanels.isEmpty &&
-        hasLocalTrack;
+        hasTrack;
     final playerPanelWidth = showPlayerPanel
         ? _playerPanelWidth.clamp(_minimumPlayerPanelWidth, width * 0.5)
         : 0.0;
@@ -303,8 +304,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     if (glassEffects &&
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.iOS) {
-      final showAccessory =
-          hasLocalTrack || _remoteSessions.sessions.isNotEmpty;
+      final showAccessory = hasTrack || _remoteSessions.sessions.isNotEmpty;
       return GlassScaffold(
         backgroundColor: SpotifinColors.background,
         settings: SpotifinGlass.settings(glassOpacity),
@@ -322,7 +322,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           bottomAccessorySpacing: 0,
           bottomAccessory: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: hasLocalTrack
+            child: hasTrack
                 ? const PlayerBar()
                 : const GlassContainer(
                     useOwnLayer: true,
@@ -364,7 +364,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (hasLocalTrack)
+                if (hasTrack)
                   const PlayerBar(integratedMobile: true)
                 else
                   const RemoteNowPlayingBar(),
@@ -400,7 +400,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!hasLocalTrack) const RemoteNowPlayingBar(),
+          if (!hasTrack) const RemoteNowPlayingBar(),
           NavigationBar(
             selectedIndex: selectedIndex,
             onDestinationSelected: widget.controller.selectDestination,

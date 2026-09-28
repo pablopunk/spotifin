@@ -158,6 +158,9 @@ class ActivePlayback extends ChangeNotifier {
         recovering: _cast.ownership == CastOwnership.recovering,
         error: _error,
         capabilities: _capabilities(destination),
+        connectedDeviceName: destination == PlaybackDestination.local
+            ? null
+            : _cast.connectedDeviceName,
       );
     }
     notifyListeners();

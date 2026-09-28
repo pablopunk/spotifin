@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../platform/airplay_control.dart';
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
+import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
@@ -14,12 +13,11 @@ import '../common/glass.dart';
 import 'cast_button.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
-import 'volume_scale.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
   const DesktopPlayerBar({
     required this.track,
-    required this.playback,
+    required this.active,
     required this.onOpenPlayer,
     required this.onOpenQueue,
     required this.onOpenLyrics,
@@ -29,7 +27,7 @@ class DesktopPlayerBar extends StatelessWidget {
   });
 
   final Track track;
-  final PlaybackService playback;
+  final ActivePlayback active;
   final VoidCallback onOpenPlayer;
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
@@ -52,12 +50,12 @@ class DesktopPlayerBar extends StatelessWidget {
                   child: _TrackSummary(track: track, onTap: onOpenPlayer),
                 ),
               ),
-              Expanded(flex: 2, child: _DesktopTransport(playback: playback)),
+              Expanded(flex: 2, child: _DesktopTransport(active: active)),
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: _DesktopUtilities(
-                    playback: playback,
+                    active: active,
                     onOpenQueue: onOpenQueue,
                     onOpenLyrics: onOpenLyrics,
                   ),
@@ -91,10 +89,10 @@ class DesktopPlayerBar extends StatelessWidget {
   }
 }
 
-class MobilePlayerBar extends ConsumerWidget {
+class MobilePlayerBar extends StatelessWidget {
   const MobilePlayerBar({
     required this.track,
-    required this.playback,
+    required this.active,
     required this.onOpenPlayer,
     required this.glass,
     required this.glassOpacity,
@@ -103,19 +101,19 @@ class MobilePlayerBar extends ConsumerWidget {
   });
 
   final Track track;
-  final PlaybackService playback;
+  final ActivePlayback active;
   final VoidCallback onOpenPlayer;
   final bool glass;
   final double glassOpacity;
   final bool integrated;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        final casting = cast.isCasting;
+        final state = active.state;
+        final casting = state.destination == PlaybackDestination.cast;
         final content = Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -126,7 +124,7 @@ class MobilePlayerBar extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _MobileProgress(playback: playback),
+                  _MobileProgress(active: active),
                   ListTile(
                     minTileHeight: 72,
                     leading: Artwork(
@@ -135,16 +133,14 @@ class MobilePlayerBar extends ConsumerWidget {
                       borderRadius: SpotifinRadii.small,
                     ),
                     title: Text(
-                      casting
-                          ? (cast.remoteTrack?.name ?? track.name)
-                          : track.name,
+                      track.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     subtitle: Text(
-                      casting && cast.connectedDeviceName != null
-                          ? 'Casting to ${cast.connectedDeviceName} · ${cast.remoteTrack?.artist ?? track.artist}'
+                      casting && state.connectedDeviceName != null
+                          ? 'Casting to ${state.connectedDeviceName} · ${track.artist}'
                           : track.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -158,20 +154,16 @@ class MobilePlayerBar extends ConsumerWidget {
                         const RemoteDeviceButton(),
                         IconButton(
                           tooltip: 'Previous',
-                          onPressed: casting
-                              ? cast.previous
-                              : playback.previous,
+                          onPressed: active.previous,
                           icon: const Icon(Icons.skip_previous_rounded),
                         ),
                         SpotifinPlayButton(
-                          onPressed: casting ? cast.toggle : playback.toggle,
-                          playing: casting
-                              ? cast.remotePlaying
-                              : playback.playing,
+                          onPressed: active.toggle,
+                          playing: state.playing,
                         ),
                         IconButton(
                           tooltip: 'Next',
-                          onPressed: casting ? cast.next : playback.next,
+                          onPressed: active.next,
                           icon: const Icon(Icons.skip_next_rounded),
                         ),
                       ],
@@ -250,18 +242,24 @@ class _TrackSummary extends StatelessWidget {
   );
 }
 
-class _DesktopTransport extends ConsumerWidget {
-  const _DesktopTransport({required this.playback});
+class _DesktopTransport extends StatelessWidget {
+  const _DesktopTransport({required this.active});
 
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        final casting = cast.isCasting;
+        final state = active.state;
+        final casting = state.destination == PlaybackDestination.cast;
+        final canShuffle = state.capabilities.contains(
+          PlaybackCapability.shuffle,
+        );
+        final canRepeat = state.capabilities.contains(
+          PlaybackCapability.repeat,
+        );
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -271,38 +269,38 @@ class _DesktopTransport extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _ToggleButton(
-                    tooltip: casting
+                    tooltip: casting && !canShuffle
                         ? 'Stop casting to change shuffle'
                         : 'Shuffle',
-                    active: playback.shuffle,
-                    onPressed: casting ? () {} : playback.toggleShuffle,
+                    active: state.shuffle,
+                    onPressed: canShuffle ? active.toggleShuffle : () {},
                     icon: Icons.shuffle_rounded,
                   ),
                   IconButton(
                     tooltip: 'Previous',
-                    onPressed: casting ? cast.previous : playback.previous,
+                    onPressed: active.previous,
                     icon: const Icon(Icons.skip_previous_rounded),
                   ),
-                  _CastAwarePlayButton(playback: playback),
+                  _OwnerPlayButton(active: active),
                   IconButton(
                     tooltip: 'Next',
-                    onPressed: casting ? cast.next : playback.next,
+                    onPressed: active.next,
                     icon: const Icon(Icons.skip_next_rounded),
                   ),
                   _ToggleButton(
-                    tooltip: casting
+                    tooltip: casting && !canRepeat
                         ? 'Stop casting to change repeat'
                         : 'Repeat',
-                    active: playback.loopMode != LoopMode.off,
-                    onPressed: casting ? () {} : playback.cycleRepeat,
-                    icon: playback.loopMode == LoopMode.one
+                    active: state.repeatMode != LoopMode.off,
+                    onPressed: canRepeat ? active.cycleRepeat : () {},
+                    icon: state.repeatMode == LoopMode.one
                         ? Icons.repeat_one_rounded
                         : Icons.repeat_rounded,
                   ),
                 ],
               ),
             ),
-            _ProgressSlider(playback: playback),
+            _ProgressSlider(active: active),
           ],
         );
       },
@@ -310,19 +308,17 @@ class _DesktopTransport extends ConsumerWidget {
   }
 }
 
-class _CastAwarePlayButton extends ConsumerWidget {
-  const _CastAwarePlayButton({required this.playback});
+class _OwnerPlayButton extends StatelessWidget {
+  const _OwnerPlayButton({required this.active});
 
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        final casting = cast.isCasting;
-        final playing = casting ? cast.remotePlaying : playback.playing;
+        final playing = active.state.playing;
         return IconButton.filled(
           tooltip: playing ? 'Pause' : 'Play',
           style: IconButton.styleFrom(
@@ -332,7 +328,7 @@ class _CastAwarePlayButton extends ConsumerWidget {
             maximumSize: const Size.square(32),
             padding: EdgeInsets.zero,
           ),
-          onPressed: casting ? cast.toggle : playback.toggle,
+          onPressed: active.toggle,
           icon: Icon(
             playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
             size: 22,
@@ -365,91 +361,47 @@ class _ToggleButton extends StatelessWidget {
   );
 }
 
-class _ProgressSlider extends ConsumerWidget {
-  const _ProgressSlider({required this.playback});
+class _ProgressSlider extends StatelessWidget {
+  const _ProgressSlider({required this.active});
 
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        if (cast.isCasting) {
-          final position = cast.remotePosition;
-          final duration = cast.remoteDuration ?? Duration.zero;
-          final maximum = duration.inMilliseconds.toDouble().clamp(
-            1.0,
-            double.infinity,
-          );
-          return Row(
-            children: [
-              _TimeLabel(position),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 5,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 12,
-                    ),
+        final state = active.state;
+        final position = state.position;
+        final duration = state.duration ?? Duration.zero;
+        final maximum = duration.inMilliseconds.toDouble().clamp(
+          1.0,
+          double.infinity,
+        );
+        return Row(
+          children: [
+            _TimeLabel(position),
+            Expanded(
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 4,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 5,
                   ),
-                  child: Slider(
-                    value: position.inMilliseconds.toDouble().clamp(
-                      0.0,
-                      maximum,
-                    ),
-                    max: maximum,
-                    onChanged: (value) =>
-                        cast.seek(Duration(milliseconds: value.round())),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 12,
                   ),
+                ),
+                child: Slider(
+                  value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
+                  max: maximum,
+                  onChanged: (value) =>
+                      active.seek(Duration(milliseconds: value.round())),
                 ),
               ),
-              _TimeLabel(duration),
-            ],
-          );
-        }
-        return StreamBuilder<Duration>(
-          stream: playback.player.positionStream,
-          builder: (context, snapshot) {
-            final position = snapshot.data ?? Duration.zero;
-            final duration = playback.player.duration ?? Duration.zero;
-            final maximum = duration.inMilliseconds.toDouble().clamp(
-              1.0,
-              double.infinity,
-            );
-            return Row(
-              children: [
-                _TimeLabel(position),
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 5,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 12,
-                      ),
-                    ),
-                    child: Slider(
-                      value: position.inMilliseconds.toDouble().clamp(
-                        0.0,
-                        maximum,
-                      ),
-                      max: maximum,
-                      onChanged: (value) =>
-                          playback.seek(Duration(milliseconds: value.round())),
-                    ),
-                  ),
-                ),
-                _TimeLabel(duration),
-              ],
-            );
-          },
+            ),
+            _TimeLabel(duration),
+          ],
         );
       },
     );
@@ -473,24 +425,23 @@ class _TimeLabel extends StatelessWidget {
   );
 }
 
-class _DesktopUtilities extends ConsumerWidget {
+class _DesktopUtilities extends StatelessWidget {
   const _DesktopUtilities({
-    required this.playback,
+    required this.active,
     required this.onOpenQueue,
     required this.onOpenLyrics,
   });
 
-  final PlaybackService playback;
+  final ActivePlayback active;
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        final casting = cast.isCasting;
+        final state = active.state;
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -511,20 +462,13 @@ class _DesktopUtilities extends ConsumerWidget {
             const Icon(Icons.volume_up_rounded, size: 20),
             SizedBox(
               width: 144,
-              child: casting
-                  ? Slider(
-                      value: cast.remoteVolume.clamp(0.0, 1.0),
-                      onChanged: (value) => cast.setVolume(value),
-                    )
-                  : StreamBuilder<double>(
-                      stream: playback.volumeStream,
-                      initialData: playback.volume,
-                      builder: (context, snapshot) => Slider(
-                        value: sliderFromVolume(snapshot.data ?? 1),
-                        onChanged: (position) =>
-                            playback.setVolume(volumeFromSlider(position)),
-                      ),
-                    ),
+              child: Slider(
+                value: state.volumeSlider.clamp(0.0, 1.0),
+                onChanged:
+                    state.capabilities.contains(PlaybackCapability.volume)
+                    ? active.setVolumeSlider
+                    : null,
+              ),
             ),
           ],
         );
@@ -533,35 +477,21 @@ class _DesktopUtilities extends ConsumerWidget {
   }
 }
 
-class _MobileProgress extends ConsumerWidget {
-  const _MobileProgress({required this.playback});
+class _MobileProgress extends StatelessWidget {
+  const _MobileProgress({required this.active});
 
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cast = ref.watch(castControllerProvider);
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: cast,
+      listenable: active,
       builder: (context, _) {
-        if (cast.isCasting) {
-          final duration = cast.remoteDuration?.inMilliseconds.toDouble() ?? 1;
-          final value =
-              cast.remotePosition.inMilliseconds.clamp(0, duration) / duration;
-          return LinearProgressIndicator(value: value, minHeight: 2);
-        }
-        return StreamBuilder<Duration>(
-          stream: playback.player.positionStream,
-          builder: (context, snapshot) {
-            final maximum =
-                playback.player.duration?.inMilliseconds.toDouble() ?? 1;
-            return LinearProgressIndicator(
-              value:
-                  (snapshot.data?.inMilliseconds ?? 0).clamp(0, maximum) /
-                  maximum,
-              minHeight: 2,
-            );
-          },
+        final state = active.state;
+        final maximum = state.duration?.inMilliseconds.toDouble() ?? 1;
+        return LinearProgressIndicator(
+          value: state.position.inMilliseconds.clamp(0, maximum) / maximum,
+          minHeight: 2,
         );
       },
     );

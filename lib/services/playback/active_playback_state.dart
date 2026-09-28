@@ -40,6 +40,7 @@ class ActivePlaybackState {
     required this.recovering,
     this.error,
     required this.capabilities,
+    this.connectedDeviceName,
   });
 
   const ActivePlaybackState.empty()
@@ -60,7 +61,8 @@ class ActivePlaybackState {
       busy = false,
       recovering = false,
       error = null,
-      capabilities = const {};
+      capabilities = const {},
+      connectedDeviceName = null;
 
   final PlaybackDestination destination;
 
@@ -98,4 +100,7 @@ class ActivePlaybackState {
 
   /// Action families the current destination accepts right now.
   final Set<PlaybackCapability> capabilities;
+
+  /// Receiver friendly name while casting, null on local playback.
+  final String? connectedDeviceName;
 }

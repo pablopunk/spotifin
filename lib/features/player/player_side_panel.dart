@@ -7,7 +7,8 @@ import '../../app/providers.dart';
 import '../../app/state/player_panel_controller.dart';
 import '../../app/theme.dart';
 import '../../services/lyrics/lyric_line.dart';
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
+import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
@@ -22,7 +23,7 @@ class PlayerSidePanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     final panels = ref.watch(playerPanelProvider);
     final panelController = ref.read(playerPanelProvider.notifier);
     return LayoutBuilder(
@@ -44,9 +45,9 @@ class PlayerSidePanel extends ConsumerWidget {
               ),
               Expanded(
                 child: ListenableBuilder(
-                  listenable: playback,
+                  listenable: active,
                   builder: (context, _) {
-                    final track = playback.currentTrack;
+                    final track = active.state.track;
                     if (track == null) {
                       return const SpotifinEmptyState(
                         icon: Icons.music_note_rounded,
@@ -57,7 +58,7 @@ class PlayerSidePanel extends ConsumerWidget {
                       panels: panels,
                       controller: panelController,
                       track: track,
-                      playback: playback,
+                      active: active,
                       useQuadrants: maxOpen == 4,
                     );
                   },
@@ -76,14 +77,14 @@ class _ResponsivePanelSections extends StatelessWidget {
     required this.panels,
     required this.controller,
     required this.track,
-    required this.playback,
+    required this.active,
     required this.useQuadrants,
   });
 
   final PlayerPanelState panels;
   final PlayerPanelController controller;
   final Track track;
-  final PlaybackService playback;
+  final ActivePlayback active;
   final bool useQuadrants;
 
   @override
@@ -103,17 +104,17 @@ class _ResponsivePanelSections extends StatelessWidget {
     PlayerPanel.player => _PanelSection(
       title: 'Now playing',
       onClose: controller.togglePlayer,
-      child: _PlayerPanel(track: track, playback: playback),
+      child: _PlayerPanel(track: track, active: active),
     ),
     PlayerPanel.lyrics => _PanelSection(
       title: 'Lyrics',
       onClose: controller.toggleLyrics,
-      child: _LyricsPanel(track: track, playback: playback),
+      child: _LyricsPanel(track: track, active: active),
     ),
     PlayerPanel.queue => _PanelSection(
       title: 'Queue',
       onClose: controller.toggleQueue,
-      child: _QueuePanel(playback: playback),
+      child: _QueuePanel(active: active),
     ),
     PlayerPanel.history => _PanelSection(
       title: 'History',
@@ -341,90 +342,95 @@ class _PanelTab extends StatelessWidget {
 }
 
 class _PlayerPanel extends StatelessWidget {
-  const _PlayerPanel({required this.track, required this.playback});
+  const _PlayerPanel({required this.track, required this.active});
 
   final Track track;
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-    child: Column(
-      children: [
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final size = constraints.biggest.shortestSide;
-              return Align(
-                alignment: Alignment.bottomCenter,
-                child: Artwork(
-                  itemId: track.albumId ?? track.id,
-                  size: size,
-                  borderRadius: SpotifinRadii.card,
-                ),
-              );
-            },
+  Widget build(BuildContext context) {
+    final state = active.state;
+    final canShuffle = state.capabilities.contains(PlaybackCapability.shuffle);
+    final canRepeat = state.capabilities.contains(PlaybackCapability.repeat);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+      child: Column(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = constraints.biggest.shortestSide;
+                return Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Artwork(
+                    itemId: track.albumId ?? track.id,
+                    size: size,
+                    borderRadius: SpotifinRadii.card,
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: SpotifinSpacing.sm),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            track.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge,
+          const SizedBox(height: SpotifinSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              track.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
-        ),
-        const SizedBox(height: SpotifinSpacing.xxs),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PlayerCollectionLinks(
-            track: track,
-            style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: SpotifinSpacing.xxs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PlayerCollectionLinks(
+              track: track,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
-        ),
-        const SizedBox(height: SpotifinSpacing.xs),
-        _PanelProgress(playback: playback),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _ActiveControl(
-              tooltip: 'Shuffle',
-              active: playback.shuffle,
-              onPressed: playback.toggleShuffle,
-              icon: Icons.shuffle_rounded,
-            ),
-            IconButton(
-              tooltip: 'Previous',
-              iconSize: 32,
-              onPressed: playback.previous,
-              icon: const Icon(Icons.skip_previous_rounded),
-            ),
-            SpotifinPlayButton(
-              onPressed: playback.toggle,
-              playing: playback.playing,
-              large: true,
-            ),
-            IconButton(
-              tooltip: 'Next',
-              iconSize: 32,
-              onPressed: playback.next,
-              icon: const Icon(Icons.skip_next_rounded),
-            ),
-            _ActiveControl(
-              tooltip: 'Repeat',
-              active: playback.loopMode != LoopMode.off,
-              onPressed: playback.cycleRepeat,
-              icon: playback.loopMode == LoopMode.one
-                  ? Icons.repeat_one_rounded
-                  : Icons.repeat_rounded,
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: SpotifinSpacing.xs),
+          _PanelProgress(active: active),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _ActiveControl(
+                tooltip: 'Shuffle',
+                active: state.shuffle,
+                onPressed: canShuffle ? active.toggleShuffle : null,
+                icon: Icons.shuffle_rounded,
+              ),
+              IconButton(
+                tooltip: 'Previous',
+                iconSize: 32,
+                onPressed: active.previous,
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+              SpotifinPlayButton(
+                onPressed: active.toggle,
+                playing: state.playing,
+                large: true,
+              ),
+              IconButton(
+                tooltip: 'Next',
+                iconSize: 32,
+                onPressed: active.next,
+                icon: const Icon(Icons.skip_next_rounded),
+              ),
+              _ActiveControl(
+                tooltip: 'Repeat',
+                active: state.repeatMode != LoopMode.off,
+                onPressed: canRepeat ? active.cycleRepeat : null,
+                icon: state.repeatMode == LoopMode.one
+                    ? Icons.repeat_one_rounded
+                    : Icons.repeat_rounded,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ActiveControl extends StatelessWidget {
@@ -437,7 +443,7 @@ class _ActiveControl extends StatelessWidget {
 
   final String tooltip;
   final bool active;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData icon;
 
   @override
@@ -450,68 +456,67 @@ class _ActiveControl extends StatelessWidget {
 }
 
 class _PanelProgress extends StatelessWidget {
-  const _PanelProgress({required this.playback});
+  const _PanelProgress({required this.active});
 
-  final PlaybackService playback;
-
-  @override
-  Widget build(BuildContext context) => StreamBuilder<Duration>(
-    stream: playback.player.positionStream,
-    builder: (context, snapshot) {
-      final position = snapshot.data ?? Duration.zero;
-      final duration = playback.player.duration ?? Duration.zero;
-      final maximum = duration.inMilliseconds.toDouble().clamp(
-        1.0,
-        double.infinity,
-      );
-      return Column(
-        children: [
-          Slider(
-            value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
-            max: maximum,
-            onChanged: (value) =>
-                playback.seek(Duration(milliseconds: value.round())),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _time(position),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              Text(
-                _time(duration),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ],
-      );
-    },
-  );
-}
-
-class _QueuePanel extends StatelessWidget {
-  const _QueuePanel({required this.playback});
-
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
   Widget build(BuildContext context) {
-    final queue = playback.upcomingQueue;
+    final state = active.state;
+    final position = state.position;
+    final duration = state.duration ?? Duration.zero;
+    final maximum = duration.inMilliseconds.toDouble().clamp(
+      1.0,
+      double.infinity,
+    );
+    return Column(
+      children: [
+        Slider(
+          value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
+          max: maximum,
+          onChanged: (value) =>
+              active.seek(Duration(milliseconds: value.round())),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(_time(position), style: Theme.of(context).textTheme.bodySmall),
+            Text(_time(duration), style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QueuePanel extends StatelessWidget {
+  const _QueuePanel({required this.active});
+
+  final ActivePlayback active;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = active.state;
+    final queue = state.upcoming;
+    final canEdit = state.capabilities.contains(
+      PlaybackCapability.queueEditing,
+    );
     return ReorderableListView.builder(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 112),
       buildDefaultDragHandles: false,
       itemCount: queue.length,
-      onReorderItem: playback.reorderUpcoming,
+      onReorderItem: canEdit
+          ? (oldIndex, newIndex) => active.reorderUpcoming(oldIndex, newIndex)
+          : (_, _) {},
       itemBuilder: (context, index) {
         final track = queue[index];
         return _QueueItem(
           key: ValueKey('$index-${track.id}'),
           track: track,
           index: index,
-          selected: index == 0 && playback.currentIndex != null,
-          playback: playback,
+          selected: index == 0 && state.index != null,
+          active: active,
+          canRemove: canEdit,
         );
       },
     );
@@ -523,14 +528,16 @@ class _QueueItem extends StatefulWidget {
     required this.track,
     required this.index,
     required this.selected,
-    required this.playback,
+    required this.active,
+    required this.canRemove,
     super.key,
   });
 
   final Track track;
   final int index;
   final bool selected;
-  final PlaybackService playback;
+  final ActivePlayback active;
+  final bool canRemove;
 
   @override
   State<_QueueItem> createState() => _QueueItemState();
@@ -549,7 +556,7 @@ class _QueueItemState extends State<_QueueItem> {
       selectedColor: SpotifinColors.accent,
       selectedTileColor: SpotifinColors.interactive,
       hoverColor: SpotifinColors.hover,
-      onTap: () => widget.playback.playUpcomingIndex(widget.index),
+      onTap: () => widget.active.playUpcomingIndex(widget.index),
       leading: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -601,7 +608,9 @@ class _QueueItemState extends State<_QueueItem> {
       ),
       trailing: IconButton(
         tooltip: 'Remove from queue',
-        onPressed: () => widget.playback.removeUpcomingAt(widget.index),
+        onPressed: widget.canRemove
+            ? () => widget.active.removeUpcomingAt(widget.index)
+            : null,
         icon: const Icon(Icons.close_rounded),
       ),
     ),
@@ -609,10 +618,10 @@ class _QueueItemState extends State<_QueueItem> {
 }
 
 class _LyricsPanel extends ConsumerStatefulWidget {
-  const _LyricsPanel({required this.track, required this.playback});
+  const _LyricsPanel({required this.track, required this.active});
 
   final Track track;
-  final PlaybackService playback;
+  final ActivePlayback active;
 
   @override
   ConsumerState<_LyricsPanel> createState() => _LyricsPanelState();
@@ -678,13 +687,10 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
       if (_lineKeys.length != lines.length) {
         _lineKeys = List.generate(lines.length, (_) => GlobalKey());
       }
-      return StreamBuilder<Duration>(
-        stream: widget.playback.player.positionStream,
-        builder: (context, positionSnapshot) {
-          final active = _activeLine(
-            lines,
-            positionSnapshot.data ?? Duration.zero,
-          );
+      return ListenableBuilder(
+        listenable: widget.active,
+        builder: (context, _) {
+          final active = _activeLine(lines, widget.active.state.position);
           _followActiveLine(active, lines.length);
           return NotificationListener<UserScrollNotification>(
             onNotification: (notification) {
@@ -706,7 +712,7 @@ class _LyricsPanelState extends ConsumerState<_LyricsPanel> {
                       : () {
                           _followingLyrics = true;
                           _activeIndex = -1;
-                          widget.playback.seek(line.start!);
+                          widget.active.seek(line.start!);
                         },
                   borderRadius: BorderRadius.circular(SpotifinRadii.small),
                   child: Padding(

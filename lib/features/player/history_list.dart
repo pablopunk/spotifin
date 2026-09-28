@@ -34,13 +34,14 @@ class HistoryList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     final serverStream = ref.watch(recentlyPlayedStreamProvider);
     final syncError = ref.watch(appControllerProvider).syncError;
     return ListenableBuilder(
-      listenable: playback,
+      listenable: active,
       builder: (context, _) {
-        final sessionTracks = playback.history;
+        // History selection routes through the owner so Cast stays Cast.
+        final sessionTracks = active.state.history;
         return StreamBuilder<List<Track>>(
           stream: serverStream,
           builder: (context, snapshot) {
@@ -196,7 +197,8 @@ class _HistoryRowState extends ConsumerState<_HistoryRow> {
     onExit: (_) => setState(() => _hovered = false),
     child: ListTile(
       hoverColor: SpotifinColors.hover,
-      onTap: () => ref.read(playbackProvider).playHistoryTrack(widget.track),
+      onTap: () =>
+          ref.read(activePlaybackProvider).playHistoryTrack(widget.track),
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(SpotifinRadii.small),
         child: Stack(
