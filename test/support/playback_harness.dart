@@ -70,6 +70,11 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   /// When set, [seek]/[seekToNext]/[seekToPrevious] wait for this gate.
   Completer<void>? seekGate;
 
+  /// When set, incremental audio edits ([addAudioSource], [addAudioSources],
+  /// [insertAudioSources], [removeAudioSourceAt], [moveAudioSource]) throw
+  /// this error instead of completing.
+  Object? audioError;
+
   /// When set, [setAudioSources] throws this error instead of completing.
   Object? loadError;
 
@@ -180,12 +185,16 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   @override
   Future<void> addAudioSource(AudioSource audioSource) async {
     calls.add('addAudioSource');
+    final error = audioError;
+    if (error != null) throw error;
     sources.add(audioSource);
   }
 
   @override
   Future<void> addAudioSources(List<AudioSource> audioSources) async {
     calls.add('addAudioSources');
+    final error = audioError;
+    if (error != null) throw error;
     sources.addAll(audioSources);
   }
 
@@ -195,12 +204,16 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
     List<AudioSource> audioSources,
   ) async {
     calls.add('insertAudioSources');
+    final error = audioError;
+    if (error != null) throw error;
     sources.insertAll(index.clamp(0, sources.length), audioSources);
   }
 
   @override
   Future<void> removeAudioSourceAt(int index) async {
     calls.add('removeAudioSourceAt');
+    final error = audioError;
+    if (error != null) throw error;
     if (index >= 0 && index < sources.length) {
       sources.removeAt(index);
     }
@@ -214,6 +227,8 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   @override
   Future<void> moveAudioSource(int currentIndex, int newIndex) async {
     calls.add('moveAudioSource');
+    final error = audioError;
+    if (error != null) throw error;
     if (currentIndex < 0 ||
         currentIndex >= sources.length ||
         newIndex < 0 ||

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -13,11 +12,44 @@ import '../../storage/database.dart';
 import '../downloads/download_service.dart';
 import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
-import 'collection_queue.dart';
 import 'mobile_queue.dart';
 import 'playback_history.dart';
 import 'queue_item_identity.dart';
+import 'queue_state.dart';
 import 'remote_playback.dart';
+
+/// Occurrence id key inside [MediaItem] extras.
+///
+/// [MediaItem.id] stays the track id; the occurrence id addresses one queue
+/// entry so duplicate tracks and stale player events resolve unambiguously.
+const String kOccurrenceIdKey = 'occurrenceId';
+
+/// Source revision key inside [MediaItem] extras.
+///
+/// The revision increments on every committed audio source installation.
+/// Events whose tags carry an older revision are obsolete and ignored.
+const String kSourceRevisionKey = 'sourceRevision';
+
+/// Prior audio snapshot used to roll back a failed audio change.
+class _AudioSnapshot {
+  _AudioSnapshot({
+    required this.session,
+    required this.entries,
+    required this.index,
+    required this.position,
+    required this.playing,
+    required this.revision,
+  });
+
+  final JellyfinSession session;
+  final List<QueueEntry> entries;
+  final int index;
+  final Duration position;
+  final bool playing;
+
+  /// Source revision the snapshot's tags were built with.
+  final int revision;
+}
 
 class PlaybackService extends ChangeNotifier implements RemotePlayback {
   PlaybackService(
@@ -35,7 +67,9 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _subscriptions.add(
       _player.playerStateStream.listen((playerState) {
         if (playerState.processingState == ProcessingState.completed) {
-          unawaited(_finishCompletedQueue());
+          unawaited(
+            _enqueue((generation) => _finishCompletedQueueNow(generation)),
+          );
         } else {
           unawaited(_reportProgress());
         }
@@ -43,11 +77,8 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       }),
     );
     _subscriptions.add(
-      _player.currentIndexStream.listen((_) {
-        if (_loadingSources) return;
-        _handleTrackChange();
-        _saveQueue();
-        notifyListeners();
+      _player.currentIndexStream.listen((index) {
+        _onIndexEvent(index);
       }),
     );
     _subscriptions.add(
@@ -55,10 +86,10 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         final second = position.inSeconds;
         if (second != _lastSavedSecond) {
           _lastSavedSecond = second;
-          _savePosition(position);
+          _persistPosition(position);
         }
         if (second % 10 == 0) {
-          _reportProgress();
+          unawaited(_reportProgress());
         }
       }),
     );
@@ -78,42 +109,66 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   final StreamController<double> _volumeController =
       StreamController<double>.broadcast();
   final List<StreamSubscription<Object?>> _subscriptions = [];
+
+  /// Ordered network report lane (Jellyfin playback reports only).
   Future<void> _reportQueue = Future.value();
-  Future<void> _navigation = Future.value();
-  final Set<String> _pendingHistorySync = {};
-  JellyfinSession? _session;
-  List<Track> _queue = [];
-  List<String> _playlistItemIds = [];
+
+  /// One private operation chain ordering every queue edit, replacement,
+  /// restore, takeover, shuffle, extension, navigation, completion, and
+  /// clear. Public methods enqueue exactly once; private implementations
+  /// call each other directly and never await another chain task.
+  Future<void> _operations = Future.value();
+
+  /// Serialized local persistence lane (state-store writes only).
+  Future<void> _persistence = Future.value();
+
   final Map<String, Track> _tracksById = {};
   final PlaybackHistory _history = PlaybackHistory();
-  bool _loadingSources = false;
+
+  /// Single owner of queue entry identity, collection context, loaded
+  /// window, current index, and the shuffle flag.
+  QueueState _state = QueueState.empty();
+
+  /// Account generation invalidating older work. [clear] and account changes
+  /// bump it synchronously, before waiting for the chain; queued operations
+  /// capture it and drop stale commits, saves, and reports.
+  int _accountGeneration = 0;
+
+  /// Audio source revision tagging installed [MediaItem] extras. Incremented
+  /// only on committed source installations; stale tagged events are ignored.
+  int _sourceRevision = 0;
+
+  /// True while a chain task applies audio work. Index/completion events in
+  /// this window must not publish intermediate state; the committing task
+  /// reconciles the actual active source once afterwards.
+  bool _audioInstalling = false;
+
+  /// Last occurrence for which a transition was committed or processed.
+  /// Repeat events for it are already-processed duplicates.
+  String? _lastProcessedOccurrenceId;
+
+  JellyfinSession? _session;
   bool _smallStreaming = false;
   bool _normalization = false;
   double _userVolume = 1;
   double _normalizationMultiplier = 1;
-  bool _shuffle = false;
   LoopMode _loopMode = LoopMode.off;
   String? _reportedTrackId;
-  String? _reportedPlaylistItemId;
+  String? _reportedOccurrenceId;
   String? _playSessionId;
   int _lastReportedSecond = -1;
   int _lastSavedSecond = -1;
   bool _castingActive = false;
-  List<Track> _context = const [];
-  int _contextStart = 0;
-  int _contextEnd = 0;
-  bool _extendingQueue = false;
   final math.Random _random;
 
-  static const _initialQueueSize = 100;
-  static const _queueLookBehind = 20;
-  static const _queueExtensionSize = 100;
   static const _queueExtensionThreshold = 15;
 
   AudioPlayer get player => _player;
   double get volume => _userVolume;
   Stream<double> get volumeStream => _volumeController.stream;
-  List<Track> get queue => UnmodifiableListView(_queue);
+
+  /// Currently loaded queue tracks.
+  List<Track> get queue => _state.loadedTracks;
 
   /// Whether a Chromecast receiver currently owns playback.
   ///
@@ -136,41 +191,51 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   /// Visible queue: current track first, then remaining upcoming tracks.
   ///
-  /// The underlying full [queue] is unchanged. Played entries before
+  /// The underlying loaded queue is unchanged. Played entries before
   /// [currentIndex] are hidden here; use [history] to go back to them.
   List<Track> get upcomingQueue =>
-      MobileQueueView.upcoming(_queue, currentIndex);
+      MobileQueueView.upcoming(queue, currentIndex);
 
   /// Full-queue index backing `upcomingQueue[0]`.
   int get upcomingOffset =>
-      MobileQueueView.offsetFor(currentIndex, _queue.length);
+      MobileQueueView.offsetFor(currentIndex, queue.length);
   bool get playing => _player.playing;
-  bool get shuffle => _shuffle;
+  bool get shuffle => _state.shuffle;
   LoopMode get loopMode => _loopMode;
-  int? get currentIndex => _player.currentIndex;
+
+  /// Window-relative index of the current entry in the committed state.
+  int? get currentIndex => _state.currentIndex;
+
   Track? get currentTrack {
     final tag = _player.sequenceState.currentSource?.tag;
     if (tag is MediaItem) {
-      final sourceTrack = _tracksById[tag.id];
-      if (sourceTrack != null) return sourceTrack;
+      final occurrenceId = tag.extras?[kOccurrenceIdKey] as String?;
+      if (occurrenceId != null) {
+        final match = _findLoadedByOccurrence(occurrenceId);
+        if (match != null) return match.track;
+      }
     }
-    final index = currentIndex;
-    return index == null || index < 0 || index >= _queue.length
-        ? null
-        : _queue[index];
+    return _state.currentEntry?.track;
   }
 
   Future<void> configure(
     JellyfinSession session, {
     bool smallStreaming = false,
     bool normalization = false,
-  }) async {
+  }) {
+    final previous = _session;
+    if (previous == null || _accountId(session) != _accountId(previous)) {
+      _accountGeneration++;
+    }
     _session = session;
     _smallStreaming = smallStreaming;
     _normalization = normalization;
-    await _configureAudioSession();
-    final track = currentTrack;
-    if (track != null) await _applyGain(track);
+    return _enqueue((generation) async {
+      await _configureAudioSession();
+      if (generation != _accountGeneration) return;
+      final track = currentTrack;
+      if (track != null) await _applyGain(track);
+    });
   }
 
   static Future<void> _defaultConfigureAudioSession() async {
@@ -182,107 +247,185 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     List<Track> tracks, {
     int? startIndex,
     bool? shuffle,
-  }) async {
-    if (tracks.isEmpty || _session == null) return;
-    if (shuffle != null) _shuffle = shuffle;
-    final prepared = CollectionQueue.prepare(
+  }) => _enqueue(
+    (generation) => _replaceQueueNow(
       tracks,
-      shuffle: _shuffle,
-      random: _random,
       startIndex: startIndex,
+      shuffle: shuffle,
+      generation: generation,
+      autoplay: true,
+    ),
+  );
+
+  Future<void> _replaceQueueNow(
+    List<Track> tracks, {
+    int? startIndex,
+    bool? shuffle,
+    required int generation,
+    required bool autoplay,
+  }) async {
+    final session = _session;
+    if (tracks.isEmpty || session == null) return;
+    final candidate = QueueState.prepare(
+      tracks,
+      startIndex: startIndex,
+      shuffle: shuffle ?? _state.shuffle,
+      random: _random,
+      newId: _newPlaylistItemId,
     );
-    _context = prepared.context;
-    final start = math.max(0, prepared.index - _queueLookBehind);
-    _contextStart = start;
-    _contextEnd = math.min(_context.length, start + _initialQueueSize);
-    _queue = _context.sublist(start, _contextEnd);
-    _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
-    _rememberTracks(_queue);
-    await _loadSources(initialIndex: prepared.index - start);
-    unawaited(_player.play());
-    unawaited(_reportProgress(force: true));
+    await _installCollection(
+      candidate: candidate,
+      session: session,
+      generation: generation,
+      initialPosition: Duration.zero,
+      autoplay: autoplay,
+    );
   }
 
-  Future<void> playTrack(Track track, List<Track> context) async {
-    final index = context.indexWhere((item) => item.id == track.id);
-    await replaceQueue(context, startIndex: index < 0 ? 0 : index);
-  }
+  Future<void> playTrack(Track track, List<Track> context) =>
+      _enqueue((generation) async {
+        final index = context.indexWhere((item) => item.id == track.id);
+        await _replaceQueueNow(
+          context,
+          startIndex: index < 0 ? 0 : index,
+          generation: generation,
+          autoplay: true,
+        );
+      });
 
   @override
-  Future<void> addToQueue(Track track) async {
+  Future<void> addToQueue(Track track) =>
+      _enqueue((generation) => _addToQueueNow(track, generation));
+
+  Future<void> _addToQueueNow(Track track, int generation) async {
     final session = _session;
     if (session == null) return;
-    _stopAutomaticQueueExpansion();
-    _queue = [..._queue, track];
-    _playlistItemIds.add(_newPlaylistItemId());
+    final candidate = _state.append(track, newId: _newPlaylistItemId);
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() async {
+        await _player.addAudioSource(
+          (await _sources(session, [
+            candidate.entries.last,
+          ], prior.revision)).single,
+        );
+      });
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
+    }
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
     _rememberTracks([track]);
-    final sources = await _sources(session, [track]);
-    await _player.addAudioSource(sources.single);
-    await _saveQueue();
+    await _persistCommittedState(generation);
     unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
   @override
-  Future<void> addNextToQueue(List<Track> tracks) async {
+  Future<void> addNextToQueue(List<Track> tracks) =>
+      _enqueue((generation) => _insertNextNow(tracks, generation));
+
+  Future<void> _insertNextNow(List<Track> tracks, int generation) async {
     final session = _session;
     if (session == null || tracks.isEmpty) return;
-    _stopAutomaticQueueExpansion();
-    final insertAt = math.min((currentIndex ?? -1) + 1, _queue.length);
-    _queue.insertAll(insertAt, tracks);
-    _playlistItemIds.insertAll(
-      insertAt,
-      tracks.map((_) => _newPlaylistItemId()),
-    );
-    _rememberTracks(tracks);
-    await _player.insertAudioSources(insertAt, await _sources(session, tracks));
-    await _saveQueue();
-    unawaited(_reportProgress(force: true));
-    notifyListeners();
-  }
-
-  Future<void> removeAt(int index) async {
-    if (index < 0 || index >= _queue.length) return;
-    _stopAutomaticQueueExpansion();
-    _queue.removeAt(index);
-    _playlistItemIds.removeAt(index);
-    await _player.removeAudioSourceAt(index);
-    await _saveQueue();
-    unawaited(_reportProgress(force: true));
-    notifyListeners();
-  }
-
-  Future<void> removeTrack(String trackId) async {
-    _stopAutomaticQueueExpansion();
-    _context = _context.where((track) => track.id != trackId).toList();
-    _contextEnd = math.min(_contextEnd, _context.length);
-    for (var index = _queue.length - 1; index >= 0; index--) {
-      if (_queue[index].id != trackId) continue;
-      _queue.removeAt(index);
-      _playlistItemIds.removeAt(index);
-      await _player.removeAudioSourceAt(index);
+    final base = _state;
+    final candidate = base.insertNext(tracks, newId: _newPlaylistItemId);
+    // The audio list mirrors the loaded window, so translation is
+    // window-relative; the collapsed candidate starts at zero.
+    final insertAt = (base.currentIndex ?? -1) + 1;
+    final added = candidate.entries.sublist(insertAt, insertAt + tracks.length);
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() async {
+        await _player.insertAudioSources(
+          insertAt,
+          await _sources(session, added, prior.revision),
+        );
+      });
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
     }
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    _rememberTracks(tracks);
+    await _persistCommittedState(generation);
+    unawaited(_reportProgress(force: true));
+    notifyListeners();
+  }
+
+  Future<void> removeAt(int index) =>
+      _enqueue((generation) => _removeAtNow(index, generation));
+
+  Future<void> _removeAtNow(int index, int generation) async {
+    final session = _session;
+    if (session == null) return;
+    final candidate = _state.removeAt(index);
+    if (identical(candidate, _state)) return;
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() => _player.removeAudioSourceAt(index));
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
+    }
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    await _persistCommittedState(generation);
+    unawaited(_reportProgress(force: true));
+    notifyListeners();
+  }
+
+  Future<void> removeTrack(String trackId) =>
+      _enqueue((generation) => _removeTrackNow(trackId, generation));
+
+  Future<void> _removeTrackNow(String trackId, int generation) async {
+    final session = _session;
+    if (session == null) return;
+    final base = _state;
+    final candidate = base.removeTrack(trackId);
+    if (identical(candidate, _state)) return;
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() async {
+        final loaded = base.loadedEntries;
+        for (var index = loaded.length - 1; index >= 0; index--) {
+          if (loaded[index].track.id != trackId) continue;
+          await _player.removeAudioSourceAt(index);
+        }
+      });
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
+    }
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
     _tracksById.remove(trackId);
     _history.removeTrack(trackId);
-    await _saveQueue();
+    await _persistCommittedState(generation);
     unawaited(_reportProgress(force: true));
     notifyListeners();
   }
 
-  Future<void> reorder(int oldIndex, int newIndex) async {
-    if (oldIndex < 0 ||
-        oldIndex >= _queue.length ||
-        newIndex < 0 ||
-        newIndex >= _queue.length) {
-      return;
+  Future<void> reorder(int oldIndex, int newIndex) =>
+      _enqueue((generation) => _reorderNow(oldIndex, newIndex, generation));
+
+  Future<void> _reorderNow(int oldIndex, int newIndex, int generation) async {
+    final session = _session;
+    if (session == null) return;
+    final candidate = _state.reorder(oldIndex, newIndex);
+    if (identical(candidate, _state)) return;
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() => _player.moveAudioSource(oldIndex, newIndex));
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
     }
-    _stopAutomaticQueueExpansion();
-    final track = _queue.removeAt(oldIndex);
-    final playlistItemId = _playlistItemIds.removeAt(oldIndex);
-    _queue.insert(newIndex, track);
-    _playlistItemIds.insert(newIndex, playlistItemId);
-    await _player.moveAudioSource(oldIndex, newIndex);
-    await _saveQueue();
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    await _persistCommittedState(generation);
     unawaited(_reportProgress(force: true));
     notifyListeners();
   }
@@ -294,147 +437,183 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   /// overlay alone. Preserves the previous history-tap behavior: the track is
   /// queued next and playback jumps to it, leaving the rest of the queue
   /// intact.
-  Future<void> playHistoryTrack(Track track) async {
+  Future<void> playHistoryTrack(Track track) =>
+      _enqueue((generation) => _playHistoryTrackNow(track, generation));
+
+  Future<void> _playHistoryTrackNow(Track track, int generation) async {
     if (_session == null) return;
     _rememberTracks([track]);
-    await addNextToQueue([track]);
-    await playQueueIndex((currentIndex ?? -1) + 1);
+    await _insertNextNow([track], generation);
+    if (generation != _accountGeneration) return;
+    final target = (_state.currentIndex ?? -1) + 1;
+    await _playQueueIndexNow(target, generation);
   }
 
   /// Plays a mobile (upcoming-view) index.
   ///
   /// Mobile index 0 is the current track; translation keeps desktop's
   /// full-queue indices untouched.
-  Future<void> playUpcomingIndex(int mobileIndex) async {
+  Future<void> playUpcomingIndex(int mobileIndex) => _enqueue((generation) {
     final full = MobileQueueView.toFullIndex(
       mobileIndex,
-      currentIndex,
-      _queue.length,
+      _state.currentIndex,
+      _state.loadedEntries.length,
     );
-    if (full < 0) return;
-    await playQueueIndex(full);
-  }
+    if (full < 0) return Future.value();
+    return _playQueueIndexNow(full, generation);
+  });
 
   /// Removes a mobile (upcoming-view) index.
-  Future<void> removeUpcomingAt(int mobileIndex) async {
+  Future<void> removeUpcomingAt(int mobileIndex) => _enqueue((generation) {
     final full = MobileQueueView.toFullIndex(
       mobileIndex,
-      currentIndex,
-      _queue.length,
+      _state.currentIndex,
+      _state.loadedEntries.length,
     );
-    if (full < 0) return;
-    await removeAt(full);
-  }
+    if (full < 0) return Future.value();
+    return _removeAtNow(full, generation);
+  });
 
   /// Reorders within the mobile (upcoming-view) list.
   ///
   /// The current track stays pinned at mobile index 0: moves involving it
   /// are ignored so the mobile queue always keeps current first and only
   /// the remaining upcoming order changes.
-  Future<void> reorderUpcoming(int oldMobileIndex, int newMobileIndex) async {
-    final translated = MobileQueueView.reorderFullIndices(
-      oldMobileIndex,
-      newMobileIndex,
-      currentIndex,
-      _queue.length,
-    );
-    if (translated == null) return;
-    await reorder(translated.$1, translated.$2);
-  }
+  Future<void> reorderUpcoming(int oldMobileIndex, int newMobileIndex) =>
+      _enqueue((generation) {
+        final translated = MobileQueueView.reorderFullIndices(
+          oldMobileIndex,
+          newMobileIndex,
+          _state.currentIndex,
+          _state.loadedEntries.length,
+        );
+        if (translated == null) return Future.value();
+        return _reorderNow(translated.$1, translated.$2, generation);
+      });
 
   @override
-  Future<void> toggle() async {
+  Future<void> toggle() => _enqueue((generation) async {
     if (_player.playing) {
-      await _savePosition(_player.position);
-      await pause();
+      await _savePosition(_player.position, generation);
+      await _pauseNow(generation);
       return;
     }
-    await play();
-  }
+    await _playNow(generation);
+  });
 
   @override
-  Future<void> pause() async {
+  Future<void> pause() => _enqueue(_pauseNow);
+
+  Future<void> _pauseNow(int generation) async {
     if (!_player.playing) return;
-    await _player.pause();
+    await _guardedAudio(() => _player.pause());
+    if (generation != _accountGeneration) return;
     unawaited(_reportProgress(force: true));
   }
 
   @override
-  Future<void> play() async {
+  Future<void> play() => _enqueue(_playNow);
+
+  Future<void> _playNow(int generation) async {
     if (_player.playing) return;
+    // Never await AudioPlayer.play(): its future can represent the whole
+    // playback session rather than the request itself.
     unawaited(_player.play());
+    if (generation != _accountGeneration) return;
     unawaited(_reportProgress(force: true));
   }
 
   @override
-  Future<void> stop() async {
-    unawaited(_reportStop());
-    await _player.stop();
+  Future<void> stop() => _enqueue((generation) async {
+    _scheduleStopReport();
+    await _guardedAudio(() => _player.stop());
+    if (generation != _accountGeneration) return;
     notifyListeners();
-  }
+  });
 
   @override
-  Future<void> next() => _serializeNavigation(_nextNow);
+  Future<void> next() => _enqueue((generation) => _nextNow(generation));
 
-  Future<void> _nextNow() async {
-    final index = currentIndex;
-    if (index == null || _queue.isEmpty) return;
+  Future<void> _nextNow(int generation) async {
+    final state = _state;
+    final index = state.currentIndex;
+    if (index == null || state.loadedEntries.isEmpty) return;
     final next = index + 1;
-    if (next >= _queue.length) {
+    if (next >= state.loadedEntries.length) {
       // Queue exhaustion (or loop wrap handled by the player): keep the
       // previous just_audio behavior without manufacturing history.
-      await _player.seekToNext();
+      await _guardedAudio(() => _player.seekToNext());
       return;
     }
-    _history.record(_queue[index]);
-    _pendingHistorySync.add(_playlistItemIds[next]);
-    await _player.seekToNext();
-    await _saveQueue();
+    final outgoing = state.loadedEntries[index];
+    final target = state.loadedEntries[next];
+    await _guardedAudio(() => _player.seekToNext());
+    if (generation != _accountGeneration) return;
+    _history.record(outgoing.track);
+    final candidate = state.selectEntry(target.id);
+    _commitState(candidate, generation: generation);
+    _lastProcessedOccurrenceId = target.id;
+    _schedulePlayingReport(target);
+    unawaited(_persistCommittedState(generation));
+    unawaited(_extendQueueIfNeeded());
     notifyListeners();
   }
 
   Future<void> playQueueIndex(int index) =>
-      _serializeNavigation(() => _playQueueIndexNow(index));
+      _enqueue((generation) => _playQueueIndexNow(index, generation));
 
-  Future<void> _playQueueIndexNow(int index) async {
-    if (index < 0 || index >= _queue.length) return;
-    final current = currentIndex;
+  Future<void> _playQueueIndexNow(int index, int generation) async {
+    final state = _state;
+    if (index < 0 || index >= state.loadedEntries.length) return;
+    final current = state.currentIndex;
+    final target = state.loadedEntries[index];
     if (current != null && index == current) {
-      await _player.seek(Duration.zero, index: index);
+      await _guardedAudio(() => _player.seek(Duration.zero, index: index));
+      if (generation != _accountGeneration) return;
+      _lastProcessedOccurrenceId = target.id;
+      _schedulePlayingReport(target);
+      // Never await AudioPlayer.play().
       unawaited(_player.play());
       unawaited(_reportProgress(force: true));
       return;
     }
-    final target = _queue[index];
     if (current != null && index > current) {
       // Forward jump: the track being left was played.
-      if (current >= 0 && current < _queue.length) {
-        _history.record(_queue[current]);
+      if (current >= 0 && current < state.loadedEntries.length) {
+        _history.record(state.loadedEntries[current].track);
       }
     } else {
       // Backward jump: the target (and newer history) becomes
       // current/upcoming again, so unwind history instead of pushing.
       // Direction-first keeps duplicate track ids correct: a forward jump
       // onto a duplicate id still records, a backward jump never pushes.
-      if (_history.containsId(target.id)) {
-        _history.removeUpToId(target.id);
+      if (_history.containsId(target.track.id)) {
+        _history.removeUpToId(target.track.id);
       }
     }
-    _pendingHistorySync.add(_playlistItemIds[index]);
-    await _player.seek(Duration.zero, index: index);
+    await _guardedAudio(() => _player.seek(Duration.zero, index: index));
+    if (generation != _accountGeneration) return;
+    final candidate = state.selectEntry(target.id);
+    _commitState(candidate, generation: generation);
+    _lastProcessedOccurrenceId = target.id;
+    _schedulePlayingReport(target);
+    // Never await AudioPlayer.play().
     unawaited(_player.play());
     unawaited(_reportProgress(force: true));
-    await _saveQueue();
+    await _persistCommittedState(generation);
+    unawaited(_extendQueueIfNeeded());
     notifyListeners();
   }
 
   @override
-  Future<void> previous() => _serializeNavigation(_previousNow);
+  Future<void> previous() => _enqueue((generation) => _previousNow(generation));
 
-  Future<void> _previousNow() async {
-    if (_queue.isEmpty) return;
+  Future<void> _previousNow(int generation) async {
+    final state = _state;
+    if (state.loadedEntries.isEmpty) return;
     if (_player.position > const Duration(seconds: 4)) {
-      await _player.seek(Duration.zero);
+      await _guardedAudio(() => _player.seek(Duration.zero));
+      if (generation != _accountGeneration) return;
       unawaited(_reportProgress(force: true));
       return;
     }
@@ -442,60 +621,83 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       // No recorded history: preserve the old seekToPrevious fallback but
       // suppress the automatic history push so the upcoming list and
       // history stay distinct.
-      final index = currentIndex;
+      final index = state.currentIndex;
+      await _guardedAudio(() => _player.seekToPrevious());
+      if (generation != _accountGeneration) return;
       if (index != null && index - 1 >= 0) {
-        _pendingHistorySync.add(_playlistItemIds[index - 1]);
+        final candidate = state.selectEntry(state.loadedEntries[index - 1].id);
+        _commitState(candidate, generation: generation);
+        final entry = candidate.currentEntry;
+        _lastProcessedOccurrenceId = entry?.id;
+        if (entry != null) _schedulePlayingReport(entry);
       }
-      await _player.seekToPrevious();
       return;
     }
     final target = _history.mostRecent;
     if (target == null) {
-      await _player.seekToPrevious();
+      await _guardedAudio(() => _player.seekToPrevious());
       return;
     }
     final found =
         _findInQueueBeforeCurrent(target.id) ??
-        _queue.indexWhere((item) => item.id == target.id);
+        state.loadedTracks.indexWhere((item) => item.id == target.id);
     if (found < 0) {
       // History entry is no longer queued: drop it instead of stalling,
       // then fall back to the player behavior.
       _history.takeFirst();
-      await _saveQueue();
+      await _persistCommittedState(generation);
       notifyListeners();
-      await _player.seekToPrevious();
+      await _guardedAudio(() => _player.seekToPrevious());
       return;
     }
+    final entry = state.loadedEntries[found];
     _history.takeFirst();
-    _pendingHistorySync.add(_playlistItemIds[found]);
-    await _player.seek(Duration.zero, index: found);
+    await _guardedAudio(() => _player.seek(Duration.zero, index: found));
+    if (generation != _accountGeneration) return;
+    final candidate = state.selectEntry(entry.id);
+    _commitState(candidate, generation: generation);
+    _lastProcessedOccurrenceId = entry.id;
+    _schedulePlayingReport(entry);
+    // Never await AudioPlayer.play().
     unawaited(_player.play());
     unawaited(_reportProgress(force: true));
-    await _saveQueue();
+    await _persistCommittedState(generation);
     notifyListeners();
   }
 
   int? _findInQueueBeforeCurrent(String trackId) {
-    final current = currentIndex;
+    final current = _state.currentIndex;
     if (current == null) return null;
+    final loaded = _state.loadedEntries;
     for (var i = current - 1; i >= 0; i--) {
-      if (_queue[i].id == trackId) return i;
+      if (loaded[i].track.id == trackId) return i;
     }
     return null;
   }
 
-  Future<void> _serializeNavigation(Future<void> Function() task) {
-    final result = _navigation.then((_) => task());
-    _navigation = result.then<void>((_) {}, onError: (_, _) {});
+  /// Enqueues [task] on the single operation chain.
+  ///
+  /// The task is skipped when a [clear] or account change invalidated its
+  /// captured generation before it starts. The chain itself never breaks:
+  /// task errors reach the caller while the lane stays alive for the next
+  /// operation, so an operation after a prior failure still runs.
+  Future<void> _enqueue(Future<void> Function(int generation) task) {
+    final generation = _accountGeneration;
+    final result = _operations.then((_) {
+      if (generation != _accountGeneration) return Future<void>.value();
+      return task(generation);
+    });
+    _operations = result.then<void>((_) {}, onError: (_, _) {});
     return result;
   }
 
   @override
-  Future<void> seek(Duration position) async {
-    await _player.seek(position);
-    await _savePosition(position);
+  Future<void> seek(Duration position) => _enqueue((generation) async {
+    await _guardedAudio(() => _player.seek(position));
+    if (generation != _accountGeneration) return;
+    await _savePosition(position, generation);
     unawaited(_reportProgress(force: true));
-  }
+  });
 
   @override
   Future<void> setVolume(double volume) async {
@@ -505,317 +707,407 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     unawaited(_reportProgress(force: true));
   }
 
-  Future<void> toggleShuffle() async {
-    if (_shuffle) {
-      _shuffle = false;
-      await _player.setShuffleModeEnabled(false);
-      await _saveQueue();
-      unawaited(_reportProgress(force: true));
-      notifyListeners();
-      return;
-    }
-    _shuffle = true;
-    await _player.setShuffleModeEnabled(false);
-    final index = currentIndex;
-    if (index == null || _queue.isEmpty) {
-      await _saveQueue();
-      unawaited(_reportProgress(force: true));
-      notifyListeners();
-      return;
-    }
-    while (_extendingQueue) {
-      await Future.delayed(const Duration(milliseconds: 10));
-    }
-    _extendingQueue = true;
-    try {
-      final position = _player.position;
-      final wasPlaying = _player.playing;
-      _shuffleRemainder(index);
-      await _loadSources(initialIndex: index, initialPosition: position);
-      if (wasPlaying) unawaited(_player.play());
-    } finally {
-      _extendingQueue = false;
-    }
-    unawaited(_reportProgress(force: true));
-    notifyListeners();
-  }
+  Future<void> toggleShuffle() =>
+      _enqueue((generation) => _toggleShuffleNow(generation));
 
-  void _shuffleRemainder(int currentIndex) {
-    final queueSuffix = _queue.sublist(currentIndex + 1);
-    final idSuffix = _playlistItemIds.sublist(currentIndex + 1);
-    final tail = _contextEnd < _context.length
-        ? _context.sublist(_contextEnd)
-        : <Track>[];
-    final shuffled = CollectionQueue.shuffleRemainder(
-      queueSuffix: queueSuffix,
-      idSuffix: idSuffix,
-      tail: tail,
-      random: _random,
-      newId: _newPlaylistItemId,
+  Future<void> _toggleShuffleNow(int generation) async {
+    final session = _session;
+    if (session == null) return;
+    if (_state.shuffle) {
+      final marked = _state.withShuffle(false);
+      _commitState(marked, generation: generation);
+      await _persistCommittedState(generation);
+      unawaited(_reportProgress(force: true));
+      notifyListeners();
+      return;
+    }
+    final state = _state;
+    final index = state.currentIndex;
+    if (index == null || state.loadedEntries.isEmpty) {
+      final marked = state.withShuffle(true);
+      _commitState(marked, generation: generation);
+      await _persistCommittedState(generation);
+      unawaited(_reportProgress(force: true));
+      notifyListeners();
+      return;
+    }
+    // One candidate through the single commit path: the shuffle flag and
+    // the shuffled order publish together only on successful audio work.
+    final candidate = state.withShuffle(true).shuffleRemaining(random: _random);
+    await _installCollection(
+      candidate: candidate,
+      session: session,
+      generation: generation,
+      initialPosition: _player.position,
+      autoplay: _player.playing,
     );
-    _queue = [..._queue.sublist(0, currentIndex + 1), ...shuffled.queueTracks];
-    _playlistItemIds = [
-      ..._playlistItemIds.sublist(0, currentIndex + 1),
-      ...shuffled.queueIds,
-    ];
-    final prefixLength = _contextStart + currentIndex + 1;
-    _context = [
-      ..._context.sublist(0, prefixLength),
-      ...shuffled.queueTracks,
-      ...shuffled.tail,
-    ];
-    _rememberTracks(shuffled.queueTracks);
-    _rememberTracks(shuffled.tail);
   }
 
-  Future<void> cycleRepeat() async {
+  Future<void> cycleRepeat() => _enqueue((generation) async {
     _loopMode = switch (_loopMode) {
       LoopMode.off => LoopMode.all,
       LoopMode.all => LoopMode.one,
       LoopMode.one => LoopMode.off,
     };
-    await _player.setLoopMode(_loopMode);
+    await _guardedAudio(() => _player.setLoopMode(_loopMode));
+    if (generation != _accountGeneration) return;
     unawaited(_reportProgress(force: true));
     notifyListeners();
-  }
+  });
 
   @override
-  Future<void> setShuffle(bool enabled) async {
-    if (_shuffle == enabled) return;
-    await toggleShuffle();
-  }
+  Future<void> setShuffle(bool enabled) => _enqueue((generation) async {
+    if (_state.shuffle == enabled) return;
+    await _toggleShuffleNow(generation);
+  });
 
   @override
-  Future<void> setRepeatMode(LoopMode mode) async {
+  Future<void> setRepeatMode(LoopMode mode) => _enqueue((generation) async {
     if (_loopMode == mode) return;
     _loopMode = mode;
-    await _player.setLoopMode(mode);
+    await _guardedAudio(() => _player.setLoopMode(mode));
+    if (generation != _accountGeneration) return;
     unawaited(_reportProgress(force: true));
     notifyListeners();
-  }
+  });
 
   @override
   Future<void> takeOver(
     List<Track> tracks, {
     required int startIndex,
     required Duration position,
+  }) => _enqueue(
+    (generation) => _takeOverNow(
+      tracks,
+      startIndex: startIndex,
+      position: position,
+      generation: generation,
+    ),
+  );
+
+  Future<void> _takeOverNow(
+    List<Track> tracks, {
+    required int startIndex,
+    required Duration position,
+    required int generation,
   }) async {
-    if (tracks.isEmpty || _session == null) return;
-    final safeIndex = startIndex.clamp(0, tracks.length - 1);
-    _context = List.of(tracks);
-    _contextStart = 0;
-    _contextEnd = tracks.length;
-    _queue = List.of(tracks);
-    _playlistItemIds = tracks.map((_) => _newPlaylistItemId()).toList();
-    _rememberTracks(tracks);
-    final duration = Duration(
-      microseconds: tracks[safeIndex].durationTicks ~/ 10,
+    final session = _session;
+    if (tracks.isEmpty || session == null) return;
+    final candidate = QueueState.restore(
+      tracks,
+      index: startIndex.clamp(0, tracks.length - 1),
+      shuffle: _state.shuffle,
+      newId: _newPlaylistItemId,
     );
+    final selected = candidate.loadedTracks[candidate.currentIndex ?? 0];
+    final duration = Duration(microseconds: selected.durationTicks ~/ 10);
     final safePosition = position > duration ? duration : position;
-    await _loadSources(initialIndex: safeIndex, initialPosition: safePosition);
-    unawaited(_player.play());
-    unawaited(_reportProgress(force: true));
+    await _installCollection(
+      candidate: candidate,
+      session: session,
+      generation: generation,
+      initialPosition: safePosition,
+      autoplay: true,
+    );
   }
 
-  Future<void> restore(List<Track> catalog) async {
+  Future<void> restore(List<Track> catalog) =>
+      _enqueue((generation) => _restoreNow(catalog, generation));
+
+  Future<void> _restoreNow(List<Track> catalog, int generation) async {
     final session = _session;
     if (session == null || catalog.isEmpty) return;
     final encoded = await _stateStore.read(_accountId(session));
+    if (generation != _accountGeneration) return;
     if (encoded == null) return;
     final snapshot = jsonDecode(encoded) as Map<String, dynamic>;
     final ids = (snapshot['queue'] as List<dynamic>? ?? const [])
         .cast<String>();
     final byId = {for (final track in catalog) track.id: track};
-    _queue = ids.map((id) => byId[id]).whereType<Track>().toList();
-    if (_queue.isEmpty) return;
+    final tracks = ids.map((id) => byId[id]).whereType<Track>().toList();
+    if (tracks.isEmpty) return;
     // Older snapshots may contain a persisted 'history' list from when the
     // app maintained its own duplicate history. It is intentionally ignored:
     // Jellyfin is the durable history store and the session overlay starts
     // empty on every launch.
-    _shuffle = snapshot['shuffle'] as bool? ?? false;
-    _playlistItemIds = _queue.map((_) => _newPlaylistItemId()).toList();
-    _rememberTracks(_queue);
-    _context = List.of(_queue);
-    _contextStart = 0;
-    _contextEnd = _context.length;
-    final index = snapshot['index'] as int? ?? 0;
-    final milliseconds = snapshot['positionMilliseconds'] as int? ?? 0;
-    await _loadSources(
-      initialIndex: index.clamp(0, _queue.length - 1),
-      initialPosition: Duration(milliseconds: milliseconds),
+    final candidate = QueueState.restore(
+      tracks,
+      index: (snapshot['index'] as int? ?? 0),
+      shuffle: snapshot['shuffle'] as bool? ?? false,
+      newId: _newPlaylistItemId,
     );
+    final milliseconds = snapshot['positionMilliseconds'] as int? ?? 0;
+    await _installCollection(
+      candidate: candidate,
+      session: session,
+      generation: generation,
+      initialPosition: Duration(milliseconds: milliseconds),
+      autoplay: false,
+    );
+    if (generation != _accountGeneration) return;
     await _player.pause();
-    await _savePosition(_player.position);
+    await _savePosition(_player.position, generation);
   }
 
-  Future<void> clear() async {
+  Future<void> clear() {
+    // Invalidate older work immediately, before waiting for the chain, so
+    // in-flight operations cannot publish or report into the cleared state.
+    _accountGeneration++;
+    final generation = _accountGeneration;
+    return _enqueue((_) => _clearNow(generation));
+  }
+
+  Future<void> _clearNow(int generation) async {
     final session = _session;
-    unawaited(_reportStop());
-    await _player.stop();
-    _queue = [];
-    _playlistItemIds = [];
+    final accountKey = session == null ? null : _accountId(session);
+    _scheduleStopReport();
+    try {
+      await _player.stop();
+    } catch (_) {}
+    _state = QueueState.empty();
     _history.clear();
     _tracksById.clear();
-    _context = const [];
-    _contextStart = 0;
-    _contextEnd = 0;
-    _shuffle = false;
+    _lastProcessedOccurrenceId = null;
+    _reportedTrackId = null;
+    _reportedOccurrenceId = null;
+    _playSessionId = null;
     _loopMode = LoopMode.off;
     _session = null;
-    if (session != null) await _stateStore.clear(_accountId(session));
+    // Drain in-flight position writes first: they carry the older generation
+    // and drop, so no late write can recreate state after this clear.
+    await _persistence;
+    if (accountKey != null) {
+      await _stateStore.clear(accountKey);
+    }
+    if (generation != _accountGeneration) return;
     notifyListeners();
   }
 
-  Future<void> _loadSources({
+  /// Installs [candidate]'s loaded window as the live audio sources.
+  ///
+  /// Builds the candidate sources, applies them, and only then publishes the
+  /// candidate: history, persistence, and reports all follow a successful
+  /// commit. When audio work fails after partially changing native state,
+  /// the prior audio snapshot and position are reloaded; when recovery also
+  /// fails, audio stops while the prior logical queue is retained, and the
+  /// original failure is surfaced without publishing success.
+  Future<void> _installCollection({
+    required QueueState candidate,
+    required JellyfinSession session,
+    required int generation,
+    required Duration initialPosition,
+    required bool autoplay,
+  }) async {
+    final prior = _capturePriorAudio(session);
+    final revision = _sourceRevision + 1;
+    try {
+      await _guardedAudio(
+        () => _installSources(
+          entries: candidate.loadedEntries,
+          initialIndex: candidate.currentIndex ?? 0,
+          initialPosition: initialPosition,
+          revision: revision,
+        ),
+      );
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
+    }
+    if (generation != _accountGeneration) return;
+    _sourceRevision = revision;
+    _commitState(candidate, generation: generation);
+    _rememberTracks(candidate.collectionTracks);
+    await _reconcileActiveSource(generation);
+    // Never await AudioPlayer.play().
+    if (autoplay) unawaited(_player.play());
+    unawaited(_reportProgress(force: true));
+  }
+
+  Future<void> _installSources({
+    required List<QueueEntry> entries,
     required int initialIndex,
-    Duration initialPosition = Duration.zero,
+    required Duration initialPosition,
+    required int revision,
   }) async {
     final session = _session!;
-    _loadingSources = true;
+    await _player.stop();
+    await _player.clearAudioSources();
+    await _player.setAudioSources(
+      await _sources(session, entries, revision),
+      initialIndex: initialIndex,
+      initialPosition: initialPosition,
+    );
+    await _player.setShuffleModeEnabled(false);
+    await _player.seek(initialPosition, index: initialIndex);
+  }
+
+  /// Captures the prior audio snapshot before an audio change.
+  _AudioSnapshot _capturePriorAudio(JellyfinSession session) {
+    final state = _state;
+    return _AudioSnapshot(
+      session: session,
+      entries: List.of(state.loadedEntries),
+      index: state.currentIndex ?? 0,
+      position: _player.position,
+      playing: _player.playing,
+      revision: _sourceRevision,
+    );
+  }
+
+  /// Reloads the prior audio snapshot after a failed change and rethrows the
+  /// original [error]. When recovery also fails, audio stops while the prior
+  /// logical queue is retained.
+  Future<void> _recoverPriorAudio(_AudioSnapshot prior, {Object? error}) async {
     try {
+      final revision = _sourceRevision + 1;
       await _player.stop();
       await _player.clearAudioSources();
       await _player.setAudioSources(
-        await _sources(session, _queue),
-        initialIndex: initialIndex,
-        initialPosition: initialPosition,
+        await _sources(prior.session, prior.entries, revision),
+        initialIndex: prior.index,
+        initialPosition: prior.position,
       );
       await _player.setShuffleModeEnabled(false);
-      await _player.seek(initialPosition, index: initialIndex);
-    } finally {
-      _loadingSources = false;
+      await _player.seek(prior.position, index: prior.index);
+      _sourceRevision = revision;
+      // Never await AudioPlayer.play().
+      if (prior.playing) unawaited(_player.play());
+    } catch (_) {
+      try {
+        await _player.stop();
+      } catch (_) {}
     }
-    await _handleTrackChange();
-    await _saveQueue();
+    if (error != null) throw error;
+  }
+
+  /// Runs [work] while index/completion events are held back from publishing
+  /// intermediate state. The committing task reconciles once afterwards.
+  Future<T> _guardedAudio<T>(Future<T> Function() work) async {
+    _audioInstalling = true;
+    try {
+      return await work();
+    } finally {
+      _audioInstalling = false;
+    }
+  }
+
+  /// Publishes [candidate] as the committed state.
+  void _commitState(QueueState candidate, {required int generation}) {
+    _state = candidate;
+  }
+
+  QueueEntry? _findLoadedByOccurrence(String occurrenceId) {
+    for (final entry in _state.loadedEntries) {
+      if (entry.id == occurrenceId) return entry;
+    }
+    return null;
+  }
+
+  void _onIndexEvent(int? index) {
+    if (_audioInstalling) return;
+    final generation = _accountGeneration;
+    unawaited(_enqueue((_) => _handleIndexEvent(index, generation)));
+  }
+
+  /// Handles one committed index transition exactly once.
+  ///
+  /// The event's occurrence, revision, and index are validated against the
+  /// committed state and the current source. Obsolete revision events,
+  /// already-processed occurrence transitions, and stale echoes for an index
+  /// the player has already left are ignored.
+  Future<void> _handleIndexEvent(int? eventIndex, int generation) async {
+    if (generation != _accountGeneration) return;
+    final resolved = _resolveEventOccurrence(eventIndex);
+    if (resolved == null) return;
+    if (resolved.id == _lastProcessedOccurrenceId) return;
+    _recordHistory();
+    await _finalizeTransition(resolved, generation);
+  }
+
+  QueueEntry? _resolveEventOccurrence(int? eventIndex) {
+    final loaded = _state.loadedEntries;
+    if (loaded.isEmpty) return null;
+    final tag = _player.sequenceState.currentSource?.tag;
+    if (tag is MediaItem) {
+      final revision = tag.extras?[kSourceRevisionKey];
+      if (revision is int && revision != _sourceRevision) return null;
+      final occurrenceId = tag.extras?[kOccurrenceIdKey] as String?;
+      if (occurrenceId != null) {
+        return _findLoadedByOccurrence(occurrenceId);
+      }
+    }
+    if (eventIndex == null) return null;
+    // A player echo for an index that is no longer active is stale.
+    if (eventIndex != _player.currentIndex) return null;
+    if (eventIndex < 0 || eventIndex >= loaded.length) return null;
+    return loaded[eventIndex];
+  }
+
+  Future<void> _finalizeTransition(QueueEntry entry, int generation) async {
+    if (generation != _accountGeneration) return;
+    final candidate = _state.selectEntry(entry.id);
+    if (!identical(candidate, _state)) {
+      _commitState(candidate, generation: generation);
+    }
+    _lastProcessedOccurrenceId = entry.id;
+    unawaited(_extendQueueIfNeeded());
+    await _applyGain(entry.track);
+    _schedulePlayingReport(entry);
+    await _persistCommittedState(generation);
     notifyListeners();
   }
 
-  Future<List<AudioSource>> _sources(
-    JellyfinSession session,
-    List<Track> tracks,
-  ) async {
-    final local = await _downloads.resolveAll(tracks.map((track) => track.id));
-    return tracks
-        .map((track) => _source(session, track, local[track.id]))
-        .toList(growable: false);
-  }
-
-  AudioSource _source(JellyfinSession session, Track track, [Uri? local]) {
-    return AudioSource.uri(
-      local ?? _client.streamUri(session, track.id, small: _smallStreaming),
-      tag: MediaItem(
-        id: track.id,
-        title: track.name,
-        artist: track.artist,
-        album: track.album,
-        duration: Duration(microseconds: track.durationTicks ~/ 10),
-        artUri: _client.imageUri(session, track.albumId ?? track.id),
-      ),
-    );
-  }
-
-  Future<void> _saveQueue() async {
-    await _savePosition(_player.position);
-  }
-
-  Future<void> _savePosition(Duration position) async {
-    if (_queue.isEmpty) return;
-    final session = _session;
-    if (session == null) return;
-    await _stateStore.write(
-      _accountId(session),
-      jsonEncode({
-        'queue': _queue.map((track) => track.id).toList(),
-        'index': currentIndex ?? 0,
-        'positionMilliseconds': position.inMilliseconds,
-        'shuffle': _shuffle,
-      }),
-    );
-  }
-
-  String _accountId(JellyfinSession session) =>
-      '${session.serverId}.${session.userId}';
-
-  Future<void> _handleTrackChange() async {
-    final track = currentTrack;
-    final session = _session;
-    final playlistItemId = _currentPlaylistItemId;
-    if (track == null ||
-        session == null ||
-        track.id == _reportedTrackId &&
-            playlistItemId == _reportedPlaylistItemId) {
-      return;
+  /// Reconciles the actual active source once after a committed install.
+  Future<void> _reconcileActiveSource(int generation) async {
+    if (generation != _accountGeneration) return;
+    final loaded = _state.loadedEntries;
+    if (loaded.isEmpty) return;
+    QueueEntry? active;
+    final tag = _player.sequenceState.currentSource?.tag;
+    if (tag is MediaItem) {
+      final occurrenceId = tag.extras?[kOccurrenceIdKey] as String?;
+      if (occurrenceId != null) {
+        active = _findLoadedByOccurrence(occurrenceId);
+      }
     }
-    // Manual navigations (next/previous/direct selection/history replay)
-    // already keep history in sync synchronously and register the target
-    // playlist item here. Skipping the automatic record keeps queue display
-    // and history distinct: going back never duplicates the upcoming list.
-    if (playlistItemId != null && _pendingHistorySync.remove(playlistItemId)) {
-      // History already updated by the navigation itself.
-    } else {
-      _recordHistory();
+    final playerIndex = _player.currentIndex;
+    if (active == null &&
+        playerIndex != null &&
+        playerIndex >= 0 &&
+        playerIndex < loaded.length) {
+      active = loaded[playerIndex];
     }
-    unawaited(_extendQueueIfNeeded());
-    await _applyGain(track);
-    unawaited(_reportStop());
-    _reportedTrackId = track.id;
-    _reportedPlaylistItemId = playlistItemId;
-    final playSessionId =
-        '${DateTime.now().microsecondsSinceEpoch}-${track.id}';
-    _playSessionId = playSessionId;
-    _lastReportedSecond = -1;
-    if (_castingActive) return;
-    unawaited(
-      _serializeReport(() async {
-        try {
-          await _client.reportPlayback(
-            session,
-            '/Sessions/Playing',
-            track.id,
-            _player.position,
-            playSessionId: playSessionId,
-            paused: !_player.playing,
-            playlistItemId: playlistItemId,
-            queue: _reportedQueue,
-            volume: (_userVolume * 100).round(),
-            repeatMode: _reportedRepeatMode,
-            shuffle: _shuffle,
-          );
-        } catch (_) {}
-      }),
-    );
+    active ??= _state.currentEntry;
+    if (active == null) return;
+    await _finalizeTransition(active, generation);
   }
 
-  Future<void> _extendQueueIfNeeded() async {
+  Future<void> _extendQueueIfNeeded() =>
+      _enqueue((generation) => _extendNow(generation));
+
+  Future<void> _extendNow(int generation) async {
     final session = _session;
-    final index = currentIndex;
+    final state = _state;
+    final index = state.currentIndex;
     if (session == null ||
         index == null ||
-        _extendingQueue ||
-        _contextEnd >= _context.length ||
-        _queue.length - index > _queueExtensionThreshold) {
+        !state.hasUnloadedTail ||
+        state.loadedEntries.length - index > _queueExtensionThreshold) {
       return;
     }
-    _extendingQueue = true;
-    try {
-      final end = math.min(_context.length, _contextEnd + _queueExtensionSize);
-      final tracks = _context.sublist(_contextEnd, end);
-      _rememberTracks(tracks);
-      await _player.addAudioSources(await _sources(session, tracks));
-      _queue = [..._queue, ...tracks];
-      _playlistItemIds.addAll(tracks.map((_) => _newPlaylistItemId()));
-      _contextEnd = end;
-      await _saveQueue();
-      notifyListeners();
-    } finally {
-      _extendingQueue = false;
-    }
-  }
-
-  void _stopAutomaticQueueExpansion() {
-    _context = const [];
-    _contextStart = 0;
-    _contextEnd = 0;
+    final candidate = state.extend();
+    final added = candidate.loadedEntries.sublist(
+      state.windowEnd - state.windowStart,
+    );
+    if (added.isEmpty) return;
+    final revision = _sourceRevision;
+    await _guardedAudio(() async {
+      await _player.addAudioSources(await _sources(session, added, revision));
+    });
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    await _persistCommittedState(generation);
+    notifyListeners();
   }
 
   void _rememberTracks(Iterable<Track> tracks) {
@@ -830,10 +1122,12 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
       await _updateOutputVolume();
       return;
     }
+    final loaded = _state.loadedEntries;
     final albumQueue =
-        _queue.isNotEmpty &&
-        _queue.every(
-          (item) => item.albumId != null && item.albumId == track.albumId,
+        loaded.isNotEmpty &&
+        loaded.every(
+          (item) =>
+              item.track.albumId != null && item.track.albumId == track.albumId,
         );
     final gain = albumQueue
         ? track.albumNormalizationGain
@@ -854,47 +1148,225 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> _updateOutputVolume() =>
       _player.setVolume(_userVolume * _normalizationMultiplier);
 
-  Future<void> _reportProgress({bool force = false}) =>
-      _serializeReport(() => _reportProgressNow(force: force));
+  Future<List<AudioSource>> _sources(
+    JellyfinSession session,
+    List<QueueEntry> entries,
+    int revision,
+  ) async {
+    final local = await _downloads.resolveAll(
+      entries.map((entry) => entry.track.id),
+    );
+    return entries
+        .map(
+          (entry) => _source(session, entry, revision, local[entry.track.id]),
+        )
+        .toList(growable: false);
+  }
 
-  Future<void> _reportProgressNow({required bool force}) async {
+  AudioSource _source(
+    JellyfinSession session,
+    QueueEntry entry,
+    int revision, [
+    Uri? local,
+  ]) {
+    final track = entry.track;
+    return AudioSource.uri(
+      local ?? _client.streamUri(session, track.id, small: _smallStreaming),
+      tag: MediaItem(
+        id: track.id,
+        title: track.name,
+        artist: track.artist,
+        album: track.album,
+        duration: Duration(microseconds: track.durationTicks ~/ 10),
+        artUri: _client.imageUri(session, track.albumId ?? track.id),
+        extras: {kOccurrenceIdKey: entry.id, kSourceRevisionKey: revision},
+      ),
+    );
+  }
+
+  String _encodeState(QueueState state, Duration position) => jsonEncode({
+    'queue': [for (final entry in state.loadedEntries) entry.track.id],
+    'index': state.currentIndex ?? 0,
+    'positionMilliseconds': position.inMilliseconds,
+    'shuffle': state.shuffle,
+  });
+
+  Future<void> _persistCommittedState(int generation) =>
+      _persistSnapshot(_state, _player.position, generation);
+
+  Future<void> _savePosition(Duration position, int generation) =>
+      _persistSnapshot(_state, position, generation);
+
+  Future<void> _persistSnapshot(
+    QueueState state,
+    Duration position,
+    int generation,
+  ) {
+    final session = _session;
+    if (session == null || state.loadedEntries.isEmpty) {
+      return Future.value();
+    }
+    final accountKey = _accountId(session);
+    final encoded = _encodeState(state, position);
+    final result = _persistence.then((_) {
+      if (generation != _accountGeneration) return Future<void>.value();
+      return _stateStore.write(accountKey, encoded);
+    });
+    _persistence = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
+  /// Saves the current position from outside the operation chain (player
+  /// position events). The write is serialized with the producing operation
+  /// and dropped when a [clear] or account change invalidated its
+  /// generation, so no late write recreates state after [clear].
+  void _persistPosition(Duration position) {
+    final generation = _accountGeneration;
+    final session = _session;
+    final state = _state;
+    if (session == null || state.loadedEntries.isEmpty) return;
+    final accountKey = _accountId(session);
+    final encoded = _encodeState(state, position);
+    final result = _persistence.then((_) {
+      if (generation != _accountGeneration) return Future<void>.value();
+      return _stateStore.write(accountKey, encoded);
+    });
+    _persistence = result.then<void>((_) {}, onError: (_, _) {});
+  }
+
+  String _accountId(JellyfinSession session) =>
+      '${session.serverId}.${session.userId}';
+
+  Future<void> _reportProgress({bool force = false}) {
+    final generation = _accountGeneration;
+    final session = _session;
+    final trackId = _reportedTrackId;
+    final occurrenceId = _reportedOccurrenceId;
+    final playSessionId = _playSessionId;
+    if (session == null || trackId == null || playSessionId == null) {
+      return Future.value();
+    }
+    final accountKey = _accountId(session);
+    final second = _player.position.inSeconds;
+    if (!force && second == _lastReportedSecond) {
+      return Future.value();
+    }
+    final position = _player.position;
+    final playing = _player.playing;
+    final volume = (_userVolume * 100).round();
+    final repeatMode = _reportedRepeatMode;
+    final shuffle = _state.shuffle;
+    final currentOccurrenceId = occurrenceId;
+    final queue = _reportedQueue;
+    return _serializeReport(() async {
+      if (generation != _accountGeneration) return;
+      final current = _session;
+      if (current == null || _accountId(current) != accountKey) return;
+      // While a Chromecast receiver owns playback, the receiver reports as
+      // its own Jellyfin session; the phone stays silent to avoid double
+      // sessions.
+      if (_castingActive) return;
+      if (playSessionId != _playSessionId) return;
+      if (occurrenceId != _reportedOccurrenceId) return;
+      if (!force && second == _lastReportedSecond) return;
+      _lastReportedSecond = second;
+      try {
+        await _client.reportPlayback(
+          current,
+          '/Sessions/Playing/Progress',
+          trackId,
+          position,
+          playSessionId: playSessionId,
+          paused: !playing,
+          playlistItemId: currentOccurrenceId,
+          queue: queue,
+          volume: volume,
+          repeatMode: repeatMode,
+          shuffle: shuffle,
+        );
+      } catch (_) {}
+    });
+  }
+
+  void _schedulePlayingReport(QueueEntry entry) {
+    final generation = _accountGeneration;
+    final session = _session;
+    if (session == null) return;
+    final accountKey = _accountId(session);
+    _scheduleStopReport();
+    _reportedTrackId = entry.track.id;
+    _reportedOccurrenceId = entry.id;
+    final playSessionId =
+        '${DateTime.now().microsecondsSinceEpoch}-${entry.track.id}';
+    _playSessionId = playSessionId;
+    _lastReportedSecond = -1;
+    final position = _player.position;
+    final playing = _player.playing;
+    final volume = (_userVolume * 100).round();
+    final repeatMode = _reportedRepeatMode;
+    final shuffle = _state.shuffle;
+    final queue = _reportedQueue;
+    unawaited(
+      _serializeReport(() async {
+        if (generation != _accountGeneration) return;
+        final current = _session;
+        if (current == null || _accountId(current) != accountKey) return;
+        if (_castingActive) return;
+        if (playSessionId != _playSessionId) return;
+        try {
+          await _client.reportPlayback(
+            current,
+            '/Sessions/Playing',
+            entry.track.id,
+            position,
+            playSessionId: playSessionId,
+            paused: !playing,
+            playlistItemId: entry.id,
+            queue: queue,
+            volume: volume,
+            repeatMode: repeatMode,
+            shuffle: shuffle,
+          );
+        } catch (_) {}
+      }),
+    );
+  }
+
+  void _scheduleStopReport() {
+    final generation = _accountGeneration;
     final session = _session;
     final trackId = _reportedTrackId;
     final playSessionId = _playSessionId;
-    final second = _player.position.inSeconds;
+    _reportedTrackId = null;
+    _reportedOccurrenceId = null;
+    _playSessionId = null;
     if (session == null || trackId == null || playSessionId == null) return;
-    // While a Chromecast receiver owns playback, the receiver reports as its
-    // own Jellyfin session; the phone stays silent to avoid double sessions.
-    if (_castingActive) return;
-    if (!force && second == _lastReportedSecond) return;
-    _lastReportedSecond = second;
-    try {
-      await _client.reportPlayback(
-        session,
-        '/Sessions/Playing/Progress',
-        trackId,
-        _player.position,
-        playSessionId: playSessionId,
-        paused: !_player.playing,
-        playlistItemId: _currentPlaylistItemId,
-        queue: _reportedQueue,
-        volume: (_userVolume * 100).round(),
-        repeatMode: _reportedRepeatMode,
-        shuffle: _shuffle,
-      );
-    } catch (_) {}
-  }
-
-  String? get _currentPlaylistItemId {
-    final index = currentIndex;
-    return index == null || index < 0 || index >= _playlistItemIds.length
-        ? null
-        : _playlistItemIds[index];
+    final accountKey = _accountId(session);
+    final position = _player.position;
+    unawaited(
+      _serializeReport(() async {
+        if (generation != _accountGeneration) return;
+        final current = _session;
+        // The final stopped report for the outgoing owner is still
+        // delivered in order, even while a receiver owns playback; only a
+        // stale account drops it.
+        if (current == null || _accountId(current) != accountKey) return;
+        try {
+          await _client.reportPlayback(
+            current,
+            '/Sessions/Playing/Stopped',
+            trackId,
+            position,
+            playSessionId: playSessionId,
+          );
+        } catch (_) {}
+      }),
+    );
   }
 
   List<Map<String, String>> get _reportedQueue => [
-    for (var index = 0; index < _queue.length; index++)
-      {'Id': _queue[index].id, 'PlaylistItemId': _playlistItemIds[index]},
+    for (final entry in _state.loadedEntries)
+      {'Id': entry.track.id, 'PlaylistItemId': entry.id},
   ];
 
   String get _reportedRepeatMode => switch (_loopMode) {
@@ -904,30 +1376,6 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   };
 
   String _newPlaylistItemId() => _queueItemIdentity.next();
-
-  Future<void> _reportStop() {
-    final session = _session;
-    final trackId = _reportedTrackId;
-    final playSessionId = _playSessionId;
-    _reportedTrackId = null;
-    _reportedPlaylistItemId = null;
-    _playSessionId = null;
-    if (session == null || trackId == null || playSessionId == null) {
-      return Future.value();
-    }
-    final position = _player.position;
-    return _serializeReport(() async {
-      try {
-        await _client.reportPlayback(
-          session,
-          '/Sessions/Playing/Stopped',
-          trackId,
-          position,
-          playSessionId: playSessionId,
-        );
-      } catch (_) {}
-    });
-  }
 
   /// Records the outgoing track in the transient session overlay.
   ///
@@ -942,11 +1390,13 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _history.record(previous);
   }
 
-  Future<void> _finishCompletedQueue() async {
+  Future<void> _finishCompletedQueueNow(int generation) async {
+    if (generation != _accountGeneration) return;
     _recordHistory();
-    unawaited(_reportStop());
-    await _player.stop();
-    await _saveQueue();
+    _scheduleStopReport();
+    await _guardedAudio(() => _player.stop());
+    if (generation != _accountGeneration) return;
+    await _persistCommittedState(generation);
     notifyListeners();
   }
 
@@ -958,6 +1408,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
 
   @override
   void dispose() {
+    _accountGeneration++;
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
