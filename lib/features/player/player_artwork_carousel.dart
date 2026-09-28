@@ -71,7 +71,7 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
         final wide = constraints.maxWidth >= 576;
         final currentSize = constraints.maxHeight.clamp(
           0.0,
-          constraints.maxWidth * (wide ? .55 : .64),
+          constraints.maxWidth * (wide ? .68 : .72),
         );
         return SizedBox.expand(
           child: Stack(
@@ -85,7 +85,7 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
                   viewportWidth: constraints.maxWidth,
                   viewportHeight: constraints.maxHeight,
                   currentSize: currentSize,
-                  neighborSize: constraints.maxWidth * .28,
+                  neighborSize: constraints.maxWidth * .2,
                 ),
               ),
               Positioned.fill(
@@ -197,7 +197,7 @@ class _ArtworkCovers extends StatelessWidget {
     required this.neighborSize,
   });
 
-  static const viewportFraction = .34;
+  static const viewportFraction = .38;
   static const _neighborFade = .35;
 
   final PageController controller;
