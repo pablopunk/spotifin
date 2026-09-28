@@ -68,7 +68,7 @@ Future<void> _playLibrary(WidgetRef ref) async {
   );
   final tracks = await ref.read(databaseProvider).allTracksByDateAdded();
   if (tracks.isEmpty) return;
-  await playback.replaceQueue(tracks, startIndex: 0);
+  await ref.read(activePlaybackProvider).replaceQueue(tracks, startIndex: 0);
 }
 
 Future<AppState> _waitForReadySession(WidgetRef ref) async {

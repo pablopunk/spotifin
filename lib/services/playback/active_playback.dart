@@ -382,6 +382,17 @@ class ActivePlayback extends ChangeNotifier {
     },
   );
 
+  /// Explicit transfer to local playback for Jellyfin-addressed commands.
+  ///
+  /// When Cast owns playback, awaits `disconnect(resumeLocal: false)`, which
+  /// restores the edited Cast queue paused before the local action runs and
+  /// never autoplays. Failures propagate so a failed Cast stop prevents the
+  /// local action. No-op while already local.
+  Future<void> stopCastingForLocalTransfer() async {
+    if (_cast.ownership == CastOwnership.local) return;
+    await _cast.disconnect(resumeLocal: false);
+  }
+
   /// Explicit transfer to local playback.
   ///
   /// Delegates to a successful Cast disconnect/resume; the displayed

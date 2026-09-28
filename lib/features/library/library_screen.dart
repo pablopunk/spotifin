@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
 import '../../storage/database.dart';
 import '../../storage/track_artists.dart';
 import '../common/artwork.dart';
@@ -110,8 +110,9 @@ class _TrackList extends ConsumerWidget {
       child: CoverflowSection(
         viewId: libraryCoverflowViewId(CoverflowSource.tracks),
         items: items,
-        onCenterTap: (item) =>
-            ref.read(playbackProvider).playTrack(item.tracks.single, sorted),
+        onCenterTap: (item) => ref
+            .read(activePlaybackProvider)
+            .playTrack(item.tracks.single, sorted),
         list: ListView.builder(
           key: const PageStorageKey('library-songs'),
           padding: EdgeInsets.only(
@@ -149,7 +150,7 @@ class _AlbumList extends ConsumerWidget {
         onCenterTap: (item) => item.tracks.isEmpty
             ? null
             : ref
-                  .read(playbackProvider)
+                  .read(activePlaybackProvider)
                   .replaceQueue(item.tracks, shuffle: false),
         list: _CollectionGrid(entries: entries),
       ),
@@ -200,7 +201,7 @@ class _ArtistList extends ConsumerWidget {
         onCenterTap: (item) => item.tracks.isEmpty
             ? null
             : ref
-                  .read(playbackProvider)
+                  .read(activePlaybackProvider)
                   .replaceQueue(item.tracks, shuffle: false),
         list: _CollectionGrid(entries: entries, artist: true),
       ),
@@ -280,7 +281,7 @@ class _CollectionCard extends ConsumerWidget {
       ),
       onPlay: tracks.isEmpty
           ? null
-          : () => ref.read(playbackProvider).replaceQueue(tracks),
+          : () => ref.read(activePlaybackProvider).replaceQueue(tracks),
     );
     if (!menu) return card;
     return AlbumContextMenu(title: title, tracks: tracks, child: card);
@@ -330,7 +331,7 @@ class _ArtistAlbumsTab extends ConsumerWidget {
             onCenterTap: (item) => item.tracks.isEmpty
                 ? null
                 : ref
-                      .read(playbackProvider)
+                      .read(activePlaybackProvider)
                       .replaceQueue(item.tracks, shuffle: false),
             list: spotifinGrid(
               itemCount: albums.length,
@@ -496,7 +497,7 @@ class _PlaylistsTab extends ConsumerWidget {
             onCenterTap: (item) => item.tracks.isEmpty
                 ? null
                 : ref
-                      .read(playbackProvider)
+                      .read(activePlaybackProvider)
                       .replaceQueue(item.tracks, shuffle: false),
             list: spotifinGrid(
               itemCount: playlists.length,
@@ -534,7 +535,7 @@ class _PlaylistsTab extends ConsumerWidget {
                     onPlay: playlistTracks.isEmpty
                         ? null
                         : () => ref
-                              .read(playbackProvider)
+                              .read(activePlaybackProvider)
                               .replaceQueue(playlistTracks),
                   ),
                 );
@@ -727,7 +728,7 @@ class CollectionScreen extends ConsumerWidget {
     if (!kind.hasArtistTabs) {
       final viewId = collectionCoverflowViewId(kind.name, title, albumStableId);
       final coverflow = ref.watch(coverflowModeProvider(viewId));
-      final playback = ref.watch(playbackProvider);
+      final active = ref.watch(activePlaybackProvider);
       final items = trackCoverflowItems(sortedTracks);
       return MobileCoverflowScope(
         viewId: viewId,
@@ -747,26 +748,22 @@ class CollectionScreen extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 24),
                     child: ListenableBuilder(
-                      listenable: playback,
+                      listenable: active,
                       builder: (context, _) => CoverflowStage(
                         items: items,
                         initialIndex: ref.watch(
                           coverflowPositionProvider(viewId),
                         ),
-                        currentTrackId: playback.currentTrack?.id,
-                        playing: playback.playing,
+                        currentTrackId: active.state.track?.id,
+                        playing: active.state.playing,
                         onFocus: (index) => ref
                             .read(coverflowPositionProvider(viewId).notifier)
                             .set(index),
                         onCenterTap: (item) {
-                          if (playback.currentTrack?.id ==
-                              item.tracks.single.id) {
-                            playback.toggle();
+                          if (active.state.track?.id == item.tracks.single.id) {
+                            active.toggle();
                           } else {
-                            playback.playTrack(
-                              item.tracks.single,
-                              sortedTracks,
-                            );
+                            active.playTrack(item.tracks.single, sortedTracks);
                           }
                         },
                       ),
@@ -829,7 +826,7 @@ class CollectionScreen extends ConsumerWidget {
                   ),
                   items: trackCoverflowItems(sortedTracks),
                   onCenterTap: (item) => ref
-                      .read(playbackProvider)
+                      .read(activePlaybackProvider)
                       .playTrack(item.tracks.single, sortedTracks),
                   list: Column(
                     children: [
@@ -904,14 +901,14 @@ class _CollectionHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     return StreamBuilder<Map<String, DateTime>>(
       stream: ref.watch(albumDatesStreamProvider),
       initialData: const {},
       builder: (context, snapshot) => ListenableBuilder(
-        listenable: playback,
+        listenable: active,
         builder: (context, _) =>
-            _content(context, playback, snapshot.data ?? const {}),
+            _content(context, active, snapshot.data ?? const {}),
       ),
     );
   }
@@ -932,7 +929,7 @@ class _CollectionHeader extends ConsumerWidget {
 
   Widget _content(
     BuildContext context,
-    PlaybackService playback,
+    ActivePlayback active,
     Map<String, DateTime> albumDates,
   ) {
     final metadata = _collectionMetadata(kind, tracks, albumDates);
@@ -1000,7 +997,7 @@ class _CollectionHeader extends ConsumerWidget {
                           SpotifinPlayButton(
                             onPressed: tracks.isEmpty
                                 ? null
-                                : () => playback.replaceQueue(
+                                : () => active.replaceQueue(
                                     tracks,
                                     shuffle: false,
                                   ),
@@ -1008,12 +1005,12 @@ class _CollectionHeader extends ConsumerWidget {
                           const SizedBox(width: SpotifinSpacing.sm),
                           IconButton(
                             tooltip: 'Shuffle',
-                            color: playback.shuffle
+                            color: active.state.shuffle
                                 ? SpotifinColors.accent
                                 : SpotifinColors.textMuted,
                             onPressed: tracks.isEmpty
                                 ? null
-                                : () => playback.replaceQueue(
+                                : () => active.replaceQueue(
                                     tracks,
                                     shuffle: true,
                                   ),

@@ -1,16 +1,51 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/features/car/carplay_shuffle.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:spotifin/services/playback/active_playback_state.dart';
+import 'package:spotifin/storage/database.dart';
 
-class _Playback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
+
+Track _track(String id) => Track(
+  id: id,
+  name: id,
+  album: 'Album',
+  albumId: 'album',
+  artist: 'Artist',
+  artistItems: '[]',
+  labels: '',
+  durationTicks: 0,
+  container: '',
+  favorite: false,
+  playCount: 0,
+);
+
+ActivePlaybackState _state({required bool shuffle}) => ActivePlaybackState(
+  destination: PlaybackDestination.local,
+  track: _track('current'),
+  index: 0,
+  entryId: 'entry-0',
+  queue: [_track('current')],
+  upcoming: [_track('current')],
+  upcomingOffset: 0,
+  history: const [],
+  playing: true,
+  position: Duration.zero,
+  duration: Duration.zero,
+  volumeSlider: 1,
+  shuffle: shuffle,
+  repeatMode: LoopMode.off,
+  busy: false,
+  recovering: false,
+  capabilities: PlaybackCapability.values.toSet(),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'CarPlay shuffle follows playback and toggles it on button press',
+    'CarPlay shuffle follows the owner and toggles it on button press',
     () async {
       const channel = MethodChannel('spotifin/test_carplay_shuffle');
       final messages = <bool>[];
@@ -23,24 +58,9 @@ void main() {
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-      final playback = _Playback();
-      var shuffle = false;
-      VoidCallback? listener;
-      when(() => playback.shuffle).thenAnswer((_) => shuffle);
-      when(() => playback.addListener(any())).thenAnswer((invocation) {
-        listener = invocation.positionalArguments.single as VoidCallback;
-      });
-      when(() => playback.removeListener(any())).thenReturn(null);
-      when(() => playback.toggleShuffle()).thenAnswer((_) async {
-        shuffle = !shuffle;
-        listener!();
-      });
-
-      final controller = CarPlayShuffle(
-        playback,
-        channel: channel,
-        enabled: true,
-      )..start();
+      final active = FakeActivePlayback()..emit(_state(shuffle: false));
+      final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+        ..start();
       addTearDown(controller.dispose);
       await Future<void>.delayed(Duration.zero);
       expect(messages, [false]);
@@ -53,12 +73,39 @@ void main() {
         (_) {},
       );
       await Future<void>.delayed(Duration.zero);
-      verify(() => playback.toggleShuffle()).called(1);
-      expect(messages, [false, true]);
+      expect(active.actions, ['toggleShuffle']);
 
-      listener!();
+      active.emit(_state(shuffle: true));
       await Future<void>.delayed(Duration.zero);
       expect(messages, [false, true]);
+    },
+  );
+
+  test(
+    'CarPlay shuffle ignores presses while the capability is missing',
+    () async {
+      const channel = MethodChannel('spotifin/test_carplay_shuffle_disabled');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (_) async => null);
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final active = FakeActivePlayback()
+        ..emit(const ActivePlaybackState.empty());
+      final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+        ..start();
+      addTearDown(controller.dispose);
+
+      await messenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('toggleShuffle'),
+        ),
+        (_) {},
+      );
+      await Future<void>.delayed(Duration.zero);
+      // Empty capabilities: no owner action runs while frozen.
+      expect(active.actions, isEmpty);
     },
   );
 }

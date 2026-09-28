@@ -12,13 +12,13 @@ import '../jellyfin/remote_session.dart';
 import '../jellyfin/session.dart';
 import '../redaction.dart';
 import 'playback_handoff.dart';
-import 'playback_service.dart';
 import 'remote_command_handler.dart';
+import 'remote_playback.dart';
 
 class RemoteSessionService extends ChangeNotifier {
   RemoteSessionService(
     this._client,
-    PlaybackService playback,
+    RemotePlayback playback,
     AppDatabase database,
   ) : _commands = RemoteCommandHandler(playback, database),
       _handoff = PlaybackHandoff(_client, playback, database);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../services/playback/active_playback.dart';
 import '../../storage/database.dart';
 
 final _openTrackActionsProvider = NotifierProvider<_OpenTrackActions, Object?>(
@@ -74,15 +75,16 @@ class _MobileTrackQueueActionsState
                   _action(
                     icon: Icons.queue_play_next_rounded,
                     label: 'Play next',
-                    onTap: () => ref.read(playbackProvider).addNextToQueue([
-                      widget.track,
-                    ]),
+                    onTap: () => _guardedQueueAction(
+                      (owner) => owner.addNextToQueue([widget.track]),
+                    ),
                   ),
                   _action(
                     icon: Icons.playlist_add_rounded,
                     label: 'Add to queue',
-                    onTap: () =>
-                        ref.read(playbackProvider).addToQueue(widget.track),
+                    onTap: () => _guardedQueueAction(
+                      (owner) => owner.addToQueue(widget.track),
+                    ),
                   ),
                 ],
               ),
@@ -120,6 +122,18 @@ class _MobileTrackQueueActionsState
         ],
       ),
     );
+  }
+
+  Future<void> _guardedQueueAction(
+    Future<void> Function(ActivePlayback owner) action,
+  ) async {
+    try {
+      await action(ref.read(activePlaybackProvider));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$error')));
+    }
   }
 
   void _settle() {

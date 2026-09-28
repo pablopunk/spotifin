@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
@@ -11,10 +12,10 @@ import 'package:spotifin/features/coverflow/coverflow_controller.dart';
 import 'package:spotifin/features/coverflow/coverflow_model.dart';
 import 'package:spotifin/features/coverflow/coverflow_overlay.dart';
 import 'package:spotifin/features/coverflow/coverflow_stage.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
-class _MockPlayback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
 
 class _FakeTrack extends Fake implements Track {}
 
@@ -32,6 +33,60 @@ Track _track(String id, String name) => Track(
   playCount: 0,
 );
 
+ActivePlaybackState _ownerState({
+  List<Track> queue = const [],
+  int? index,
+  Track? track,
+  bool playing = false,
+}) => ActivePlaybackState(
+  destination: PlaybackDestination.local,
+  track: track,
+  index: index,
+  entryId: track == null ? null : 'entry-0',
+  queue: queue,
+  upcoming: index == null ? queue : queue.sublist(index),
+  upcomingOffset: index ?? 0,
+  history: const [],
+  playing: playing,
+  position: Duration.zero,
+  duration: Duration.zero,
+  volumeSlider: 1,
+  shuffle: false,
+  repeatMode: LoopMode.off,
+  busy: false,
+  recovering: false,
+  capabilities: PlaybackCapability.values.toSet(),
+);
+
+ActivePlaybackState _castOwnerState({required List<Track> queue}) =>
+    ActivePlaybackState(
+      destination: PlaybackDestination.cast,
+      track: queue.first,
+      index: 0,
+      entryId: 'entry-remote',
+      queue: queue,
+      upcoming: queue,
+      upcomingOffset: 0,
+      history: const [],
+      playing: true,
+      position: Duration.zero,
+      duration: Duration.zero,
+      volumeSlider: 0.4,
+      shuffle: false,
+      repeatMode: LoopMode.off,
+      busy: false,
+      recovering: false,
+      capabilities: const {
+        PlaybackCapability.transport,
+        PlaybackCapability.seek,
+        PlaybackCapability.volume,
+        PlaybackCapability.selection,
+        PlaybackCapability.queueEditing,
+        PlaybackCapability.shuffle,
+      },
+      connectedDeviceName: 'Living Room',
+    );
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakeTrack());
@@ -43,22 +98,16 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final queue = [_track('1', 'First'), _track('2', 'Second')];
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.queue).thenReturn(queue);
-    when(() => playback.currentIndex).thenReturn(0);
-    when(() => playback.currentTrack).thenReturn(queue.first);
-    when(() => playback.playing).thenReturn(false);
-    when(() => playback.toggle()).thenAnswer((_) async {});
+    active.emit(_ownerState(queue: queue, index: 0, track: queue.first));
 
     var dismissed = false;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -79,7 +128,7 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Cover for First'));
     await tester.pump();
-    verify(() => playback.toggle()).called(1);
+    expect(active.actions, ['toggle']);
 
     await tester.fling(
       find.byType(CoverflowStage),
@@ -87,7 +136,8 @@ void main() {
       1000,
     );
     await tester.pumpAndSettle();
-    verifyNever(() => playback.playQueueIndex(any()));
+    // Browsing alone sends no playback action.
+    expect(active.actions.where((action) => action != 'toggle'), isEmpty);
     expect(find.textContaining('Second'), findsWidgets);
 
     await tester.fling(find.byType(CoverflowStage), const Offset(0, 400), 1000);
@@ -111,19 +161,13 @@ void main() {
         album: const Value('Album'),
       ),
     ]);
-    final playback = _MockPlayback();
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.queue).thenReturn(const <Track>[]);
-    when(
-      () => playback.replaceQueue(any(), startIndex: any(named: 'startIndex')),
-    ).thenAnswer((_) async {});
+    final active = FakeActivePlayback()..emit(_ownerState());
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -145,20 +189,16 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final queued = _track('queue', 'Queued song');
     final albumTrack = _track('album-track', 'Album song');
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.currentTrack).thenReturn(queued);
-    when(() => playback.playing).thenReturn(false);
-    when(() => playback.playTrack(any(), any())).thenAnswer((_) async {});
+    active.emit(_ownerState(queue: [queued], index: 0, track: queued));
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -193,10 +233,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Album song'), findsOneWidget);
     await tester.tap(find.textContaining('Album song'));
-    verify(() => playback.playTrack(albumTrack, [albumTrack])).called(1);
+    expect(active.actions, ['playTrack']);
+    expect(active.actionArguments['playTrack'], [
+      albumTrack,
+      [albumTrack],
+    ]);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
     await tester.runAsync(database.close);
+  });
+
+  testWidgets('coverflow selection stays on Cast while casting', (
+    tester,
+  ) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final active = FakeActivePlayback();
+    final remote = _track('remote', 'Remote song');
+    final remoteNext = _track('remote-next', 'Remote next');
+    active.emit(_castOwnerState(queue: [remote, remoteNext]));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          activePlaybackProvider.overrideWithValue(active),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: Scaffold(body: CoverflowOverlay(onDismiss: () {})),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Remote song'), findsWidgets);
+    await tester.tap(find.bySemanticsLabel('Cover for Remote song'));
+    await tester.pump();
+    // Tapping the current cover toggles instead of starting local audio.
+    expect(active.actions, ['toggle']);
   });
 }

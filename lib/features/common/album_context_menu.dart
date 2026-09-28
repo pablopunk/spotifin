@@ -78,18 +78,34 @@ class AlbumContextMenu extends ConsumerWidget {
       items: _items(),
     );
     if (action == null || !context.mounted) return;
+    final owner = ref.read(activePlaybackProvider);
     if (action == 'play') {
-      await ref.read(playbackProvider).replaceQueue(tracks);
+      await _guardedQueueAction(context, () => owner.replaceQueue(tracks));
     } else if (action == 'playNext') {
-      await ref.read(playbackProvider).addNextToQueue(tracks);
+      await _guardedQueueAction(context, () => owner.addNextToQueue(tracks));
     } else if (action == 'queue') {
       for (final track in tracks) {
-        await ref.read(playbackProvider).addToQueue(track);
+        await _guardedQueueAction(context, () => owner.addToQueue(track));
       }
     } else if (action == 'download') {
       await _download(ref);
     } else if (action == 'delete') {
       await _delete(context, ref);
+    }
+  }
+
+  /// Runs an owner queue action, surfacing failures with the existing
+  /// visible error pattern instead of an unhandled future.
+  Future<void> _guardedQueueAction(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 

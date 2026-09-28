@@ -4,16 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
 
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
+import '../../services/playback/active_playback_state.dart';
 import '../../storage/database.dart';
 
 class CarPlayUpNext {
-  CarPlayUpNext(this.playback, {MethodChannel? channel, bool? enabled})
+  CarPlayUpNext(this.active, {MethodChannel? channel, bool? enabled})
     : _channel = channel ?? const MethodChannel('spotifin/carplay_up_next'),
       _enabled =
           enabled ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS);
 
-  final PlaybackService playback;
+  final ActivePlayback active;
   final MethodChannel _channel;
   final bool _enabled;
   bool? _lastAvailable;
@@ -21,7 +22,7 @@ class CarPlayUpNext {
   void start() {
     if (!_enabled) return;
     _channel.setMethodCallHandler(_handleCall);
-    playback.addListener(_syncAvailability);
+    active.addListener(_syncAvailability);
     _syncAvailability();
   }
 
@@ -34,7 +35,7 @@ class CarPlayUpNext {
   }
 
   CPListTemplate buildTemplate({int? limit}) {
-    final queue = playback.upcomingQueue;
+    final queue = active.state.upcoming;
     final visible = queue.take(limit ?? 50).toList();
     return CPListTemplate(
       title: 'Up Next',
@@ -53,15 +54,18 @@ class CarPlayUpNext {
   CPListItem _item(Track track, int index) => CPListItem(
     text: track.name,
     detailText: track.artist,
-    isPlaying: index == 0 && playback.currentIndex != null,
+    isPlaying: index == 0 && active.state.index != null,
     onPress: (complete, _) async {
       try {
-        final queue = playback.upcomingQueue;
+        if (!active.state.capabilities.contains(PlaybackCapability.selection)) {
+          return;
+        }
+        final queue = active.state.upcoming;
         final currentIndex = index < queue.length && queue[index].id == track.id
             ? index
             : queue.indexWhere((item) => item.id == track.id);
         if (currentIndex >= 0) {
-          await playback.playUpcomingIndex(currentIndex);
+          await active.playUpcomingIndex(currentIndex);
           await FlutterCarplay.pop();
         }
       } finally {
@@ -71,7 +75,7 @@ class CarPlayUpNext {
   );
 
   void _syncAvailability() {
-    final available = playback.upcomingQueue.isNotEmpty;
+    final available = active.state.upcoming.isNotEmpty;
     if (_lastAvailable == available) return;
     _lastAvailable = available;
     unawaited(_channel.invokeMethod<void>('setUpNextEnabled', available));
@@ -79,7 +83,7 @@ class CarPlayUpNext {
 
   void dispose() {
     if (!_enabled) return;
-    playback.removeListener(_syncAvailability);
+    active.removeListener(_syncAvailability);
     _channel.setMethodCallHandler(null);
   }
 }

@@ -9,12 +9,37 @@ import 'package:spotifin/features/coverflow/coverflow_controller.dart';
 import 'package:spotifin/features/coverflow/coverflow_header_toggle.dart';
 import 'package:spotifin/features/coverflow/coverflow_model.dart';
 import 'package:spotifin/features/coverflow/coverflow_overlay.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
-class _MockPlayback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
 
 class _FakeTrack extends Fake implements Track {}
+
+ActivePlaybackState _ownerState({
+  required List<Track> queue,
+  int index = 0,
+  bool playing = false,
+}) => ActivePlaybackState(
+  destination: PlaybackDestination.local,
+  track: queue.isEmpty ? null : queue[index.clamp(0, queue.length - 1)],
+  index: queue.isEmpty ? null : index,
+  entryId: queue.isEmpty ? null : 'entry-0',
+  queue: queue,
+  upcoming: queue.isEmpty ? const [] : queue.sublist(index),
+  upcomingOffset: queue.isEmpty ? 0 : index,
+  history: const [],
+  playing: playing,
+  position: Duration.zero,
+  duration: Duration.zero,
+  volumeSlider: 1,
+  shuffle: false,
+  repeatMode: LoopMode.off,
+  busy: false,
+  recovering: false,
+  capabilities: PlaybackCapability.values.toSet(),
+);
 
 Track _track(String id, String name) => Track(
   id: id,
@@ -47,18 +72,12 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final queued = [
       _track('queue-1', 'Queued first'),
       _track('queue-2', 'Queued second'),
     ];
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.queue).thenReturn(queued);
-    when(() => playback.currentIndex).thenReturn(0);
-    when(() => playback.currentTrack).thenReturn(queued.first);
-    when(() => playback.playing).thenReturn(false);
-    when(() => playback.toggle()).thenAnswer((_) async {});
+    active.emit(_ownerState(queue: queued, index: 0));
 
     // A library/view collection exists, but rotation must ignore it: the
     // rotation path passes no collection, so the overlay falls back to the
@@ -91,7 +110,7 @@ void main() {
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -156,15 +175,10 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final queued = [_track('queue-1', 'Queued song')];
     final albumTrack = _track('album-track', 'Album song');
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.queue).thenReturn(queued);
-    when(() => playback.currentTrack).thenReturn(queued.first);
-    when(() => playback.playing).thenReturn(false);
-    when(() => playback.playTrack(any(), any())).thenAnswer((_) async {});
+    active.emit(_ownerState(queue: queued, index: 0));
 
     final requested = MobileCoverflowCollection(
       items: [
@@ -185,7 +199,7 @@ void main() {
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -210,28 +224,20 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final queue = [
       _track('q1', 'Queue one'),
       _track('q2', 'Queue two'),
       _track('q3', 'Queue three'),
     ];
-    when(() => playback.addListener(any())).thenReturn(null);
-    when(() => playback.removeListener(any())).thenReturn(null);
-    when(() => playback.queue).thenReturn(queue);
-    when(() => playback.currentIndex).thenReturn(1);
-    when(() => playback.currentTrack).thenReturn(queue[1]);
-    when(() => playback.playing).thenReturn(true);
-    when(() => playback.toggle()).thenAnswer((_) async {});
-    when(() => playback.playQueueIndex(any())).thenAnswer((_) async {});
-    when(() => playback.playTrack(any(), any())).thenAnswer((_) async {});
+    active.emit(_ownerState(queue: queue, index: 1, playing: true));
 
     // Rotation path: queue overlay.
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -263,7 +269,7 @@ void main() {
       ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(database),
-          playbackProvider.overrideWithValue(playback),
+          activePlaybackProvider.overrideWithValue(active),
         ],
         child: MaterialApp(
           theme: buildTheme(),
@@ -277,10 +283,15 @@ void main() {
     expect(find.textContaining('View album'), findsWidgets);
 
     // Merely showing either overlay must not reorder or replace the queue.
-    expect(playback.queue.map((track) => track.id), ['q1', 'q2', 'q3']);
-    expect(playback.currentIndex, 1);
-    verifyNever(
-      () => playback.replaceQueue(any(), startIndex: any(named: 'startIndex')),
+    expect(
+      active.actions.where(
+        (action) =>
+            action == 'replaceQueue' ||
+            action == 'playQueueIndex' ||
+            action == 'playTrack' ||
+            action == 'reorderUpcoming',
+      ),
+      isEmpty,
     );
 
     await tester.pumpWidget(const SizedBox.shrink());

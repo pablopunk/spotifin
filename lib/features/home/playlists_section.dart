@@ -118,7 +118,7 @@ class _PlaylistCard extends ConsumerWidget {
           ),
           onPlay: tracks.isEmpty
               ? null
-              : () => ref.read(playbackProvider).replaceQueue(tracks),
+              : () => ref.read(activePlaybackProvider).replaceQueue(tracks),
         ),
       ),
     );

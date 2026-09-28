@@ -5,21 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/features/common/playlist_context_menu.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
-import 'package:spotifin/storage/database.dart';
 
-class _MockPlayback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
+
+import 'package:spotifin/storage/database.dart';
 
 void main() {
   setUpAll(() => registerFallbackValue(<Track>[]));
 
   testWidgets('opens playlist actions with a secondary click', (tester) async {
-    final playback = _MockPlayback();
+    final active = FakeActivePlayback();
     final tracks = [_track(), _track().copyWith(id: 'second')];
-    when(() => playback.addNextToQueue(any())).thenAnswer((_) async {});
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [playbackProvider.overrideWithValue(playback)],
+        overrides: [activePlaybackProvider.overrideWithValue(active)],
         child: MaterialApp(
           home: Scaffold(
             body: PlaylistContextMenu(
@@ -51,7 +50,8 @@ void main() {
 
     await tester.tap(find.text('Play next'));
     await tester.pumpAndSettle();
-    verify(() => playback.addNextToQueue(tracks)).called(1);
+    expect(active.actions, ['addNextToQueue']);
+    expect(active.actionArguments['addNextToQueue'], [tracks]);
 
     await gesture.down(position);
     await gesture.up();

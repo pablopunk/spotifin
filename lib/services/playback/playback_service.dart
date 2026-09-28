@@ -912,14 +912,13 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   ///
   /// Used after Cast handoff cleanup releases report suppression so the
   /// restored local state is reported exactly once on the serialized path.
-  Future<void> reportCurrentState() =>
-      _enqueue((generation) async {
-        if (generation != _accountGeneration) return;
-        final entry = _state.currentEntry;
-        if (entry == null) return;
-        _schedulePlayingOnly(entry);
-        await _persistCommittedState(generation);
-      });
+  Future<void> reportCurrentState() => _enqueue((generation) async {
+    if (generation != _accountGeneration) return;
+    final entry = _state.currentEntry;
+    if (entry == null) return;
+    _schedulePlayingOnly(entry);
+    await _persistCommittedState(generation);
+  });
 
   Future<void> _clearNow(int generation) async {
     final session = _session;

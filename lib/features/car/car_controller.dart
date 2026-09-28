@@ -55,13 +55,13 @@ class CarController extends Notifier<CarState> {
   }
 
   Future<void> playTrack(Track track, List<Track> context) =>
-      ref.read(playbackProvider).playTrack(track, context);
+      ref.read(activePlaybackProvider).playTrack(track, context);
 
   Future<void> playTracks(
     List<Track> tracks, {
     int startIndex = 0,
     bool shuffle = false,
   }) => ref
-      .read(playbackProvider)
+      .read(activePlaybackProvider)
       .replaceQueue(tracks, startIndex: startIndex, shuffle: shuffle);
 }

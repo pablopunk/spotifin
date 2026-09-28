@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
-import '../../services/playback/playback_service.dart';
+import '../../services/playback/active_playback.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
@@ -19,10 +19,11 @@ class CoverflowOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     return ListenableBuilder(
-      listenable: playback,
+      listenable: active,
       builder: (context, _) {
+        final state = active.state;
         if (collection case final collection?) {
           final initialIndex = collection.viewId == null
               ? collection.initialIndex
@@ -31,25 +32,24 @@ class CoverflowOverlay extends ConsumerWidget {
             onDismiss: onDismiss,
             items: collection.items,
             initialIndex: initialIndex,
-            playing: playback.playing,
-            currentTrackId: playback.currentTrack?.id,
-            onToggle: playback.toggle,
-            onSelect: (index) =>
-                _playCollectionItem(playback, collection, index),
-            onTrackTap: (item, track) => playback.playTrack(track, item.tracks),
+            playing: state.playing,
+            currentTrackId: state.track?.id,
+            onToggle: active.toggle,
+            onSelect: (index) => _playCollectionItem(active, collection, index),
+            onTrackTap: (item, track) => active.playTrack(track, item.tracks),
           );
         }
-        final queue = playback.queue;
+        final queue = state.queue;
         if (queue.isNotEmpty) {
           return _OverlayShell(
             onDismiss: onDismiss,
             items: trackCoverflowItems(queue),
-            initialIndex: _safeIndex(playback.currentIndex, queue.length),
-            playing: playback.playing,
-            currentTrackId: playback.currentTrack?.id,
-            onToggle: playback.toggle,
-            onSelect: playback.playQueueIndex,
-            onTrackTap: (item, track) => playback.playTrack(track, item.tracks),
+            initialIndex: _safeIndex(state.index, queue.length),
+            playing: state.playing,
+            currentTrackId: state.track?.id,
+            onToggle: active.toggle,
+            onSelect: active.playQueueIndex,
+            onTrackTap: (item, track) => active.playTrack(track, item.tracks),
           );
         }
         return StreamBuilder<List<Track>>(
@@ -62,9 +62,8 @@ class CoverflowOverlay extends ConsumerWidget {
               items: trackCoverflowItems(fallback),
               initialIndex: 0,
               onSelect: (index) =>
-                  playback.replaceQueue(fallback, startIndex: index),
-              onTrackTap: (item, track) =>
-                  playback.playTrack(track, item.tracks),
+                  active.replaceQueue(fallback, startIndex: index),
+              onTrackTap: (item, track) => active.playTrack(track, item.tracks),
             );
           },
         );
@@ -78,17 +77,17 @@ class CoverflowOverlay extends ConsumerWidget {
   }
 
   void _playCollectionItem(
-    PlaybackService playback,
+    ActivePlayback active,
     MobileCoverflowCollection collection,
     int index,
   ) {
     final item = collection.items[index];
     if (item.tracks.isEmpty) return;
     if (collection.playback == MobileCoverflowPlayback.tracks) {
-      playback.playTrack(item.tracks.single, collection.contextTracks);
+      active.playTrack(item.tracks.single, collection.contextTracks);
       return;
     }
-    playback.replaceQueue(item.tracks, shuffle: false);
+    active.replaceQueue(item.tracks, shuffle: false);
   }
 }
 

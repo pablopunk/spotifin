@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
+import '../../services/playback/active_playback.dart';
 import '../../storage/database.dart';
 import 'artist_links.dart';
 import 'artwork.dart';
@@ -29,32 +30,46 @@ class TrackTile extends ConsumerStatefulWidget {
 class _TrackTileState extends ConsumerState<TrackTile> {
   var _hovered = false;
 
+  Future<void> _runQueueAction(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final downloadStatus = ref
         .watch(downloadStatusesProvider)
         .value?[widget.track.id];
-    final playback = ref.watch(playbackProvider);
+    final owner = ref.watch(activePlaybackProvider);
     final tile = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: ListenableBuilder(
-        listenable: playback,
+        listenable: owner,
         builder: (context, _) {
-          final active = playback.currentTrack?.id == widget.track.id;
+          final state = owner.state;
+          final active = state.track?.id == widget.track.id;
           return TrackTileContent(
             track: widget.track,
             contextTracks: widget.contextTracks,
             showAlbum: widget.showAlbum,
             downloadStatus: downloadStatus,
             active: active,
-            playing: playback.playing,
+            playing: state.playing,
             hovered: _hovered,
-            onRowTap: () =>
-                playback.playTrack(widget.track, widget.contextTracks),
+            onRowTap: () => _runQueueAction(
+              () => owner.playTrack(widget.track, widget.contextTracks),
+            ),
             onArtworkTap: () => active
-                ? playback.toggle()
-                : playback.playTrack(widget.track, widget.contextTracks),
+                ? _runQueueAction(owner.toggle)
+                : _runQueueAction(
+                    () => owner.playTrack(widget.track, widget.contextTracks),
+                  ),
           );
         },
       ),
@@ -366,9 +381,13 @@ Future<void> _handleTrackAction(
         .read(appControllerProvider.notifier)
         .toggleFavorite(track.id, !track.favorite);
   } else if (action == _TrackAction.queue) {
-    await ref.read(playbackProvider).addToQueue(track);
+    await _guardedQueueAction(context, ref, (owner) => owner.addToQueue(track));
   } else if (action == _TrackAction.playNext) {
-    await ref.read(playbackProvider).addNextToQueue([track]);
+    await _guardedQueueAction(
+      context,
+      ref,
+      (owner) => owner.addNextToQueue([track]),
+    );
   } else if (action == _TrackAction.download) {
     final app = ref.read(appControllerProvider);
     if (app.session != null) {
@@ -382,6 +401,22 @@ Future<void> _handleTrackAction(
     await _addToPlaylist(context, ref, track);
   } else if (action == _TrackAction.delete) {
     await _deleteTrack(context, ref, track);
+  }
+}
+
+/// Runs an owner queue action, surfacing failures with the existing
+/// visible error pattern instead of an unhandled future.
+Future<void> _guardedQueueAction(
+  BuildContext context,
+  WidgetRef ref,
+  Future<void> Function(ActivePlayback owner) action,
+) async {
+  try {
+    await action(ref.read(activePlaybackProvider));
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$error')));
   }
 }
 

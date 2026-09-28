@@ -2,12 +2,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
 import 'package:flutter_carplay/controllers/carplay_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/features/car/carplay_up_next.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
-class _Playback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
 
 Track _track(String id) => Track(
   id: id,
@@ -21,6 +21,31 @@ Track _track(String id) => Track(
   container: '',
   favorite: false,
   playCount: 0,
+);
+
+ActivePlaybackState _state({
+  required List<Track> upcoming,
+  required int index,
+}) => ActivePlaybackState(
+  destination: PlaybackDestination.local,
+  track: upcoming.isEmpty
+      ? null
+      : upcoming[index.clamp(0, upcoming.length - 1)],
+  index: upcoming.isEmpty ? null : index,
+  entryId: 'entry-0',
+  queue: upcoming,
+  upcoming: upcoming,
+  upcomingOffset: 0,
+  history: const [],
+  playing: true,
+  position: Duration.zero,
+  duration: Duration.zero,
+  volumeSlider: 1,
+  shuffle: false,
+  repeatMode: LoopMode.off,
+  busy: false,
+  recovering: false,
+  capabilities: PlaybackCapability.values.toSet(),
 );
 
 void main() {
@@ -39,13 +64,11 @@ void main() {
       });
       addTearDown(() => messenger.setMockMethodCallHandler(carChannel, null));
 
-      final playback = _Playback();
       final current = _track('Current');
       final next = _track('Next');
-      when(() => playback.currentIndex).thenReturn(2);
-      when(() => playback.upcomingQueue).thenReturn([current, next]);
-      when(() => playback.playUpcomingIndex(any())).thenAnswer((_) async {});
-      final controller = CarPlayUpNext(playback, enabled: false);
+      final active = FakeActivePlayback()
+        ..emit(_state(upcoming: [current, next], index: 0));
+      final controller = CarPlayUpNext(active, enabled: false);
       final template = controller.buildTemplate();
       final items = template.sections.single.items.cast<CPListItem>();
       expect(items.map((item) => item.text), ['Current', 'Next']);
@@ -54,12 +77,13 @@ void main() {
       var completed = false;
       await items.last.onPress!(() => completed = true, items.last);
       expect(completed, isTrue);
-      verify(() => playback.playUpcomingIndex(1)).called(1);
+      expect(active.actions, ['playUpcomingIndex']);
+      expect(active.actionArguments['playUpcomingIndex'], [1]);
       expect(carCalls, contains('popTemplate'));
 
-      when(() => playback.upcomingQueue).thenReturn([next]);
+      active.emit(_state(upcoming: [next], index: 0));
       await items.last.onPress!(() {}, items.last);
-      verify(() => playback.playUpcomingIndex(0)).called(1);
+      expect(active.actionArguments['playUpcomingIndex'], [0]);
     },
   );
 
@@ -75,22 +99,15 @@ void main() {
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-    final playback = _Playback();
-    var queue = <Track>[];
-    VoidCallback? listener;
-    when(() => playback.upcomingQueue).thenAnswer((_) => queue);
-    when(() => playback.addListener(any())).thenAnswer((invocation) {
-      listener = invocation.positionalArguments.single as VoidCallback;
-    });
-    when(() => playback.removeListener(any())).thenReturn(null);
-    final controller = CarPlayUpNext(playback, channel: channel, enabled: true)
+    final active = FakeActivePlayback()
+      ..emit(_state(upcoming: const [], index: 0));
+    final controller = CarPlayUpNext(active, channel: channel, enabled: true)
       ..start();
     addTearDown(controller.dispose);
     await Future<void>.delayed(Duration.zero);
     expect(availability, [false]);
 
-    queue = [_track('Current')];
-    listener!();
+    active.emit(_state(upcoming: [_track('Current')], index: 0));
     await Future<void>.delayed(Duration.zero);
     expect(availability, [false, true]);
   });
@@ -114,17 +131,10 @@ void main() {
       messenger.setMockMethodCallHandler(channel, (_) async => null);
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-      final playback = _Playback();
-      when(() => playback.upcomingQueue)
-          .thenReturn([_track('Current'), _track('Next')]);
-      when(() => playback.currentIndex).thenReturn(0);
-      when(() => playback.addListener(any())).thenReturn(null);
-      when(() => playback.removeListener(any())).thenReturn(null);
-      final controller = CarPlayUpNext(
-        playback,
-        channel: channel,
-        enabled: true,
-      )..start();
+      final active = FakeActivePlayback()
+        ..emit(_state(upcoming: [_track('Current'), _track('Next')], index: 0));
+      final controller = CarPlayUpNext(active, channel: channel, enabled: true)
+        ..start();
       addTearDown(controller.dispose);
 
       await messenger.handlePlatformMessage(

@@ -144,4 +144,9 @@ class FakeActivePlayback extends ChangeNotifier implements ActivePlayback {
   Future<void> resumeHere() async {
     _record('resumeHere');
   }
+
+  @override
+  Future<void> stopCastingForLocalTransfer() async {
+    _record('stopCastingForLocalTransfer');
+  }
 }

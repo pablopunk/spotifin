@@ -30,31 +30,31 @@ class CoverflowSection extends ConsumerWidget {
     );
     if (!coverflow) return trackedList;
     final initialIndex = ref.watch(coverflowPositionProvider(viewId));
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     return LayoutBuilder(
       builder: (context, constraints) => Column(
         children: [
           SizedBox(
             height: (constraints.maxHeight * 0.62).clamp(360.0, 560.0),
             child: ListenableBuilder(
-              listenable: playback,
+              listenable: active,
               builder: (context, _) => CoverflowStage(
                 items: items,
                 initialIndex: initialIndex,
-                currentTrackId: playback.currentTrack?.id,
-                playing: playback.playing,
+                currentTrackId: active.state.track?.id,
+                playing: active.state.playing,
                 onFocus: (index) => ref
                     .read(coverflowPositionProvider(viewId).notifier)
                     .set(index),
                 onCenterTap: (item) {
-                  if (playback.currentTrack?.id == item.tracks.single.id) {
-                    playback.toggle();
+                  if (active.state.track?.id == item.tracks.single.id) {
+                    active.toggle();
                   } else {
                     onCenterTap(item);
                   }
                 },
                 onTrackTap: (item, track) =>
-                    playback.playTrack(track, item.tracks),
+                    active.playTrack(track, item.tracks),
               ),
             ),
           ),

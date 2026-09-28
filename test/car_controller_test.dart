@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:spotifin/services/playback/active_playback.dart';
 import 'package:spotifin/storage/database.dart';
 
-class _MockPlayback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
 
 class _FakeTrack extends Fake implements Track {}
 
@@ -32,11 +32,11 @@ void main() {
 
   ProviderContainer makeContainer({
     AppDatabase? database,
-    PlaybackService? playback,
+    ActivePlayback? active,
   }) => ProviderContainer(
     overrides: [
       if (database != null) databaseProvider.overrideWithValue(database),
-      if (playback != null) playbackProvider.overrideWithValue(playback),
+      if (active != null) activePlaybackProvider.overrideWithValue(active),
     ],
   );
 
@@ -97,15 +97,29 @@ void main() {
     expect(state.playlists.map((p) => p.id), ['p']);
   });
 
-  test('playTrack delegates to playback', () async {
-    final playback = _MockPlayback();
-    when(() => playback.playTrack(any(), any())).thenAnswer((_) async {});
-    final container = makeContainer(playback: playback);
+  test('playTrack delegates to the active owner', () async {
+    final active = FakeActivePlayback();
+    final container = makeContainer(active: active);
     addTearDown(container.dispose);
     final track = makeTrack('a');
     await container.read(carControllerProvider.notifier).playTrack(track, [
       track,
     ]);
-    verify(() => playback.playTrack(track, [track])).called(1);
+    expect(active.actions, ['playTrack']);
+    expect(active.actionArguments['playTrack'], [
+      track,
+      [track],
+    ]);
+  });
+
+  test('playTracks delegates queue replacement to the active owner', () async {
+    final active = FakeActivePlayback();
+    final container = makeContainer(active: active);
+    addTearDown(container.dispose);
+    final track = makeTrack('a');
+    await container
+        .read(carControllerProvider.notifier)
+        .playTracks([track], startIndex: 0, shuffle: true);
+    expect(active.actions, ['replaceQueue']);
   });
 }

@@ -87,14 +87,15 @@ class PlaylistContextMenu extends ConsumerWidget {
       items: _items(),
     );
     if (action == null || !context.mounted) return;
+    final owner = ref.read(activePlaybackProvider);
     switch (action) {
       case _PlaylistAction.play:
-        await ref.read(playbackProvider).replaceQueue(tracks);
+        await _guardedQueueAction(context, () => owner.replaceQueue(tracks));
       case _PlaylistAction.playNext:
-        await ref.read(playbackProvider).addNextToQueue(tracks);
+        await _guardedQueueAction(context, () => owner.addNextToQueue(tracks));
       case _PlaylistAction.queue:
         for (final track in tracks) {
-          await ref.read(playbackProvider).addToQueue(track);
+          await _guardedQueueAction(context, () => owner.addToQueue(track));
         }
       case _PlaylistAction.download:
         await _download(ref);
@@ -102,6 +103,21 @@ class PlaylistContextMenu extends ConsumerWidget {
         await renamePlaylist(context, ref, playlist);
       case _PlaylistAction.remove:
         await removePlaylist(context, ref, playlist);
+    }
+  }
+
+  /// Runs an owner queue action, surfacing failures with the existing
+  /// visible error pattern instead of an unhandled future.
+  Future<void> _guardedQueueAction(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 

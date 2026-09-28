@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/theme.dart';
@@ -11,35 +12,27 @@ import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/common/playlist_artwork.dart';
 import 'package:spotifin/features/library/collection_sort.dart';
 import 'package:spotifin/features/library/library_screen.dart';
-import 'package:spotifin/services/playback/playback_service.dart';
+import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
-class _MockPlayback extends Mock implements PlaybackService {}
+import 'support/fake_active_playback.dart';
 
 class _FakeTrack extends Fake implements Track {}
 
-PlaybackService _mockPlayback() {
-  final playback = _MockPlayback();
-  when(() => playback.addListener(any())).thenReturn(null);
-  when(() => playback.removeListener(any())).thenReturn(null);
-  when(() => playback.currentTrack).thenReturn(null);
-  when(() => playback.playing).thenReturn(false);
-  when(() => playback.shuffle).thenReturn(false);
-  when(() => playback.toggle()).thenAnswer((_) async {});
-  when(() => playback.replaceQueue(any(), shuffle: any(named: 'shuffle')))
-      .thenAnswer((_) async {});
-  when(() => playback.replaceQueue(any())).thenAnswer((_) async {});
-  return playback;
+FakeActivePlayback _mockOwner() {
+  final active = FakeActivePlayback();
+  active.emit(const ActivePlaybackState.empty());
+  return active;
 }
 
 Widget _appWithPlayback(
   Widget home,
   AppDatabase database,
-  PlaybackService playback,
+  FakeActivePlayback active,
 ) => ProviderScope(
   overrides: [
     databaseProvider.overrideWithValue(database),
-    playbackProvider.overrideWithValue(playback),
+    activePlaybackProvider.overrideWithValue(active),
   ],
   child: MaterialApp(theme: buildTheme(), home: home),
 );
@@ -510,7 +503,7 @@ void main() {
             tracks: list,
           ),
           database,
-          _mockPlayback(),
+          _mockOwner(),
         ),
       );
       await tester.pumpAndSettle();
@@ -557,6 +550,61 @@ void main() {
     expect(find.text('ALBUM'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await _dispose(tester, database);
+  });
+  testWidgets('collection and playlist play stay on Cast while casting', (
+    tester,
+  ) async {
+    final tracks = await _tracks();
+    final active = FakeActivePlayback();
+    active.emit(
+      ActivePlaybackState(
+        destination: PlaybackDestination.cast,
+        track: tracks.list.first,
+        index: 0,
+        entryId: 'entry-remote',
+        queue: [tracks.list.first],
+        upcoming: [tracks.list.first],
+        upcomingOffset: 0,
+        history: const [],
+        playing: true,
+        position: Duration.zero,
+        duration: const Duration(minutes: 3),
+        volumeSlider: 0.4,
+        shuffle: false,
+        repeatMode: LoopMode.off,
+        busy: false,
+        recovering: false,
+        capabilities: const {
+          PlaybackCapability.transport,
+          PlaybackCapability.seek,
+          PlaybackCapability.volume,
+          PlaybackCapability.selection,
+          PlaybackCapability.queueEditing,
+          PlaybackCapability.shuffle,
+        },
+        connectedDeviceName: 'Living Room',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _appWithPlayback(
+        CollectionScreen(
+          title: 'Mix',
+          kind: CollectionKind.playlist,
+          tracks: tracks.list,
+        ),
+        tracks.database,
+        active,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The header play control reaches the owner exactly once; ordinary
+    // playlist selection stays on Cast with no local playback involved.
+    await tester.tap(find.byType(SpotifinPlayButton));
+    await tester.pump();
+    expect(active.actions, ['replaceQueue']);
+    await _dispose(tester, tracks.database);
   });
 }
 

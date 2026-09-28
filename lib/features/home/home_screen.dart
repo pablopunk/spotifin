@@ -557,7 +557,8 @@ class _CollectionResults extends ConsumerWidget {
               ),
             ),
           ),
-          onPlay: () => ref.read(playbackProvider).replaceQueue(entry.value),
+          onPlay: () =>
+              ref.read(activePlaybackProvider).replaceQueue(entry.value),
         );
         return artist
             ? card
@@ -698,7 +699,7 @@ class _HorizontalSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playback = ref.watch(playbackProvider);
+    final active = ref.watch(activePlaybackProvider);
     return Padding(
       padding: const EdgeInsets.only(bottom: SpotifinSpacing.xl),
       child: Column(
@@ -720,7 +721,7 @@ class _HorizontalSection extends ConsumerWidget {
           SizedBox(
             height: 224,
             child: ListenableBuilder(
-              listenable: playback,
+              listenable: active,
               builder: (context, _) => ListView.separated(
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpotifinSpacing.lg,
@@ -731,7 +732,7 @@ class _HorizontalSection extends ConsumerWidget {
                     const SizedBox(width: SpotifinSpacing.md),
                 itemBuilder: (context, index) {
                   final track = tracks[index];
-                  final active = playback.currentTrack?.id == track.id;
+                  final isActive = active.state.track?.id == track.id;
                   return TrackContextMenu(
                     track: track,
                     contextTracks: contextTracks,
@@ -749,20 +750,20 @@ class _HorizontalSection extends ConsumerWidget {
                           ),
                           title: track.name,
                           subtitle: track.artist,
-                          active: active,
-                          playing: playback.playing,
-                          playTooltip: active && playback.playing
+                          active: isActive,
+                          playing: active.state.playing,
+                          playTooltip: isActive && active.state.playing
                               ? 'Pause'
                               : 'Play',
                           onTap: () => ref
-                              .read(playbackProvider)
+                              .read(activePlaybackProvider)
                               .playTrack(track, contextTracks),
                           onPlay: () {
-                            final player = ref.read(playbackProvider);
-                            if (player.currentTrack?.id == track.id) {
-                              player.toggle();
+                            final owner = ref.read(activePlaybackProvider);
+                            if (owner.state.track?.id == track.id) {
+                              owner.toggle();
                             } else {
-                              player.playTrack(track, contextTracks);
+                              owner.playTrack(track, contextTracks);
                             }
                           },
                         ),

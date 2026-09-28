@@ -13,6 +13,7 @@ import '../services/lyrics/lyrics_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/active_playback.dart';
+import '../services/playback/local_playback_target.dart';
 import '../services/playback/remote_session_service.dart';
 import '../services/cast/cast_controller.dart';
 import '../services/cast/cast_sender.dart';
@@ -141,11 +142,22 @@ final playbackProvider = Provider<PlaybackService>((ref) {
 final remoteSessionProvider = Provider<RemoteSessionService>((ref) {
   final service = RemoteSessionService(
     ref.watch(jellyfinClientProvider),
-    ref.watch(playbackProvider),
+    ref.watch(localPlaybackTargetProvider),
     ref.watch(databaseProvider),
   );
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Explicit local target for Jellyfin-addressed commands. Ordinary UI uses
+/// [activePlaybackProvider]; incoming remote commands and "Play here" run
+/// through this adapter so they stop Cast first and never duplicate audio.
+final localPlaybackTargetProvider = Provider<LocalPlaybackTarget>((ref) {
+  final active = ref.watch(activePlaybackProvider);
+  return LocalPlaybackTarget(
+    ref.watch(playbackProvider),
+    active.stopCastingForLocalTransfer,
+  );
 });
 
 final castSenderProvider = Provider<CastSender>((ref) {
