@@ -324,13 +324,10 @@ class AppController extends Notifier<AppState> {
         ref.read(castControllerProvider).configure(lease.session);
       } catch (_) {}
       if (!scope.isCurrent(lease)) return;
-      ref.read(carControllerProvider.notifier).setSignedIn(true);
       final cached = await ref.read(databaseProvider).allTracks();
       if (!scope.isCurrent(lease)) return;
       if (cached.isEmpty) return;
       await ref.read(playbackProvider).restore(cached);
-      if (!scope.isCurrent(lease)) return;
-      ref.read(carControllerProvider.notifier).refreshCatalog(tracks: cached);
     } catch (_) {}
   }
 
@@ -436,8 +433,6 @@ class AppController extends Notifier<AppState> {
       try {
         ref.read(castControllerProvider).configure(lease.session);
       } catch (_) {}
-      if (!scope.isCurrent(lease)) return;
-      ref.read(carControllerProvider.notifier).setSignedIn(true);
     });
     if (!scope.isCurrent(lease)) return false;
     await refresh();
@@ -507,10 +502,6 @@ class AppController extends Notifier<AppState> {
       await ref
           .read(downloadProvider)
           .reconcile(catalog.map((track) => track.id));
-      if (!scope.isCurrent(lease)) return;
-      try {
-        await ref.read(carControllerProvider.notifier).refreshNow();
-      } catch (_) {}
       if (!scope.isCurrent(lease)) return;
       if (ref.read(playbackProvider).queue.isEmpty) {
         await ref.read(playbackProvider).restore(catalog);
@@ -727,9 +718,6 @@ class AppController extends Notifier<AppState> {
       try {
         await ref.read(downloadProvider).clear();
       } catch (_) {}
-      try {
-        ref.read(carControllerProvider.notifier).setSignedIn(false);
-      } catch (_) {}
     });
     // Local persistence runs on the serialized fence after already-started
     // writes. The owner marker is cleared only after account data is gone;
@@ -773,9 +761,6 @@ class AppController extends Notifier<AppState> {
       } catch (_) {}
       try {
         await ref.read(downloadProvider).clear();
-      } catch (_) {}
-      try {
-        ref.read(carControllerProvider.notifier).setSignedIn(false);
       } catch (_) {}
     });
     try {
@@ -894,9 +879,6 @@ class AppController extends Notifier<AppState> {
       try {
         await ref.read(playbackProvider).clear();
       } catch (_) {}
-      try {
-        ref.read(carControllerProvider.notifier).setSignedIn(false);
-      } catch (_) {}
     });
   }
 
@@ -931,9 +913,6 @@ class AppController extends Notifier<AppState> {
       } catch (_) {}
       try {
         await ref.read(playbackProvider).clear();
-      } catch (_) {}
-      try {
-        ref.read(carControllerProvider.notifier).setSignedIn(false);
       } catch (_) {}
     });
     try {
