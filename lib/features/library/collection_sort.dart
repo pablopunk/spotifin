@@ -272,6 +272,7 @@ class SortMenuButton<T extends Enum> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<T>(
+      useRootNavigator: true,
       icon: const Icon(Icons.sort_rounded),
       iconColor: SpotifinColors.textMuted,
       tooltip: tooltip,

@@ -6,7 +6,9 @@ import 'design_system.dart';
 const spotifinMenuConstraints = BoxConstraints(minWidth: 196, maxWidth: 224);
 
 RelativeRect spotifinMenuPosition(BuildContext context, Offset globalPosition) {
-  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final overlay =
+      Overlay.of(context, rootOverlay: true).context.findRenderObject()!
+          as RenderBox;
   final position = overlay.globalToLocal(globalPosition);
   return RelativeRect.fromLTRB(
     position.dx,

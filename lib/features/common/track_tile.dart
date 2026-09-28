@@ -278,6 +278,7 @@ class TrackMenuButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       PopupMenuButton<_TrackAction>(
+        useRootNavigator: true,
         color: SpotifinColors.raised,
         constraints: spotifinMenuConstraints,
         tooltip: 'More options',
@@ -356,6 +357,7 @@ Future<void> _showTrackMenu(
 ) async {
   final action = await showMenu<_TrackAction>(
     context: context,
+    useRootNavigator: true,
     color: SpotifinColors.raised,
     constraints: spotifinMenuConstraints,
     position: spotifinMenuPosition(context, globalPosition),

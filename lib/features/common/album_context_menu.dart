@@ -72,6 +72,7 @@ class AlbumContextMenu extends ConsumerWidget {
   ) async {
     final action = await showMenu<String>(
       context: context,
+      useRootNavigator: true,
       color: SpotifinColors.raised,
       constraints: spotifinMenuConstraints,
       position: spotifinMenuPosition(context, globalPosition),

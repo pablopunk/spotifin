@@ -319,6 +319,57 @@ void main() {
     ]);
   });
 
+  testWidgets('song menu stays above the shell player and navigation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final track = makeTrack();
+    final active = FakeActivePlayback();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [activePlaybackProvider.overrideWithValue(active)],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                Navigator(
+                  onGenerateRoute: (_) => MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      body: Align(
+                        alignment: const Alignment(1, 0.3),
+                        child: TrackMenuButton(
+                          track: track,
+                          contextTracks: [track],
+                          downloadStatus: null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 148,
+                  child: ColoredBox(color: Colors.black),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Download').hitTestable(), findsOneWidget);
+    expect(find.text('Delete permanently').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Play next'));
+    await tester.pumpAndSettle();
+    expect(active.actions, ['addNextToQueue']);
+  });
+
   testWidgets('phone hold opens the track menu', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
