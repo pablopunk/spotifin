@@ -31,7 +31,7 @@ description: Cut a Spotifin release from a bump word (patch/minor/major) and wri
    Verify with `SHA256SUMS`. **Full changelog**: https://github.com/pablopunk/spotifin/compare/vPREV...vNEW
    ```
 
-   One bullet per area with an emoji and a bold label; write for users, not as a commit dump; mention CI, license, and web changes too. Keep the summary true for the whole release.
+   One bullet per area with an emoji and a bold label; write for users, not as a commit dump; include CI, license, and web changes when present. Keep the summary true for the whole release.
 5. Stage the body in a temp file, then publish it in the background:
 
    ```sh
