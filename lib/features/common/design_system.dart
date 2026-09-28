@@ -211,16 +211,21 @@ class SpotifinPlayButton extends StatelessWidget {
   final bool large;
 
   @override
-  Widget build(BuildContext context) => FilledButton(
-    style: FilledButton.styleFrom(
-      shape: const CircleBorder(),
-      padding: EdgeInsets.all(large ? 18 : 12),
-      minimumSize: Size.square(large ? 64 : 48),
-    ),
-    onPressed: onPressed,
-    child: Icon(
-      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-      size: large ? 34 : 26,
+  Widget build(BuildContext context) => Tooltip(
+    message: playing ? 'Pause' : 'Play',
+    excludeFromSemantics: true,
+    child: FilledButton(
+      style: FilledButton.styleFrom(
+        shape: const CircleBorder(),
+        padding: EdgeInsets.all(large ? 18 : 12),
+        minimumSize: Size.square(large ? 64 : 48),
+      ),
+      onPressed: onPressed,
+      child: Icon(
+        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        semanticLabel: playing ? 'Pause' : 'Play',
+        size: large ? 34 : 26,
+      ),
     ),
   );
 }
@@ -231,11 +236,11 @@ class SpotifinCountLabel extends StatelessWidget {
   final int count;
 
   @override
-  Widget build(BuildContext context) => Text(
-    '$count ${count == 1 ? 'song' : 'songs'}',
-    style: Theme.of(context).textTheme.bodySmall,
-  );
+  Widget build(BuildContext context) =>
+      Text(songCountLabel(count), style: Theme.of(context).textTheme.bodySmall);
 }
+
+String songCountLabel(int count) => '$count ${count == 1 ? 'song' : 'songs'}';
 
 class SpotifinCollectionCard extends StatefulWidget {
   const SpotifinCollectionCard({

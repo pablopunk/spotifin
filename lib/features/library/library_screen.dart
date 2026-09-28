@@ -269,7 +269,7 @@ class _CollectionCard extends ConsumerWidget {
         ),
       ),
       title: title,
-      subtitle: '${tracks.length} songs',
+      subtitle: songCountLabel(tracks.length),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CollectionScreen(
@@ -474,7 +474,9 @@ class _PlaylistsTab extends ConsumerWidget {
             CoverflowItem(
               id: 'playlist:${playlist.id}',
               title: playlist.name,
-              subtitle: '${tracksByPlaylistId[playlist.id]?.length ?? 0} songs',
+              subtitle: songCountLabel(
+                tracksByPlaylistId[playlist.id]?.length ?? 0,
+              ),
               artItemId: _playlistArtItemId(
                 tracksByPlaylistId[playlist.id] ?? const [],
                 playlist.id,
@@ -517,7 +519,7 @@ class _PlaylistsTab extends ConsumerWidget {
                       ),
                     ),
                     title: playlist.name,
-                    subtitle: '${playlistTracks.length} songs',
+                    subtitle: songCountLabel(playlistTracks.length),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => CollectionScreen(

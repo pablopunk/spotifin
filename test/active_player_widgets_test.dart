@@ -58,7 +58,10 @@ Track _track(String id, String name) => Track(
   container: 'mp3',
 );
 
-ActivePlaybackState _localState(Track track) => ActivePlaybackState(
+ActivePlaybackState _localState(
+  Track track, {
+  Duration duration = const Duration(minutes: 3),
+}) => ActivePlaybackState(
   destination: PlaybackDestination.local,
   track: track,
   index: 0,
@@ -69,7 +72,7 @@ ActivePlaybackState _localState(Track track) => ActivePlaybackState(
   history: const [],
   playing: true,
   position: const Duration(seconds: 10),
-  duration: const Duration(minutes: 3),
+  duration: duration,
   volumeSlider: 1,
   shuffle: false,
   repeatMode: LoopMode.off,
@@ -186,6 +189,43 @@ void main() {
     expect(active.actions, ['toggle']);
   });
 
+  testWidgets('compact player keeps transport and device options reachable', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(tester, active, size: const Size(320, 844));
+    active.emit(_localState(_track('local', 'Hold My Hand')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Pause'));
+    await tester.tap(find.byTooltip('Next'));
+    expect(active.actions, ['toggle', 'next']);
+
+    await tester.tap(find.text('Hold My Hand'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Previous'), findsOneWidget);
+    expect(find.byTooltip('Other devices'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('unknown track duration does not break the compact player', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(tester, active);
+    active.emit(
+      _localState(_track('local', 'Unknown duration'), duration: Duration.zero),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final progress = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(progress.value!.isFinite, isTrue);
+  });
+
   testWidgets('local to cast to local updates', (tester) async {
     final active = FakeActivePlayback();
     await pumpBar(tester, active);
@@ -202,6 +242,34 @@ void main() {
     await tester.pump();
     expect(find.text('Song A'), findsOneWidget);
     expect(find.text('Song B'), findsNothing);
+  });
+
+  testWidgets('desktop sliders have labels and respect receiver recovery', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final active = FakeActivePlayback();
+    final track = _track('remote', 'Remote Song');
+    await pumpBar(tester, active, size: const Size(1440, 1000));
+    active.emit(_castState(track: track, playing: false));
+    await tester.pump();
+
+    expect(find.byTooltip('Play'), findsOneWidget);
+    final position = tester.getSemantics(
+      find.bySemanticsLabel('Playback position'),
+    );
+    expect(position.getSemanticsData().value, '0:30 of 3:00');
+    final volume = tester.getSemantics(find.bySemanticsLabel('Volume'));
+    expect(volume.getSemanticsData().value, '40%');
+    await tester.tap(find.byType(Slider).first);
+    expect(active.actions, ['seek']);
+
+    active.emit(_castState(track: track, recovering: true));
+    await tester.pump();
+    for (final slider in tester.widgetList<Slider>(find.byType(Slider))) {
+      expect(slider.onChanged, isNull);
+    }
+    semantics.dispose();
   });
 
   testWidgets('receiver loss retains the recovery display', (tester) async {

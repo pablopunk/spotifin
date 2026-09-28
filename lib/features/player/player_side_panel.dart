@@ -12,6 +12,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import 'history_list.dart';
+import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
 
@@ -464,18 +465,9 @@ class _PanelProgress extends StatelessWidget {
     final state = active.state;
     final position = state.position;
     final duration = state.duration ?? Duration.zero;
-    final maximum = duration.inMilliseconds.toDouble().clamp(
-      1.0,
-      double.infinity,
-    );
     return Column(
       children: [
-        Slider(
-          value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
-          max: maximum,
-          onChanged: (value) =>
-              active.seek(Duration(milliseconds: value.round())),
-        ),
+        PlaybackPositionSlider(active: active),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

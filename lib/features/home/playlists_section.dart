@@ -110,7 +110,7 @@ class _PlaylistCard extends ConsumerWidget {
         child: SpotifinCollectionCard(
           artwork: PlaylistArtwork(tracks: tracks, size: 140),
           title: playlist.name,
-          subtitle: '${tracks.length} songs',
+          subtitle: songCountLabel(tracks.length),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => PlaylistScreen(playlistId: playlist.id),

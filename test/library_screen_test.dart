@@ -152,7 +152,7 @@ void main() {
     expect(find.text('Lia Kali'), findsOneWidget);
     expect(find.text('Toni Anzis'), findsOneWidget);
     expect(find.text('2 songs'), findsNWidgets(2));
-    expect(find.text('1 songs'), findsOneWidget);
+    expect(find.text('1 song'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Toni Anzis'));
     await tester.pumpAndSettle();

@@ -547,7 +547,7 @@ class _CollectionResults extends ConsumerWidget {
             ),
           ),
           title: entry.key,
-          subtitle: '${entry.value.length} songs',
+          subtitle: songCountLabel(entry.value.length),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => CollectionScreen(

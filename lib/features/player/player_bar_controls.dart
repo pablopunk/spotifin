@@ -10,6 +10,7 @@ import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'cast_button.dart';
+import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
 import 'remote_devices.dart';
 
@@ -124,48 +125,67 @@ class MobilePlayerBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _MobileProgress(active: active),
-                  ListTile(
-                    minTileHeight: 72,
-                    leading: Artwork(
-                      itemId: track.albumId ?? track.id,
-                      size: 48,
-                      borderRadius: SpotifinRadii.small,
-                    ),
-                    title: Text(
-                      track.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    subtitle: Text(
-                      casting && state.connectedDeviceName != null
-                          ? 'Casting to ${state.connectedDeviceName} · ${track.artist}'
-                          : track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(color: SpotifinColors.textMuted),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CastButton(),
-                        const RemoteDeviceButton(),
-                        IconButton(
-                          tooltip: 'Previous',
-                          onPressed: active.previous,
-                          icon: const Icon(Icons.skip_previous_rounded),
-                        ),
-                        SpotifinPlayButton(
-                          onPressed: active.toggle,
-                          playing: state.playing,
-                        ),
-                        IconButton(
-                          tooltip: 'Next',
-                          onPressed: active.next,
-                          icon: const Icon(Icons.skip_next_rounded),
-                        ),
-                      ],
+                  LayoutBuilder(
+                    builder: (context, constraints) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Artwork(
+                            itemId: track.albumId ?? track.id,
+                            size: 44,
+                            borderRadius: SpotifinRadii.small,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  track.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  casting && state.connectedDeviceName != null
+                                      ? 'Casting to ${state.connectedDeviceName} · ${track.artist}'
+                                      : track.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: SpotifinColors.textMuted,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (constraints.maxWidth >= 480) ...[
+                            const CastButton(),
+                            const RemoteDeviceButton(),
+                            IconButton(
+                              tooltip: 'Previous',
+                              onPressed: active.previous,
+                              icon: const Icon(Icons.skip_previous_rounded),
+                            ),
+                          ],
+                          SpotifinPlayButton(
+                            onPressed: active.toggle,
+                            playing: state.playing,
+                          ),
+                          IconButton(
+                            tooltip: 'Next',
+                            onPressed: active.next,
+                            icon: const Icon(Icons.skip_next_rounded),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -373,10 +393,6 @@ class _ProgressSlider extends StatelessWidget {
         final state = active.state;
         final position = state.position;
         final duration = state.duration ?? Duration.zero;
-        final maximum = duration.inMilliseconds.toDouble().clamp(
-          1.0,
-          double.infinity,
-        );
         return Row(
           children: [
             _TimeLabel(position),
@@ -391,12 +407,7 @@ class _ProgressSlider extends StatelessWidget {
                     overlayRadius: 12,
                   ),
                 ),
-                child: Slider(
-                  value: position.inMilliseconds.toDouble().clamp(0.0, maximum),
-                  max: maximum,
-                  onChanged: (value) =>
-                      active.seek(Duration(milliseconds: value.round())),
-                ),
+                child: PlaybackPositionSlider(active: active),
               ),
             ),
             _TimeLabel(duration),
@@ -458,15 +469,27 @@ class _DesktopUtilities extends StatelessWidget {
             ),
             const SizedBox(width: SpotifinSpacing.sm),
             if (AirPlayControl.isSupported) const AirPlayControl(),
-            const Icon(Icons.volume_up_rounded, size: 20),
+            Icon(
+              state.volumeSlider == 0
+                  ? Icons.volume_off_rounded
+                  : Icons.volume_up_rounded,
+              size: 20,
+            ),
             SizedBox(
               width: 144,
-              child: Slider(
-                value: state.volumeSlider.clamp(0.0, 1.0),
-                onChanged:
-                    state.capabilities.contains(PlaybackCapability.volume)
-                    ? active.setVolumeSlider
-                    : null,
+              child: MergeSemantics(
+                child: Semantics(
+                  label: 'Volume',
+                  child: Slider(
+                    value: state.volumeSlider.clamp(0.0, 1.0),
+                    semanticFormatterCallback: (value) =>
+                        '${(value * 100).round()}%',
+                    onChanged:
+                        state.capabilities.contains(PlaybackCapability.volume)
+                        ? active.setVolumeSlider
+                        : null,
+                  ),
+                ),
               ),
             ),
           ],
@@ -487,7 +510,10 @@ class _MobileProgress extends StatelessWidget {
       listenable: active,
       builder: (context, _) {
         final state = active.state;
-        final maximum = state.duration?.inMilliseconds.toDouble() ?? 1;
+        final maximum = (state.duration?.inMilliseconds.toDouble() ?? 0).clamp(
+          1.0,
+          double.infinity,
+        );
         return LinearProgressIndicator(
           value: state.position.inMilliseconds.clamp(0, maximum) / maximum,
           minHeight: 2,

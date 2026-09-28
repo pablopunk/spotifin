@@ -14,6 +14,7 @@ import '../common/design_system.dart';
 import '../common/glass.dart';
 import 'cast_button.dart';
 import 'history_list.dart';
+import 'playback_position_slider.dart';
 import 'player_bar_controls.dart';
 import 'player_artwork_carousel.dart';
 import 'player_collection_links.dart';
@@ -429,15 +430,9 @@ class _PositionSlider extends StatelessWidget {
     final state = active.state;
     final position = state.position;
     final duration = state.duration ?? Duration.zero;
-    final max = duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
     return Column(
       children: [
-        Slider(
-          value: position.inMilliseconds.toDouble().clamp(0, max),
-          max: max,
-          onChanged: (value) =>
-              active.seek(Duration(milliseconds: value.round())),
-        ),
+        PlaybackPositionSlider(active: active),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
