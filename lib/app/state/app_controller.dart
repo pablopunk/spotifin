@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,7 +144,7 @@ class AppController extends Notifier<AppState> {
   Future<bool> _hasCachedAccountData() async {
     final database = ref.read(databaseProvider);
     if ((await database.allTracks()).isNotEmpty) return true;
-    if ((await database.pendingOperations()).isNotEmpty) return true;
+    if (await database.hasPendingOperations()) return true;
     if ((await database.allDownloads()).isNotEmpty) return true;
     if ((await database.select(database.playlists).get()).isNotEmpty) {
       return true;
@@ -487,52 +486,27 @@ class AppController extends Notifier<AppState> {
       clearSyncError: true,
     );
     try {
-      final client = ref.read(jellyfinClientProvider);
-      final database = ref.read(databaseProvider);
       final session = await _refreshSessionIdentity(lease, lease.session);
       if (!scope.isCurrent(lease)) return;
       if (session == null) return;
       state = state.copyWith(session: session);
-      final flushed = await _flushPending(lease);
-      if (!scope.isCurrent(lease)) return;
-      if (!flushed) {
-        // Pending delivery blocked; still continue with the catalog sync
-        // using the current lease.
+      final result = await ref.read(jellyfinLibraryProvider).refresh(lease);
+      if (result.isStale || !scope.isCurrent(lease)) return;
+      if (result.isFailed) {
+        final error = result.error;
+        if (error is JellyfinException && error.statusCode == 401) {
+          if (scope.isCurrent(lease)) await _expireSession();
+          return;
+        }
+        throw error ?? StateError('Library refresh failed');
       }
-      Object? playlistError;
-      try {
-        final playlists = await client.fetchPlaylists(session);
-        if (!scope.isCurrent(lease)) return;
-        final applied = await scope.commit(
-          lease,
-          () => database.replacePlaylists(playlists),
-        );
-        if (applied == AccountWriteResult.stale) return;
-      } catch (error) {
-        if (!scope.isCurrent(lease)) return;
-        playlistError = error;
-      }
-      final tracks = await client.fetchTracks(session);
-      if (!scope.isCurrent(lease)) return;
-      final trackApplied = await scope.commit(
-        lease,
-        () => database.replaceTracks(tracks),
-      );
-      if (trackApplied == AccountWriteResult.stale) return;
+      final catalog = result.catalog;
+      final playlistError = result.playlistError;
+      final pendingBlocked = result.pendingBlocked;
       if (!scope.isCurrent(lease)) return;
       await ref
           .read(downloadProvider)
-          .reconcile(tracks.map((track) => track.id.value));
-      if (!scope.isCurrent(lease)) return;
-      try {
-        final albumDates = await client.fetchAlbumDates(session);
-        if (!scope.isCurrent(lease)) return;
-        await scope.commit(lease, () => database.replaceAlbumDates(albumDates));
-        if (!scope.isCurrent(lease)) return;
-      } catch (_) {
-        if (!scope.isCurrent(lease)) return;
-      }
-      final catalog = await ref.read(databaseProvider).allTracks();
+          .reconcile(catalog.map((track) => track.id));
       if (!scope.isCurrent(lease)) return;
       try {
         await ref.read(carControllerProvider.notifier).refreshNow();
@@ -571,10 +545,12 @@ class AppController extends Notifier<AppState> {
       state = state.copyWith(
         syncing: false,
         clearError: true,
-        syncError: playlistError == null
+        syncError: playlistError == null && !pendingBlocked
             ? null
-            : 'Songs updated, but saved playlists could not be refreshed.',
-        clearSyncError: playlistError == null,
+            : playlistError != null
+            ? 'Songs updated, but saved playlists could not be refreshed.'
+            : 'Songs updated, but some edits are still pending.',
+        clearSyncError: playlistError == null && !pendingBlocked,
         lastSyncedAt: syncedAt,
       );
     } catch (error) {
@@ -605,24 +581,9 @@ class AppController extends Notifier<AppState> {
 
   /// Refreshes only the Recently Played cache without a full library sync.
   Future<void> refreshHistory({int limit = 100}) async {
-    final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null) return;
-    final session = lease.session;
-    late final List<TracksCompanion> rows;
-    try {
-      rows = await ref
-          .read(jellyfinClientProvider)
-          .fetchRecentlyPlayed(session, limit: limit);
-    } catch (_) {
-      return;
-    }
-    if (!scope.isCurrent(lease)) return;
-    if (rows.isEmpty) return;
-    await scope.commit(
-      lease,
-      () => ref.read(databaseProvider).upsertTracks(rows),
-    );
+    await ref.read(jellyfinLibraryProvider).refreshHistory(lease, limit: limit);
   }
 
   DateTime? _readLastSyncedAt(
@@ -648,16 +609,11 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> toggleFavorite(String trackId, bool favorite) async {
-    final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null) return;
-    final applied = await scope.commit(
-      lease,
-      () => ref.read(databaseProvider).saveFavoriteEdit(trackId, favorite),
-    );
-    if (applied == AccountWriteResult.stale) return;
-    if (!scope.isCurrent(lease)) return;
-    await _flushPending(lease);
+    await ref
+        .read(jellyfinLibraryProvider)
+        .toggleFavorite(lease, trackId, favorite);
   }
 
   Future<void> deleteTrack(String trackId) async {
@@ -666,71 +622,51 @@ class AppController extends Notifier<AppState> {
     if (lease == null) {
       throw const JellyfinException('Sign in before deleting a song.');
     }
-    final session = lease.session;
-    await ref.read(jellyfinClientProvider).deleteItem(session, trackId);
+    await ref.read(jellyfinLibraryProvider).deleteTrack(lease, trackId);
     if (!scope.isCurrent(lease)) return;
-    await scope.commit(lease, () => _removeLocalTrack(trackId));
+    await _removeTrackDownstream(trackId);
   }
 
   Future<void> deleteAlbum(Iterable<String> trackIds) async {
     final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null) return;
-    final session = lease.session;
+    final library = ref.read(jellyfinLibraryProvider);
     for (final trackId in trackIds) {
       if (!scope.isCurrent(lease)) return;
-      await ref.read(jellyfinClientProvider).deleteItem(session, trackId);
+      await library.deleteTrack(lease, trackId);
       if (!scope.isCurrent(lease)) return;
-      final applied = await scope.commit(
-        lease,
-        () => _removeLocalTrack(trackId),
-      );
-      if (applied == AccountWriteResult.stale) return;
+      await _removeTrackDownstream(trackId);
     }
   }
 
-  Future<void> _removeLocalTrack(String trackId) async {
+  /// Best-effort downstream cleanup after a committed track deletion,
+  /// guarded by the caller's lease.
+  Future<void> _removeTrackDownstream(String trackId) async {
     try {
       await ref.read(downloadProvider).remove(trackId);
     } catch (_) {}
-    await ref.read(databaseProvider).removeTrack(trackId);
     try {
-      await ref.read(playbackProvider).removeTrack(trackId);
+      await ref.read(activePlaybackProvider).removeTrack(trackId);
     } catch (_) {}
   }
 
   Future<void> addToPlaylist(String playlistId, String trackId) async {
-    final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null) return;
-    final applied = await scope.commit(
-      lease,
-      () =>
-          ref.read(databaseProvider).savePlaylistAddition(playlistId, trackId),
-    );
-    if (applied == AccountWriteResult.stale) return;
-    if (!scope.isCurrent(lease)) return;
-    await _flushPending(lease);
+    await ref
+        .read(jellyfinLibraryProvider)
+        .addToPlaylist(lease, playlistId, trackId);
   }
 
   Future<void> createPlaylist(String name, List<String> trackIds) async {
     final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null || name.trim().isEmpty) return;
-    final session = lease.session;
     try {
       await ref
-          .read(jellyfinClientProvider)
-          .createPlaylist(session, name.trim(), trackIds);
-      if (!scope.isCurrent(lease)) return;
-      final playlists = await ref
-          .read(jellyfinClientProvider)
-          .fetchPlaylists(session);
-      if (!scope.isCurrent(lease)) return;
-      await scope.commit(
-        lease,
-        () => ref.read(databaseProvider).replacePlaylists(playlists),
-      );
+          .read(jellyfinLibraryProvider)
+          .createPlaylist(lease, name.trim(), trackIds);
     } catch (error) {
       if (!scope.isCurrent(lease)) return;
       state = state.copyWith(error: error.toString());
@@ -741,20 +677,10 @@ class AppController extends Notifier<AppState> {
     final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null || name.trim().isEmpty) return;
-    final session = lease.session;
     try {
       await ref
-          .read(jellyfinClientProvider)
-          .renamePlaylist(session, playlistId, name.trim());
-      if (!scope.isCurrent(lease)) return;
-      final playlists = await ref
-          .read(jellyfinClientProvider)
-          .fetchPlaylists(session);
-      if (!scope.isCurrent(lease)) return;
-      await scope.commit(
-        lease,
-        () => ref.read(databaseProvider).replacePlaylists(playlists),
-      );
+          .read(jellyfinLibraryProvider)
+          .renamePlaylist(lease, playlistId, name.trim());
     } catch (error) {
       if (!scope.isCurrent(lease)) return;
       state = state.copyWith(error: error.toString());
@@ -762,18 +688,11 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> deletePlaylist(String playlistId) async {
-    final scope = _scope;
     final lease = _leaseOrActivate();
     if (lease == null) {
       throw const JellyfinException('Sign in before deleting a playlist.');
     }
-    final session = lease.session;
-    await ref.read(jellyfinClientProvider).deleteItem(session, playlistId);
-    if (!scope.isCurrent(lease)) return;
-    await scope.commit(
-      lease,
-      () => ref.read(databaseProvider).removePlaylist(playlistId),
-    );
+    await ref.read(jellyfinLibraryProvider).deletePlaylist(lease, playlistId);
   }
 
   Future<void> signOut() async {
@@ -1058,53 +977,6 @@ class AppController extends Notifier<AppState> {
           smallStreaming: state.smallStreaming,
           normalization: value,
         );
-  }
-
-  Future<bool> _flushPending(AccountLease lease) async {
-    final scope = _scope;
-    if (!scope.isCurrent(lease)) return false;
-    final database = ref.read(databaseProvider);
-    final client = ref.read(jellyfinClientProvider);
-    final operations = await database.pendingOperations();
-    for (final operation in operations) {
-      if (!scope.isCurrent(lease)) return false;
-      try {
-        final payload = jsonDecode(operation.payload) as Map<String, dynamic>;
-        if (operation.kind == 'favorite') {
-          await client.setFavorite(
-            lease.session,
-            operation.targetId,
-            payload['favorite'] as bool,
-          );
-        } else if (operation.kind == 'playlistAdd') {
-          await client.addToPlaylist(lease.session, operation.targetId, [
-            payload['trackId'] as String,
-          ]);
-        } else {
-          await scope.commit(
-            lease,
-            () => database.incrementPendingAttempts(operation.id),
-          );
-          return false;
-        }
-        if (!scope.isCurrent(lease)) return false;
-        final acknowledged = await scope.commit(
-          lease,
-          () => database.completePending(operation.id),
-        );
-        if (acknowledged == AccountWriteResult.stale) return false;
-      } catch (_) {
-        if (!scope.isCurrent(lease)) return false;
-        try {
-          await scope.commit(
-            lease,
-            () => database.incrementPendingAttempts(operation.id),
-          );
-        } catch (_) {}
-        return false;
-      }
-    }
-    return scope.isCurrent(lease);
   }
 
   Future<void> setGlassEffects(bool value) async {

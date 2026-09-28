@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/jellyfin/account_scope.dart';
 import '../services/jellyfin/jellyfin_client.dart';
+import '../services/jellyfin/library/jellyfin_library.dart';
 import '../services/downtify/downtify_client.dart';
 import '../services/downtify/downtify_store.dart';
 import '../services/jellyfin/library_cache_owner_store.dart';
@@ -104,6 +105,14 @@ final accountScopeProvider = Provider<AccountScope>((ref) {
 
 final libraryCacheOwnerStoreProvider = Provider<LibraryCacheOwnerStore>(
   (ref) => LibraryCacheOwnerStore(),
+);
+
+final jellyfinLibraryProvider = Provider<JellyfinLibrary>(
+  (ref) => JellyfinLibrary(
+    ref.watch(jellyfinClientProvider),
+    ref.watch(databaseProvider),
+    ref.watch(accountScopeProvider),
+  ),
 );
 
 final downloadProvider = Provider<DownloadService>((ref) {

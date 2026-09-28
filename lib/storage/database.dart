@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
@@ -119,6 +120,19 @@ class AppDatabase extends _$AppDatabase {
       );
 
   AppDatabase.forTesting(super.executor);
+
+  /// Random per-instance prefix plus a monotonic counter for pending-write
+  /// ids. Clock timestamps alone can repeat, so ids minted from time only
+  /// would collide and lose operations; this pair stays distinct for every
+  /// newly saved operation while already-stored ids are preserved.
+  final String _pendingIdPrefix = math.Random()
+      .nextInt(1 << 32)
+      .toRadixString(16);
+  int _pendingIdCounter = 0;
+
+  /// Mints a distinct id for a newly saved pending operation.
+  String newPendingWriteId(String kind, String targetId) =>
+      '$kind-$targetId-$_pendingIdPrefix-${_pendingIdCounter++}';
 
   @override
   int get schemaVersion => 10;
@@ -324,6 +338,23 @@ class AppDatabase extends _$AppDatabase {
     await (delete(
       pendingWrites,
     )..where((write) => write.targetId.equals(id))).go();
+    // A removed track also drops queued playlist additions whose decoded
+    // payload names it, not just rows targeted at it.
+    final additions = await (select(
+      pendingWrites,
+    )..where((row) => row.kind.equals('playlistAdd'))).get();
+    for (final addition in additions) {
+      Map<String, dynamic>? payload;
+      try {
+        payload = jsonDecode(addition.payload) as Map<String, dynamic>?;
+      } catch (_) {
+        continue;
+      }
+      if (payload?['trackId'] != id) continue;
+      await (delete(
+        pendingWrites,
+      )..where((row) => row.id.equals(addition.id))).go();
+    }
     final storedPlaylists = await select(playlists).get();
     for (final playlist in storedPlaylists) {
       final ids = (jsonDecode(playlist.trackIds) as List<dynamic>)
@@ -359,7 +390,7 @@ class AppDatabase extends _$AppDatabase {
             .go();
         await into(pendingWrites).insert(
           PendingWritesCompanion.insert(
-            id: 'favorite-$trackId-${DateTime.now().microsecondsSinceEpoch}',
+            id: newPendingWriteId('favorite', trackId),
             kind: 'favorite',
             targetId: trackId,
             payload: Value(jsonEncode({'favorite': favorite})),
@@ -400,7 +431,7 @@ class AppDatabase extends _$AppDatabase {
             .write(PlaylistsCompanion(trackIds: Value(jsonEncode(ids))));
         await into(pendingWrites).insert(
           PendingWritesCompanion.insert(
-            id: 'playlist-$playlistId-${DateTime.now().microsecondsSinceEpoch}',
+            id: newPendingWriteId('playlistAdd', playlistId),
             kind: 'playlistAdd',
             targetId: playlistId,
             payload: Value(jsonEncode({'trackId': trackId})),
@@ -412,6 +443,55 @@ class AppDatabase extends _$AppDatabase {
   Future<List<PendingWrite>> pendingOperations() => (select(
     pendingWrites,
   )..orderBy([(row) => OrderingTerm.asc(row.createdAt)])).get();
+
+  /// Oldest pending operation in SQLite rowid insertion order.
+  ///
+  /// Delivery order must follow insertion, not lexical ids or timestamps
+  /// alone; no schema change is needed for this rowid table.
+  Future<PendingWrite?> nextPendingOperation() =>
+      customSelect(
+            'SELECT * FROM pending_writes ORDER BY rowid ASC LIMIT 1',
+            readsFrom: {pendingWrites},
+          )
+          .map(
+            (row) => PendingWrite(
+              id: row.read<String>('id'),
+              kind: row.read<String>('kind'),
+              targetId: row.read<String>('target_id'),
+              payload: row.read<String>('payload'),
+              createdAt: row.read<DateTime>('created_at'),
+              attempts: row.read<int>('attempts'),
+            ),
+          )
+          .getSingleOrNull();
+
+  Future<PendingWrite?> pendingOperationById(String id) => (select(
+    pendingWrites,
+  )..where((row) => row.id.equals(id))).getSingleOrNull();
+
+  Future<bool> hasPendingOperations() async =>
+      await nextPendingOperation() != null;
+
+  /// Deletes pending `playlistAdd` rows whose decoded payload names
+  /// [trackId], not just rows whose `targetId` equals it.
+  Future<void> deletePendingPlaylistReferences(String trackId) =>
+      transaction(() async {
+        final additions = await (select(
+          pendingWrites,
+        )..where((row) => row.kind.equals('playlistAdd'))).get();
+        for (final addition in additions) {
+          Map<String, dynamic>? payload;
+          try {
+            payload = jsonDecode(addition.payload) as Map<String, dynamic>?;
+          } catch (_) {
+            continue;
+          }
+          if (payload?['trackId'] != trackId) continue;
+          await (delete(
+            pendingWrites,
+          )..where((row) => row.id.equals(addition.id))).go();
+        }
+      });
 
   Future<void> completePending(String id) =>
       (delete(pendingWrites)..where((row) => row.id.equals(id))).go();
