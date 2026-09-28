@@ -14,7 +14,11 @@ void main() {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     await database.upsertTracks([
       TracksCompanion.insert(id: 'b', name: 'Beta', artist: const Value('Zed')),
-      TracksCompanion.insert(id: 'a', name: 'alpha', artist: const Value('Amy')),
+      TracksCompanion.insert(
+        id: 'a',
+        name: 'alpha',
+        artist: const Value('Amy'),
+      ),
     ]);
     final container = ProviderContainer(
       overrides: [databaseProvider.overrideWithValue(database)],
