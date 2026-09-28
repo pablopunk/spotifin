@@ -34,6 +34,11 @@ class JellyfinLibrary {
   /// Edit wake-ups observed while a drain runs.
   final Map<String, bool> _drainWake = {};
 
+  /// Delivery pause per lane: while a snapshot request is in flight through
+  /// database apply, further delivery waits for the snapshot stage.
+  /// Local optimistic edits still commit through the account fence.
+  final Map<String, bool> _deliveryPaused = {};
+
   String _laneKey(AccountLease lease) =>
       '${lease.generation}|${lease.ownerKey}';
 
@@ -146,6 +151,19 @@ class JellyfinLibrary {
         return false;
       });
     }
+    if (_deliveryPaused[key] == true) {
+      // Snapshot stage in flight: record the wake-up and run a deferred
+      // drain after the lane's current work without locking recursively.
+      _drainWake[key] = true;
+      return _inLaneKey(key, () async {
+        if (!_scope.isCurrent(lease)) return false;
+        if (_drainWake[key] != true &&
+            !(await _database.hasPendingOperations())) {
+          return false;
+        }
+        return _drainNow(lease);
+      });
+    }
     final future = _inLaneKey(key, () => _drainNow(lease));
     _drains[key] = future;
     future.whenComplete(() {
@@ -187,61 +205,73 @@ class JellyfinLibrary {
   Future<LibraryRefreshResult> _refreshNow(AccountLease lease) async {
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     final session = lease.session;
+    final key = _laneKey(lease);
     final delivered = await _drainNow(lease);
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     Object? playlistError;
+    _deliveryPaused[key] = true;
     try {
-      final playlists = await _client.fetchPlaylists(session);
+      try {
+        final playlists = await _client.fetchPlaylists(session);
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
+        final applied = await _scope.commit(
+          lease,
+          () => _database.applyLibraryPlaylists(playlists),
+        );
+        if (applied == AccountWriteResult.stale) {
+          return const LibraryRefreshResult.stale();
+        }
+      } catch (error) {
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
+        playlistError = error;
+      }
+      try {
+        final tracks = await _client.fetchTracks(session);
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
+        final applied = await _scope.commit(
+          lease,
+          () => _database.applyLibraryTracks(tracks),
+        );
+        if (applied == AccountWriteResult.stale) {
+          return const LibraryRefreshResult.stale();
+        }
+      } catch (error) {
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
+        return LibraryRefreshResult.failed(error);
+      }
       if (!_scope.isCurrent(lease)) {
         return const LibraryRefreshResult.stale();
       }
-      final applied = await _scope.commit(
-        lease,
-        () => _database.replacePlaylists(playlists),
-      );
-      if (applied == AccountWriteResult.stale) {
-        return const LibraryRefreshResult.stale();
+      try {
+        final albumDates = await _client.fetchAlbumDates(session);
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
+        await _scope.commit(
+          lease,
+          () => _database.replaceAlbumDates(albumDates),
+        );
+      } catch (_) {
+        if (!_scope.isCurrent(lease)) {
+          return const LibraryRefreshResult.stale();
+        }
       }
-    } catch (error) {
-      if (!_scope.isCurrent(lease)) {
-        return const LibraryRefreshResult.stale();
-      }
-      playlistError = error;
-    }
-    try {
-      final tracks = await _client.fetchTracks(session);
-      if (!_scope.isCurrent(lease)) {
-        return const LibraryRefreshResult.stale();
-      }
-      final applied = await _scope.commit(
-        lease,
-        () => _database.replaceTracks(tracks),
-      );
-      if (applied == AccountWriteResult.stale) {
-        return const LibraryRefreshResult.stale();
-      }
-    } catch (error) {
-      if (!_scope.isCurrent(lease)) {
-        return const LibraryRefreshResult.stale();
-      }
-      return LibraryRefreshResult.failed(error);
-    }
-    if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
-    try {
-      final albumDates = await _client.fetchAlbumDates(session);
-      if (!_scope.isCurrent(lease)) {
-        return const LibraryRefreshResult.stale();
-      }
-      await _scope.commit(lease, () => _database.replaceAlbumDates(albumDates));
-    } catch (_) {
-      if (!_scope.isCurrent(lease)) {
-        return const LibraryRefreshResult.stale();
-      }
+    } finally {
+      _deliveryPaused[key] = false;
     }
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     // Wake pending delivery after the snapshot stage without a recursive
     // lane lock or an immediate retry loop after a failed send.
-    if (!delivered) _noteLocalEdit(lease);
+    if (_drainWake[key] == true) await _drainNow(lease);
+    if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     final catalog = await _database.allTracks();
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     return LibraryRefreshResult.committed(
@@ -254,8 +284,10 @@ class JellyfinLibrary {
   Future<LibraryRefreshResult> _refreshTracksNow(AccountLease lease) async {
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     final session = lease.session;
+    final key = _laneKey(lease);
     final delivered = await _drainNow(lease);
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
+    _deliveryPaused[key] = true;
     try {
       final tracks = await _client.fetchTracks(session);
       if (!_scope.isCurrent(lease)) {
@@ -263,7 +295,7 @@ class JellyfinLibrary {
       }
       final applied = await _scope.commit(
         lease,
-        () => _database.replaceTracks(tracks),
+        () => _database.applyLibraryTracks(tracks),
       );
       if (applied == AccountWriteResult.stale) {
         return const LibraryRefreshResult.stale();
@@ -273,9 +305,12 @@ class JellyfinLibrary {
         return const LibraryRefreshResult.stale();
       }
       return LibraryRefreshResult.failed(error);
+    } finally {
+      _deliveryPaused[key] = false;
     }
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
-    if (!delivered) _noteLocalEdit(lease);
+    if (_drainWake[key] == true) await _drainNow(lease);
+    if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     final catalog = await _database.allTracks();
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     return LibraryRefreshResult.committed(catalog, pendingBlocked: !delivered);
@@ -287,7 +322,9 @@ class JellyfinLibrary {
   }) async {
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     final session = lease.session;
+    final historyLane = _laneKey(lease);
     late final List<TracksCompanion> rows;
+    _deliveryPaused[historyLane] = true;
     try {
       rows = await _client.fetchRecentlyPlayed(session, limit: limit);
     } catch (error) {
@@ -295,10 +332,15 @@ class JellyfinLibrary {
         return const LibraryRefreshResult.stale();
       }
       return LibraryRefreshResult.failed(error);
+    } finally {
+      _deliveryPaused[historyLane] = false;
     }
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     if (rows.isEmpty) return const LibraryRefreshResult.committed([]);
-    await _scope.commit(lease, () => _database.upsertTracks(rows));
+    await _scope.commit(lease, () => _database.applyHistoryTracks(rows));
+    if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
+    final historyKey = _laneKey(lease);
+    if (_drainWake[historyKey] == true) await _drainNow(lease);
     if (!_scope.isCurrent(lease)) return const LibraryRefreshResult.stale();
     return const LibraryRefreshResult.committed([]);
   }
@@ -309,9 +351,20 @@ class JellyfinLibrary {
   ) async {
     await _inLane(lease, () async {
       if (!_scope.isCurrent(lease)) return;
-      final playlists = await _client.fetchPlaylists(session);
+      final key = _laneKey(lease);
+      _deliveryPaused[key] = true;
+      try {
+        final playlists = await _client.fetchPlaylists(session);
+        if (!_scope.isCurrent(lease)) return;
+        await _scope.commit(
+          lease,
+          () => _database.applyLibraryPlaylists(playlists),
+        );
+      } finally {
+        _deliveryPaused[key] = false;
+      }
       if (!_scope.isCurrent(lease)) return;
-      await _scope.commit(lease, () => _database.replacePlaylists(playlists));
+      if (_drainWake[key] == true) await _drainNow(lease);
     });
   }
 

@@ -325,6 +325,149 @@ class AppDatabase extends _$AppDatabase {
         await (delete(tracks)..where((row) => row.id.isNotIn(ids))).go();
       });
 
+  /// Applies a full track snapshot while preserving optimistic edits.
+  ///
+  /// Reads pending writes and affected cached rows inside this transaction:
+  /// server metadata applies for every row, the newest pending favorite
+  /// wins for edited tracks, cached rows absent from the snapshot are
+  /// retained while a pending favorite or playlist reference names them,
+  /// and unprotected rows accept the snapshot (including deletion).
+  /// Pending additions are never appended to server membership and nothing
+  /// is deduplicated by track id, so repeated application is idempotent.
+  Future<void> applyLibraryTracks(List<TracksCompanion> rows) => transaction(
+    () async {
+      final pendingFavorites = await _pendingFavoriteValues();
+      final pendingReferences = await _pendingPlaylistTrackIds();
+      final incomingIds = {for (final row in rows) row.id.value};
+      for (final row in rows) {
+        final favorite = pendingFavorites[row.id.value];
+        if (favorite == null) {
+          await into(tracks).insertOnConflictUpdate(row);
+        } else {
+          await into(tracks)
+              .insertOnConflictUpdate(row.copyWith(favorite: Value(favorite)));
+        }
+      }
+      final cached = await (select(
+        tracks,
+      )..where((row) => row.id.isNotIn(incomingIds))).get();
+      for (final row in cached) {
+        if (pendingFavorites.containsKey(row.id)) continue;
+        if (pendingReferences.contains(row.id)) continue;
+        await (delete(tracks)..where((r) => r.id.equals(row.id))).go();
+      }
+    },
+  );
+
+  /// Applies a history response as a partial upsert with favorite
+  /// protection. An empty history response never clears tracks.
+  Future<void> applyHistoryTracks(List<TracksCompanion> rows) => transaction(
+    () async {
+      if (rows.isEmpty) return;
+      final pendingFavorites = await _pendingFavoriteValues();
+      for (final row in rows) {
+        final favorite = pendingFavorites[row.id.value];
+        if (favorite == null) {
+          await into(tracks).insertOnConflictUpdate(row);
+        } else {
+          await into(tracks)
+              .insertOnConflictUpdate(row.copyWith(favorite: Value(favorite)));
+        }
+      }
+    },
+  );
+
+  /// Applies a playlist snapshot while preserving optimistic membership.
+  ///
+  /// Playlists with pending additions keep their current optimistic
+  /// `trackIds` list exactly (server metadata still updates); cached
+  /// playlists absent from the snapshot are retained while additions are
+  /// pending. Playlists without pending additions accept server membership
+  /// exactly, including legitimate duplicates.
+  Future<void> applyLibraryPlaylists(List<PlaylistsCompanion> rows) =>
+      transaction(() async {
+        final pendingPlaylists = await _pendingPlaylistIds();
+        final incomingIds = {for (final row in rows) row.id.value};
+        for (final row in rows) {
+          if (!pendingPlaylists.contains(row.id.value)) {
+            await into(playlists).insertOnConflictUpdate(row);
+            continue;
+          }
+          final cached = await (select(
+            playlists,
+          )..where((r) => r.id.equals(row.id.value))).getSingleOrNull();
+          if (cached == null) {
+            await into(playlists).insertOnConflictUpdate(row);
+          } else {
+            await into(playlists).insertOnConflictUpdate(
+              row.copyWith(trackIds: Value(cached.trackIds)),
+            );
+          }
+        }
+        final cached = await (select(
+          playlists,
+        )..where((row) => row.id.isNotIn(incomingIds))).get();
+        for (final row in cached) {
+          if (pendingPlaylists.contains(row.id)) continue;
+          await (delete(playlists)..where((r) => r.id.equals(row.id))).go();
+        }
+      });
+
+  /// Newest pending favorite value per track, oldest first so repeats keep
+  /// the latest edit.
+  Future<Map<String, bool>> _pendingFavoriteValues() async {
+    final operations =
+        await customSelect(
+              'SELECT * FROM pending_writes WHERE kind = ? ORDER BY rowid ASC',
+              variables: [Variable('favorite')],
+              readsFrom: {pendingWrites},
+            )
+            .map(
+              (row) => PendingWrite(
+                id: row.read<String>('id'),
+                kind: row.read<String>('kind'),
+                targetId: row.read<String>('target_id'),
+                payload: row.read<String>('payload'),
+                createdAt: row.read<DateTime>('created_at'),
+                attempts: row.read<int>('attempts'),
+              ),
+            )
+            .get();
+    final values = <String, bool>{};
+    for (final operation in operations) {
+      try {
+        final payload = jsonDecode(operation.payload) as Map<String, dynamic>?;
+        final favorite = payload?['favorite'];
+        if (favorite is bool) values[operation.targetId] = favorite;
+      } catch (_) {}
+    }
+    return values;
+  }
+
+  /// Track ids named in pending playlist-addition payloads.
+  Future<Set<String>> _pendingPlaylistTrackIds() async {
+    final operations = await (select(
+      pendingWrites,
+    )..where((row) => row.kind.equals('playlistAdd'))).get();
+    final ids = <String>{};
+    for (final operation in operations) {
+      try {
+        final payload = jsonDecode(operation.payload) as Map<String, dynamic>?;
+        final trackId = payload?['trackId'];
+        if (trackId is String) ids.add(trackId);
+      } catch (_) {}
+    }
+    return ids;
+  }
+
+  /// Playlist ids with pending additions.
+  Future<Set<String>> _pendingPlaylistIds() async {
+    final operations = await (select(
+      pendingWrites,
+    )..where((row) => row.kind.equals('playlistAdd'))).get();
+    return {for (final operation in operations) operation.targetId};
+  }
+
   Future<void> removeTracksExcept(List<String> ids) async {
     if (ids.isEmpty) {
       await delete(tracks).go();
