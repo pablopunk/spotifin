@@ -137,6 +137,70 @@ void main() {
     expect(harness.service.queue, isNotEmpty);
   });
 
+  test('paused snapshot restore never starts audio', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    await harness.service.replaceQueue(playbackCatalog(5), startIndex: 2);
+    await harness.settle();
+    await harness.service.pause();
+    await harness.settle();
+    final playsBefore = harness.player.playCalls;
+
+    final snapshot = harness.service.captureSnapshot();
+    expect(snapshot.playing, isFalse);
+    expect(snapshot.position, harness.player.position);
+
+    await harness.service.next();
+    await harness.settle();
+    expect(harness.service.currentTrack?.id, 'track-3');
+
+    await harness.service.restoreSnapshot(snapshot);
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-2');
+    expect(harness.service.currentIndex, 2);
+    expect(harness.player.playCalls, playsBefore);
+    expect(harness.service.playing, isFalse);
+  });
+
+  test('snapshot restore retains duplicate occurrence identity', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    final first = playbackTrack(0);
+    final second = playbackTrack(1);
+    await harness.service.replaceQueue([first, second, first], startIndex: 0);
+    await harness.waitForReports(1);
+    await harness.settle();
+
+    Set<String?> entryIds() => harness
+        .reportsFor('/Sessions/Playing')
+        .expand(
+          (report) => ((report.body['NowPlayingQueue'] as List?) ?? const [])
+              .cast<Map<String, dynamic>>(),
+        )
+        .map((entry) => entry['PlaylistItemId'] as String?)
+        .whereType<String>()
+        .toSet();
+
+    final before = entryIds();
+    expect(before, hasLength(3));
+
+    final snapshot = harness.service.captureSnapshot();
+    await harness.service.next();
+    await harness.settle();
+    await harness.service.restoreSnapshot(snapshot);
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-0');
+    expect(harness.service.currentIndex, 0);
+    final after = entryIds();
+    expect(after, before);
+  });
+
   test('dispose stops listening to player events', () async {
     final harness = PlaybackHarness();
     await harness.configure();

@@ -4,26 +4,37 @@ import 'package:flutter/foundation.dart';
 
 import '../../storage/database.dart';
 import '../jellyfin/session.dart';
+import '../playback/playback_snapshot.dart';
 import '../redaction.dart';
 import 'cast_device.dart';
 import 'cast_playback_source.dart';
 import 'cast_sender.dart';
 import 'jellyfin_cast_adapter.dart';
 
+/// Who owns playback right now.
+///
+/// Local is selected until a Cast handoff is pending ([transferring]) or
+/// Cast owns ([remote]) or is awaiting the user's recovery decision
+/// ([recovering]) after connection loss or a failed local restoration.
+/// A disconnected transport alone never selects local: only a successful
+/// restoration or account cleanup does. Discovery alone never changes it.
+enum CastOwnership { local, transferring, remote, recovering }
+
 /// Orchestrates the iPhone Chromecast MVP.
 ///
 /// Flow: discover → connect → hand off the current track (title/artist/
 /// album/artwork/duration/position) to the Jellyfin Web Receiver → drive
-/// play/pause/seek/volume/next/previous remotely → disconnect resumes local
-/// playback at the remote position. The local queue/history is never mutated
-/// while casting: a snapshot is taken at handoff and only used to resolve
-/// next/previous and to resume afterwards.
+/// play/pause/seek/volume/next/previous remotely → disconnect restores the
+/// retained Cast snapshot locally at the remote position. The local
+/// queue/history is never mutated while casting: a snapshot is taken at
+/// handoff and only used to resolve next/previous and to resume afterwards.
 ///
 /// Failure handling is explicit and user-visible via [error]: sign-in
 /// required, server unreachable by Cast (plain HTTP/localhost), nothing to
 /// cast, unsupported platform, target disappearance, failed handoff (with a
-/// one-time AAC fallback retry), connection loss (retry or resume locally),
-/// and background/foreground transitions (discovery paused/resumed).
+/// one-time AAC fallback retry, restoring local on persistent failure),
+/// connection loss (recovery ownership: retry or resume locally), and
+/// background/foreground transitions (discovery paused/resumed).
 class CastController extends ChangeNotifier {
   CastController({
     required CastPlaybackSource playback,
@@ -48,8 +59,20 @@ class CastController extends ChangeNotifier {
   bool _unstableReceiver = false;
   bool _initialized = false;
   bool _initializing = false;
-  bool _busy = false;
-  bool _casting = false;
+  bool _disposed = false;
+
+  /// Ordered command lane replacing the old silent busy-call loss. Public
+  /// methods enqueue exactly once; private implementations call each other
+  /// directly and never await another lane task.
+  Future<void> _commands = Future.value();
+
+  /// Lifecycle generation invalidating in-flight handoff/retry/restore work.
+  /// [configure], account replacement, and disposal bump it synchronously;
+  /// queued commands capture it and old completions cannot set casting true,
+  /// resume audio, or publish an old account's snapshot.
+  int _generation = 0;
+
+  CastOwnership _ownership = CastOwnership.local;
 
   List<CastDevice> _devices = const [];
   CastConnectionState _connection = CastConnectionState.disconnected;
@@ -59,9 +82,26 @@ class CastController extends ChangeNotifier {
   List<Track> _snapshot = const [];
   int _remoteIndex = 0;
   Track? _remoteTrack;
-  Duration _lastKnownPosition = Duration.zero;
-  bool _lastKnownPlaying = false;
+
+  /// Last usable media position/playing decision, kept separately from the
+  /// transport display [_remote]. Unknown/empty transport-reset events never
+  /// overwrite it, and buffering never flips a playing decision to paused,
+  /// so retry and local resume keep working after a disconnect reset.
+  Duration _recoveryPosition = Duration.zero;
+  bool _recoveryPlaying = false;
+
+  /// Complete Cast snapshot retained for resume (whole edited queue state).
+  PlaybackSnapshot? _castSnapshot;
+
+  /// Local snapshot captured at handoff, used to restore local playback
+  /// when a handoff fails.
+  PlaybackSnapshot? _localSnapshot;
+
   CastDevice? _lastDevice;
+
+  /// True while a command intentionally ends the sender session, so the
+  /// resulting transport disconnect does not trigger recovery ownership.
+  bool _leavingRemote = false;
 
   String? _error;
 
@@ -71,8 +111,22 @@ class CastController extends ChangeNotifier {
 
   bool get initialized => _initialized;
   bool get initializing => _initializing;
-  bool get busy => _busy;
-  bool get isCasting => _casting;
+
+  /// Whether a Cast command is queued or running. Commands are ordered on
+  /// the lane instead of dropped; widgets use this only to disable controls
+  /// while work is in flight.
+  bool get busy => _inflight > 0;
+  int _inflight = 0;
+
+  /// Current playback owner. Notified on every change.
+  CastOwnership get ownership => _ownership;
+
+  /// Whether a receiver owns playback or awaits the recovery decision.
+  /// Derived from [ownership] so loss retains the Cast destination.
+  bool get isCasting =>
+      _ownership == CastOwnership.remote ||
+      _ownership == CastOwnership.recovering;
+
   bool get isSupported => _isSupported();
   bool get useUnstableReceiver => _unstableReceiver;
 
@@ -130,10 +184,12 @@ class CastController extends ChangeNotifier {
     return JellyfinCastAdapter.serverBlockerMessage(uri);
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize() => _enqueue((generation) => _initializeNow());
+
+  Future<void> _initializeNow() async {
     if (_initialized || _initializing) return;
     _initializing = true;
-    notifyListeners();
+    _safeNotify();
     try {
       await _sender.initialize(
         receiverAppId: JellyfinCastAdapter.receiverAppId(
@@ -153,15 +209,10 @@ class CastController extends ChangeNotifier {
             'Reconnect or resume on this iPhone.',
           );
         }
-        notifyListeners();
+        _safeNotify();
       });
       _connectionSub ??= _sender.connectionStateStream.listen(_onConnection);
-      _remoteSub ??= _sender.remoteStateStream.listen((state) {
-        _remote = state;
-        _lastKnownPosition = state.position;
-        _lastKnownPlaying = state.isPlaying;
-        notifyListeners();
-      });
+      _remoteSub ??= _sender.remoteStateStream.listen(_onRemote);
       _devices = _sender.devices;
       _connection = _sender.connectionState;
       _connectedDevice = _sender.connectedDevice;
@@ -175,36 +226,72 @@ class CastController extends ChangeNotifier {
       _error = redactSecrets(error);
     } finally {
       _initializing = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
-  void configure(JellyfinSession? session) {
+  /// Configures the account session, returning an awaitable cleanup future.
+  ///
+  /// Invalidation is synchronous: an account change (including sign-out)
+  /// immediately defeats in-flight handoff/retry/restore work. Unchanged-
+  /// account configuration never ends Cast or resets its queue.
+  Future<void> configure(JellyfinSession? session) {
+    final previous = _session;
     _session = session;
-    if (session == null && _casting) {
-      // Signed out mid-cast: stop remote, keep local halted; the UI offers
-      // resume once the user signs back in.
-      unawaited(disconnect(resumeLocal: false));
+    if (_accountKey(session) == _accountKey(previous)) {
+      return Future.value();
     }
-    notifyListeners();
+    _generation++;
+    final generation = _generation;
+    return _enqueue((_) => _cleanupNow(generation));
   }
 
-  Future<void> setReceiverChannel(bool unstable) async {
-    if (_unstableReceiver == unstable) return;
-    _unstableReceiver = unstable;
-    _initialized = false;
-    await initialize();
+  Future<void> _cleanupNow(int generation) async {
+    if (_ownership == CastOwnership.local &&
+        _castSnapshot == null &&
+        _localSnapshot == null &&
+        _sender.connectionState == CastConnectionState.disconnected) {
+      _safeNotify();
+      return;
+    }
+    _leavingRemote = true;
+    try {
+      await _sender.disconnect(stopReceiver: true);
+    } catch (_) {
+      // Account teardown is best-effort on the receiver; the local
+      // transition below still runs so no stale snapshot can revive.
+    } finally {
+      _leavingRemote = false;
+    }
+    if (generation != _generation) return;
+    _connection = CastConnectionState.disconnected;
+    _connectedDevice = null;
+    _castSnapshot = null;
+    _localSnapshot = null;
+    _playback.setCastingActive(false);
+    _setOwnership(CastOwnership.local);
+    _safeNotify();
   }
+
+  Future<void> setReceiverChannel(bool unstable) =>
+      _enqueue((_) async {
+        if (_unstableReceiver == unstable) return;
+        _unstableReceiver = unstable;
+        _initialized = false;
+        await _initializeNow();
+      });
 
   void _onConnection(CastConnectionState state) {
-    final wasCasting = _casting;
     _connection = state;
     _connectedDevice = _sender.connectedDevice;
     if (state == CastConnectionState.disconnected) {
       _connectedDevice = null;
-      if (wasCasting) {
+      if (_ownership == CastOwnership.remote && !_leavingRemote) {
+        // Unexpected disconnect retains Cast ownership in recovery mode;
+        // it never starts local audio without the user's resume action.
+        _setOwnership(CastOwnership.recovering);
         // Reconnect, target disappearance, or failed handoff path: keep the
-        // snapshot + last known position so retry/resume can proceed, and
+        // snapshot + last usable position so retry/resume can proceed, and
         // surface explicit guidance instead of silently dropping.
         _fail(
           'Chromecast connection lost. Reconnect to resume where you left '
@@ -212,32 +299,66 @@ class CastController extends ChangeNotifier {
         );
       }
     }
-    notifyListeners();
+    _safeNotify();
   }
 
-  Future<void> connect(CastDevice device) => _guarded(() async {
+  void _onRemote(CastRemoteState state) {
+    _remote = state;
+    _adoptRecovery(state);
+    _safeNotify();
+  }
+
+  /// Keeps the last usable position/playing decision apart from transport
+  /// display resets. Unknown/empty resets never overwrite it; buffering
+  /// never flips a playing decision; legitimate zero-position seeks and
+  /// paused updates remain valid.
+  void _adoptRecovery(CastRemoteState state) {
+    switch (state.playerState) {
+      case CastPlayerState.unknown:
+        return;
+      case CastPlayerState.idle:
+        if (state.position == Duration.zero && state.duration == null) return;
+        _recoveryPosition = state.position;
+        _recoveryPlaying = false;
+      case CastPlayerState.buffering:
+        _recoveryPosition = state.position;
+      case CastPlayerState.playing:
+        _recoveryPosition = state.position;
+        _recoveryPlaying = true;
+      case CastPlayerState.paused:
+        _recoveryPosition = state.position;
+        _recoveryPlaying = false;
+    }
+  }
+
+  Future<void> connect(CastDevice device) =>
+      _enqueue((generation) => _connectNow(device, generation));
+
+  Future<void> _connectNow(CastDevice device, int generation) async {
     _error = null;
-    notifyListeners();
+    _safeNotify();
     if (!_isSupported()) {
       throw const CastException(
         'Chromecast is available on iPhone and Android.',
       );
     }
-    await initialize();
+    await _initializeNow();
+    if (generation != _generation) return;
     await _sender.connect(device);
     await _waitForConnection();
+    if (generation != _generation) return;
     _connection = _sender.connectionState;
     _connectedDevice = _sender.connectedDevice ?? device;
     _lastDevice = device;
-    notifyListeners();
+    _safeNotify();
     // Auto-handoff keeps the iPhone MVP to one tap: picking a target hands
-    // off the current track at its current position. Calls the unguarded
-    // core directly: castCurrent() would early-return on the shared busy
-    // guard while this connect is still running.
-    if (_playback.currentTrack != null && !_casting) {
-      await _castCurrentNow();
+    // off the current track at its current position. Calls the direct core:
+    // ordinary queueing would serialize behind this connect.
+    if (_playback.currentTrack != null &&
+        _ownership == CastOwnership.local) {
+      await _castCurrentNow(generation);
     }
-  });
+  }
 
   Future<void> _waitForConnection() async {
     if (_sender.connectionState == CastConnectionState.connected) return;
@@ -255,9 +376,10 @@ class CastController extends ChangeNotifier {
   /// Preserves queue/history: the local queue is snapshotted (not mutated)
   /// and local audio is stopped (phone session → Stopped) with further local
   /// reports suppressed until disconnect.
-  Future<void> castCurrent() => _guarded(_castCurrentNow);
+  Future<void> castCurrent() =>
+      _enqueue((generation) => _castCurrentNow(generation));
 
-  Future<void> _castCurrentNow() async {
+  Future<void> _castCurrentNow(int generation) async {
     final session = _session;
     if (session == null) {
       throw const CastException('Sign in to cast to Chromecast.');
@@ -275,6 +397,7 @@ class CastController extends ChangeNotifier {
         _connectedDevice == null) {
       throw const CastException('Connect to a Chromecast first.');
     }
+    final localSnapshot = _playback.captureSnapshot();
     final queue = List<Track>.of(_playback.queue);
     final index =
         _playback.currentIndex ??
@@ -282,22 +405,65 @@ class CastController extends ChangeNotifier {
     final safeIndex = index < 0 ? 0 : index;
     final position = _playback.position;
 
+    _setOwnership(CastOwnership.transferring);
+    // The outgoing local stopped report goes out on the serialized path
+    // before receiver ownership begins.
     await _playback.stopForCast();
     _playback.setCastingActive(true);
     try {
-      await _loadWithFallback(session, track, position, playlistItemId: null);
-    } catch (_) {
-      _playback.setCastingActive(false);
+      await _loadWithFallback(
+        session,
+        track,
+        position,
+        playlistItemId: null,
+        autoplay: true,
+      );
+    } catch (error) {
+      await _abortHandoff(localSnapshot, generation);
       rethrow;
     }
+    if (generation != _generation) return;
     _snapshot = queue.isEmpty ? [track] : queue;
     _remoteIndex = safeIndex.clamp(0, _snapshot.length - 1);
     _remoteTrack = track;
-    _casting = true;
-    _lastKnownPosition = position;
-    _lastKnownPlaying = true;
+    _localSnapshot = null;
+    // Retain the complete local snapshot (full collection context,
+    // occurrence ids, repeat, and temporary history) for later resume.
+    _castSnapshot = localSnapshot.copyWith(position: position, playing: true);
+    _recoveryPosition = position;
+    _recoveryPlaying = true;
+    _setOwnership(CastOwnership.remote);
     _error = null;
-    notifyListeners();
+    _safeNotify();
+  }
+
+  /// Aborts a failed handoff: stops any receiver item that might have
+  /// started, then restores the captured local snapshot. When receiver
+  /// shutdown cannot be confirmed, recovery ownership is retained and local
+  /// audio stays stopped; a failed receiver stop never starts local audio
+  /// or releases suppression.
+  Future<void> _abortHandoff(
+    PlaybackSnapshot localSnapshot,
+    int generation,
+  ) async {
+    try {
+      await _sender.stop();
+    } catch (_) {
+      _setOwnership(CastOwnership.recovering);
+      _castSnapshot = localSnapshot;
+      return;
+    }
+    if (generation != _generation) return;
+    try {
+      await _playback.restoreSnapshot(localSnapshot);
+    } catch (_) {
+      _setOwnership(CastOwnership.recovering);
+      _castSnapshot = localSnapshot;
+      rethrow;
+    }
+    _playback.setCastingActive(false);
+    _setOwnership(CastOwnership.local);
+    await _playback.reportCurrentState();
   }
 
   Future<void> _loadWithFallback(
@@ -305,6 +471,7 @@ class CastController extends ChangeNotifier {
     Track track,
     Duration position, {
     String? playlistItemId,
+    required bool autoplay,
   }) async {
     try {
       final payload = _adapter.buildPayload(
@@ -313,11 +480,17 @@ class CastController extends ChangeNotifier {
         position: position,
         playlistItemId: playlistItemId,
       );
-      await _sender.loadSingle(payload, position: payload.startPosition);
+      await _sender.loadSingle(
+        payload,
+        position: payload.startPosition,
+        autoplay: autoplay,
+      );
       _remote = _remote.copyWith(
         position: payload.startPosition,
         duration: payload.duration,
-        playerState: CastPlayerState.playing,
+        playerState: autoplay
+            ? CastPlayerState.playing
+            : CastPlayerState.paused,
       );
       return;
     } on CastException {
@@ -334,11 +507,17 @@ class CastController extends ChangeNotifier {
         playlistItemId: playlistItemId,
         small: true,
       );
-      await _sender.loadSingle(fallback, position: fallback.startPosition);
+      await _sender.loadSingle(
+        fallback,
+        position: fallback.startPosition,
+        autoplay: autoplay,
+      );
       _remote = _remote.copyWith(
         position: fallback.startPosition,
         duration: fallback.duration,
-        playerState: CastPlayerState.playing,
+        playerState: autoplay
+            ? CastPlayerState.playing
+            : CastPlayerState.paused,
       );
       return;
     } on CastException catch (error) {
@@ -367,7 +546,7 @@ class CastController extends ChangeNotifier {
         ? Duration.zero
         : (duration != null && position > duration ? duration : position);
     await _sender.seek(safe);
-    _lastKnownPosition = safe;
+    _recoveryPosition = safe;
   });
 
   Future<void> setVolume(double volume) =>
@@ -389,7 +568,7 @@ class CastController extends ChangeNotifier {
     // Mirror local behavior: restart the track when well into it.
     if (_remote.position > const Duration(seconds: 4)) {
       await _sender.seek(Duration.zero);
-      _lastKnownPosition = Duration.zero;
+      _recoveryPosition = Duration.zero;
       return;
     }
     if (_snapshot.isEmpty) {
@@ -399,7 +578,7 @@ class CastController extends ChangeNotifier {
     final at = _remoteIndex - 1;
     if (at < 0) {
       await _sender.seek(Duration.zero);
-      _lastKnownPosition = Duration.zero;
+      _recoveryPosition = Duration.zero;
       return;
     }
     await _loadSnapshotIndex(at, autoplay: true);
@@ -411,7 +590,7 @@ class CastController extends ChangeNotifier {
     final at = index.clamp(0, _snapshot.length - 1);
     if (at == _remoteIndex) {
       await _sender.seek(Duration.zero);
-      _lastKnownPosition = Duration.zero;
+      _recoveryPosition = Duration.zero;
       return;
     }
     await _loadSnapshotIndex(at, autoplay: true);
@@ -426,16 +605,39 @@ class CastController extends ChangeNotifier {
       track,
       Duration.zero,
       playlistItemId: null,
+      autoplay: autoplay,
     );
     _remoteIndex = at;
     _remoteTrack = track;
-    _lastKnownPosition = Duration.zero;
-    _lastKnownPlaying = autoplay;
-    notifyListeners();
+    _recoveryPosition = Duration.zero;
+    _recoveryPlaying = autoplay;
+    // Track receiver selection in the retained snapshot so resume restores
+    // the current Cast state. The loaded order matches the handoff queue
+    // (edits arrive with the Cast queue work); duplicates resolve by
+    // position until occurrence-based edits land.
+    final retained = _castSnapshot;
+    if (retained != null) {
+      final loaded = retained.queue.loadedEntries;
+      if (at >= 0 && at < loaded.length) {
+        _castSnapshot = retained.copyWith(
+          queue: retained.queue.selectEntry(loaded[at].id),
+          position: Duration.zero,
+          playing: autoplay,
+        );
+      }
+    }
+    _safeNotify();
   }
 
-  /// Reconnects to the last target and reloads at the last known position.
-  Future<void> retry() => _guarded(() async {
+  /// Reconnects to the last target and reloads at the last usable position.
+  ///
+  /// The recovery decision is captured before the first await and passed as
+  /// `autoplay` through both normal and AAC-fallback loads; load events
+  /// never re-read a flag the load itself may change.
+  Future<void> retry() =>
+      _enqueue((generation) => _retryNow(generation));
+
+  Future<void> _retryNow(int generation) async {
     final device = _lastDevice;
     final track = _remoteTrack;
     final session = _session;
@@ -444,65 +646,94 @@ class CastController extends ChangeNotifier {
         'Nothing to reconnect. Pick a Chromecast and try again.',
       );
     }
-    await initialize();
+    final position = _recoveryPosition;
+    final autoplay = _recoveryPlaying;
+    await _initializeNow();
+    if (generation != _generation) return;
     await _sender.connect(device);
     await _waitForConnection();
+    if (generation != _generation) return;
     _connection = _sender.connectionState;
     _connectedDevice = _sender.connectedDevice ?? device;
     await _loadWithFallback(
       session,
       track,
-      _lastKnownPosition,
+      position,
       playlistItemId: null,
+      autoplay: autoplay,
     );
-    if (!_lastKnownPlaying) await _sender.pause();
-    _casting = true;
+    if (generation != _generation) return;
+    _setOwnership(CastOwnership.remote);
     _error = null;
-    notifyListeners();
-  });
+    _safeNotify();
+  }
 
   /// Ends the Cast session and resumes local playback where remote left off.
   ///
-  /// Queue/history are preserved: resuming jumps the unchanged local queue
-  /// to the remote index (recording history exactly as a local navigation
-  /// would) and seeks to the remote position.
-  Future<void> disconnect({bool resumeLocal = true}) => _guarded(() async {
-    final position = _remote.position;
-    final playing = _remote.isPlaying;
-    final index = _remoteIndex;
-    final hadRemote = _remoteTrack != null;
-    await _sender.disconnect(stopReceiver: true);
+  /// Resume restores the complete retained Cast snapshot (not an index into
+  /// whatever local queue happens to remain). `resumeLocal:false` with a
+  /// valid account restores that snapshot paused; account invalidation
+  /// discards the snapshot and never restores it. Receiver shutdown or
+  /// local restoration failure retains recovery data and reports the Cast
+  /// error without starting local audio.
+  Future<void> disconnect({bool resumeLocal = true}) =>
+      _enqueue((generation) => _disconnectNow(resumeLocal, generation));
+
+  Future<void> _disconnectNow(bool resumeLocal, int generation) async {
+    // Capture the recovery decision before the first await.
+    final position = _recoveryPosition;
+    final resumePlaying = resumeLocal && _recoveryPlaying;
+    final snapshot = _castSnapshot;
+    if (snapshot == null &&
+        _ownership == CastOwnership.local &&
+        _sender.connectionState == CastConnectionState.disconnected) {
+      return;
+    }
+    _leavingRemote = true;
+    try {
+      await _sender.disconnect(stopReceiver: true);
+    } catch (_) {
+      _setOwnership(CastOwnership.recovering);
+      rethrow;
+    } finally {
+      _leavingRemote = false;
+    }
+    if (generation != _generation) return;
     _connection = CastConnectionState.disconnected;
     _connectedDevice = null;
-    _casting = false;
-    _playback.setCastingActive(false);
-    _error = null;
-    notifyListeners();
-    if (resumeLocal && hadRemote && _snapshot.isNotEmpty) {
-      final at = index.clamp(0, _snapshot.length - 1);
-      final current = _playback.currentIndex;
-      if (current == null || current != at) {
-        await _playback.playQueueIndex(at);
-      }
-      await _playback.seek(position);
-      if (playing) {
-        await _playback.play();
-      } else {
-        await _playback.pause();
-      }
-    } else if (resumeLocal && hadRemote) {
-      await _playback.seek(position);
-      if (playing) {
-        await _playback.play();
-      } else {
-        await _playback.pause();
-      }
+    if (_session == null || snapshot == null) {
+      // Account invalidation discards the snapshot and never restores it.
+      _castSnapshot = null;
+      _localSnapshot = null;
+      _playback.setCastingActive(false);
+      _setOwnership(CastOwnership.local);
+      _snapshot = const [];
+      _remoteTrack = null;
+      _remoteIndex = 0;
+      _safeNotify();
+      return;
     }
+    // Local ownership is published only after restoration finishes.
+    try {
+      await _playback.restoreSnapshot(
+        snapshot.copyWith(position: position, playing: resumePlaying),
+      );
+    } catch (_) {
+      _setOwnership(CastOwnership.recovering);
+      rethrow;
+    }
+    if (generation != _generation) return;
+    _playback.setCastingActive(false);
+    _setOwnership(CastOwnership.local);
+    await _playback.reportCurrentState();
+    _castSnapshot = null;
+    _localSnapshot = null;
     _snapshot = const [];
     _remoteTrack = null;
     _remoteIndex = 0;
-    notifyListeners();
-  });
+    _error = null;
+    _safeNotify();
+  }
 
   /// Restarts discovery after the app returns to the foreground.
   ///
@@ -516,7 +747,7 @@ class CastController extends ChangeNotifier {
     } catch (_) {}
     _remote = _sender.remoteState;
     _connection = _sender.connectionState;
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Pauses discovery when backgrounded to save battery. The receiver keeps
@@ -529,42 +760,77 @@ class CastController extends ChangeNotifier {
 
   void clearError() {
     _error = null;
-    notifyListeners();
+    _safeNotify();
   }
 
-  Future<void> _castGuarded(Future<void> Function() action) => _guarded(
-    () async {
-      if (!_casting) throw const CastException('Nothing is casting right now.');
+  Future<void> _castGuarded(Future<void> Function() action) => _enqueue(
+    (_) async {
+      if (!isCasting) {
+        throw const CastException('Nothing is casting right now.');
+      }
       await action();
     },
   );
 
-  Future<void> _guarded(Future<void> Function() action) async {
-    if (_busy) return;
-    _busy = true;
-    notifyListeners();
-    try {
-      await action();
-    } on CastException catch (error) {
-      _fail(error.message);
-      rethrow;
-    } catch (error) {
-      final message = redactSecrets(error);
-      _fail(message);
-      throw CastException(message);
-    } finally {
-      _busy = false;
-      notifyListeners();
-    }
+  /// Orders commands instead of silently dropping busy calls. Errors surface
+  /// through [error] and the caller; stale generations return silently; the
+  /// lane itself never breaks.
+  Future<void> _enqueue(Future<void> Function(int generation) task) {
+    if (_disposed) return Future.value();
+    final generation = _generation;
+    _inflight++;
+    _safeNotify();
+    final result = _commands.then((_) {
+      if (generation != _generation || _disposed) {
+        return Future<void>.value();
+      }
+      return task(generation);
+    }).then((_) {
+      // Preserve the error value for the caller without breaking the lane.
+    }, onError: (Object error) {
+      if (error is CastException) {
+        _fail(error.message);
+      } else {
+        final message = redactSecrets(error);
+        _fail(message);
+        throw CastException(message);
+      }
+      throw error;
+    });
+    _commands = result.then<void>((_) {}, onError: (_, _) {});
+    return result.whenComplete(() {
+      _inflight--;
+      _safeNotify();
+    });
   }
 
+  void _setOwnership(CastOwnership ownership) {
+    if (_ownership == ownership) return;
+    _ownership = ownership;
+    _safeNotify();
+  }
+
+  String? _accountKey(JellyfinSession? session) =>
+      session == null ? null : '${session.serverId}.${session.userId}';
+
   void _fail(String message) {
+    if (_disposed) return;
     _error = message.isEmpty ? 'Chromecast request failed.' : message;
+    _safeNotify();
+  }
+
+  void _safeNotify() {
+    if (_disposed) return;
     notifyListeners();
   }
 
   @override
   void dispose() {
+    // Invalidate in-flight work so no later completion can notify or
+    // publish; the borrowed sender and local playback stay alive for the
+    // provider that owns them.
+    _generation++;
+    _disposed = true;
     _devicesSub?.cancel();
     _connectionSub?.cancel();
     _remoteSub?.cancel();

@@ -1,5 +1,6 @@
 import '../../storage/database.dart';
 import '../playback/playback_service.dart';
+import '../playback/playback_snapshot.dart';
 import 'cast_playback_source.dart';
 
 /// Production [CastPlaybackSource] backed by [PlaybackService].
@@ -25,6 +26,9 @@ class PlaybackServiceCastSource implements CastPlaybackSource {
   Duration get position => _playback.player.position;
 
   @override
+  bool get playing => _playback.playing;
+
+  @override
   Future<void> stopForCast() => _playback.stop();
 
   @override
@@ -41,4 +45,14 @@ class PlaybackServiceCastSource implements CastPlaybackSource {
 
   @override
   void setCastingActive(bool active) => _playback.setCastingActive(active);
+
+  @override
+  PlaybackSnapshot captureSnapshot() => _playback.captureSnapshot();
+
+  @override
+  Future<void> restoreSnapshot(PlaybackSnapshot snapshot) =>
+      _playback.restoreSnapshot(snapshot);
+
+  @override
+  Future<void> reportCurrentState() => _playback.reportCurrentState();
 }

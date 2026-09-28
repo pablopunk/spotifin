@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_device.dart';
 import 'package:spotifin/services/cast/cast_media.dart';
@@ -9,6 +10,8 @@ import 'package:spotifin/services/cast/cast_sender.dart';
 import 'package:spotifin/services/cast/jellyfin_cast_adapter.dart';
 import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
+import 'package:spotifin/services/playback/playback_snapshot.dart';
+import 'package:spotifin/services/playback/queue_state.dart';
 import 'package:spotifin/storage/database.dart';
 
 Track track(String id, {String container = 'mp3'}) => Track(
@@ -221,15 +224,18 @@ class FakePlayback implements CastPlaybackSource {
       // ignore: prefer_initializing_formals
       _index = index;
 
-  final List<Track> _queue;
+  List<Track> _queue;
   int _index;
   Duration _position = const Duration(seconds: 12);
   bool castingActive = false;
+  bool _playing = true;
   int stopForCastCalls = 0;
   final playIndexCalls = <int>[];
   final seekCalls = <Duration>[];
   int playCalls = 0;
   int pauseCalls = 0;
+  final restoredSnapshots = <PlaybackSnapshot>[];
+  int reportCurrentStateCalls = 0;
 
   @override
   Track? get currentTrack =>
@@ -245,6 +251,9 @@ class FakePlayback implements CastPlaybackSource {
   Duration get position => _position;
 
   set position(Duration value) => _position = value;
+
+  @override
+  bool get playing => _playing;
 
   @override
   Future<void> stopForCast() async {
@@ -266,16 +275,51 @@ class FakePlayback implements CastPlaybackSource {
   @override
   Future<void> play() async {
     playCalls++;
+    _playing = true;
   }
 
   @override
   Future<void> pause() async {
     pauseCalls++;
+    _playing = false;
   }
 
   @override
   void setCastingActive(bool active) {
     castingActive = active;
+  }
+
+  int _snapshotIds = 0;
+
+  @override
+  PlaybackSnapshot captureSnapshot() => PlaybackSnapshot(
+    queue: QueueState.restore(
+      _queue,
+      index: _queue.isEmpty ? 0 : _index.clamp(0, _queue.length - 1),
+      shuffle: false,
+      newId: () => 'local-${_snapshotIds++}',
+    ),
+    position: _position,
+    playing: _playing,
+    repeatMode: LoopMode.off,
+    history: const [],
+  );
+
+  @override
+  Future<void> restoreSnapshot(PlaybackSnapshot snapshot) async {
+    restoredSnapshots.add(snapshot);
+    _queue = [for (final entry in snapshot.queue.loadedEntries) entry.track];
+    _index = (snapshot.queue.currentIndex ?? 0).clamp(
+      0,
+      _queue.isEmpty ? 0 : _queue.length - 1,
+    );
+    _position = snapshot.position;
+    _playing = snapshot.playing;
+  }
+
+  @override
+  Future<void> reportCurrentState() async {
+    reportCurrentStateCalls++;
   }
 }
 
@@ -514,15 +558,23 @@ void main() {
     expect(sender.calls, contains('connect:room'));
     expect(sender.loadPositions.last, const Duration(seconds: 25));
 
-    // Disconnect resumes the untouched local queue where remote left off.
+    // Disconnect restores the retained Cast snapshot where remote left off.
     await cast.disconnect();
     await pump();
     expect(sender.stoppedReceiver, isTrue);
     expect(cast.isCasting, isFalse);
+    expect(cast.ownership, CastOwnership.local);
     expect(playback.castingActive, isFalse);
-    expect(playback.playIndexCalls, [1]);
-    expect(playback.seekCalls.last, const Duration(seconds: 25));
-    expect(playback.playCalls, greaterThanOrEqualTo(1));
+    expect(playback.restoredSnapshots, hasLength(1));
+    final restored = playback.restoredSnapshots.single;
+    expect(
+      restored.queue.loadedEntries.map((entry) => entry.track.id),
+      ['a', 'b', 'c'],
+    );
+    expect(restored.queue.currentIndex, 1);
+    expect(restored.position, const Duration(seconds: 25));
+    expect(restored.playing, isTrue);
+    expect(playback.reportCurrentStateCalls, 1);
     expect(playback.queue.map((t) => t.id), ['a', 'b', 'c']);
   });
 

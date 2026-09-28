@@ -62,7 +62,7 @@ void _stubMocks(
   when(() => downloads.suspend()).thenAnswer((_) async {});
   when(() => remote.configure(any())).thenAnswer((_) async {});
   when(() => remote.clear()).thenAnswer((_) async {});
-  when(() => cast.configure(any())).thenReturn(null);
+  when(() => cast.configure(any())).thenAnswer((_) async {});
   when(() => cast.disconnect(resumeLocal: any(named: 'resumeLocal')))
       .thenAnswer((_) async {});
 }

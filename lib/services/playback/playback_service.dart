@@ -14,6 +14,7 @@ import '../jellyfin/jellyfin_client.dart';
 import '../jellyfin/session.dart';
 import 'mobile_queue.dart';
 import 'playback_history.dart';
+import 'playback_snapshot.dart';
 import 'queue_item_identity.dart';
 import 'queue_state.dart';
 import 'remote_playback.dart';
@@ -857,6 +858,66 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     return _enqueue((_) => _clearNow(generation));
   }
 
+  /// Captures an atomic local snapshot for Cast handoff and recovery.
+  ///
+  /// The queue state carries the full collection context (including any
+  /// unloaded tail) with every occurrence id retained; history is captured
+  /// without persisting it.
+  PlaybackSnapshot captureSnapshot() => PlaybackSnapshot(
+    queue: _state,
+    position: _player.position,
+    playing: _player.playing,
+    repeatMode: _loopMode,
+    history: _history.items,
+  );
+
+  /// Restores a snapshot atomically through the operation chain.
+  ///
+  /// Occurrence ids are retained (no new ids are allocated) and no `play()`
+  /// is issued when the snapshot is paused. Report suppression is left
+  /// untouched: callers release it and report the restored state afterwards.
+  Future<void> restoreSnapshot(PlaybackSnapshot snapshot) =>
+      _enqueue((generation) => _restoreSnapshotNow(snapshot, generation));
+
+  Future<void> _restoreSnapshotNow(
+    PlaybackSnapshot snapshot,
+    int generation,
+  ) async {
+    final session = _session;
+    if (session == null || snapshot.queue.loadedEntries.isEmpty) return;
+    await _installCollection(
+      candidate: snapshot.queue,
+      session: session,
+      generation: generation,
+      initialPosition: snapshot.position,
+      autoplay: snapshot.playing,
+    );
+    if (generation != _accountGeneration) return;
+    if (_loopMode != snapshot.repeatMode) {
+      _loopMode = snapshot.repeatMode;
+      await _guardedAudio(() => _player.setLoopMode(_loopMode));
+      if (generation != _accountGeneration) return;
+    }
+    _history
+      ..clear()
+      ..load(snapshot.history);
+    await _persistCommittedState(generation);
+    notifyListeners();
+  }
+
+  /// Reports the currently committed state immediately.
+  ///
+  /// Used after Cast handoff cleanup releases report suppression so the
+  /// restored local state is reported exactly once on the serialized path.
+  Future<void> reportCurrentState() =>
+      _enqueue((generation) async {
+        if (generation != _accountGeneration) return;
+        final entry = _state.currentEntry;
+        if (entry == null) return;
+        _schedulePlayingOnly(entry);
+        await _persistCommittedState(generation);
+      });
+
   Future<void> _clearNow(int generation) async {
     final session = _session;
     final accountKey = session == null ? null : _accountId(session);
@@ -1289,11 +1350,15 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   }
 
   void _schedulePlayingReport(QueueEntry entry) {
+    _scheduleStopReport();
+    _schedulePlayingOnly(entry);
+  }
+
+  void _schedulePlayingOnly(QueueEntry entry) {
     final generation = _accountGeneration;
     final session = _session;
     if (session == null) return;
     final accountKey = _accountId(session);
-    _scheduleStopReport();
     _reportedTrackId = entry.track.id;
     _reportedOccurrenceId = entry.id;
     final playSessionId =
