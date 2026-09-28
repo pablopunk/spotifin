@@ -59,6 +59,23 @@ void main() {
     final jellyfinClient = JellyfinClient(
       httpClient: MockClient((request) async {
         if (request.url.path == '/Library/Refresh') scanRequests++;
+        if (request.method == 'GET' &&
+            request.url.path.endsWith('/Items') &&
+            request.url.queryParameters['IncludeItemTypes'] == 'Audio') {
+          return http.Response(
+            jsonEncode({
+              'Items': [
+                {
+                  'Id': 'jellyfin-track',
+                  'Name': 'Imported Song',
+                  'Artists': ['Artist'],
+                },
+              ],
+              'TotalRecordCount': 1,
+            }),
+            200,
+          );
+        }
         return http.Response('', 204);
       }),
     );
@@ -106,13 +123,21 @@ void main() {
       'waitingForJellyfin',
     );
 
-    await database.upsertTracks([
-      TracksCompanion.insert(
-        id: 'jellyfin-track',
-        name: 'Imported Song',
-        artist: const Value('Artist'),
-      ),
-    ]);
+    // The matched track arrives through the real library interface: the
+    // track refresh persists it and the import resolves without any manual
+    // insertion or app-refresh override.
+    container
+        .read(accountScopeProvider)
+        .activate(
+          const JellyfinSession(
+            serverUrl: 'https://jellyfin.example.com',
+            serverId: 'server',
+            deviceId: 'device',
+            userId: 'user',
+            userName: 'Pablo',
+            accessToken: 'token',
+          ),
+        );
     await container.read(downtifyControllerProvider.notifier).poll();
 
     final state = container.read(downtifyControllerProvider);

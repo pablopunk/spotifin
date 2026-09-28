@@ -431,10 +431,18 @@ class DowntifyController extends Notifier<DowntifyState> {
     _lastJellyfinRefresh = now;
     _refreshingJellyfin = true;
     try {
-      await ref
-          .read(appControllerProvider.notifier)
-          .refresh(silent: true, force: true);
-      final tracks = await ref.read(databaseProvider).allTracks();
+      // The library module is the adapter seam: its track refresh carries
+      // the server result through real persistence into Drift. No extra
+      // pass-through class and no full app refresh is involved.
+      final scope = ref.read(accountScopeProvider);
+      final lease = scope.current;
+      if (lease == null) return;
+      final result = await ref
+          .read(jellyfinLibraryProvider)
+          .refreshTracks(lease);
+      if (!scope.isCurrent(lease)) return;
+      if (!result.isCommitted) return;
+      final tracks = result.catalog;
       for (final item in waiting) {
         final song = _songFromImport(item);
         final match = const DowntifyMatcher().findMatch(song, tracks);
