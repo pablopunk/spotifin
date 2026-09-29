@@ -5,6 +5,9 @@
 * When integrating work from a branch based on an older `main`: check `git merge-base --is-ancestor <commit> origin/main`. If not an ancestor and `main` moved ahead, cherry-pick/rebase onto current `origin/main` and confirm the final diff touches only the fix's files.
 * Verification honesty: confirm failures on the base revision before calling them pre-existing; untouched tests can expose regressions in changed code. For confirmed base failures, verify the changed scope with targeted analysis, tests, and format, and name the failure in the handoff. If the toolchain blocks verification, report `toolchain blocked, unverified`.
 * For standard feature/fix work, deliver directly to `origin/main`: integrate onto the current `origin/main` using the stale-branch rule above, confirm the final diff touches only the intended files, re-verify the touched boundary, then fast-forward-push `HEAD:main`. A commit reachable from `origin/main` is the done state; do not stop at a branch PR or `in_review`. If direct push is genuinely blocked (for example, authentication or branch protection), report the exact blocker rather than leaving a PR awaiting manual merge.
+* When an issue explicitly supersedes prior tickets or withdraws its `waiting_on`/`next_issue` chain, follow the issue's stated task shape; do not enforce stale chain metadata, reopen or rerun superseded tickets, comment-mention superseded agents, or require old tickets to be marked done.
+* `plans/` is git-ignored and may be absent; record results on the issue instead of requiring, creating, or committing a local plan index.
+* Treat issue line numbers, excerpts, and suggested signatures as plan-time evidence. Reconcile against current `origin/main`, preserve landed fixes, and update callers and tests together; never revert a later fix to match a stale excerpt.
 
 ### Verification
 
