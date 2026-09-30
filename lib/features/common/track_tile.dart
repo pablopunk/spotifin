@@ -159,12 +159,25 @@ class TrackTileContent extends StatelessWidget {
                     ),
                   ),
                 ),
-                title: Text(
-                  track.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(color: active ? SpotifinColors.accent : null),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        track.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: active ? SpotifinColors.accent : null,
+                        ),
+                      ),
+                    ),
+                    if (downloadStatus == 'complete' ||
+                        downloadStatus == 'queued' ||
+                        downloadStatus == 'downloading') ...[
+                      const SizedBox(width: SpotifinSpacing.xxs),
+                      _DownloadIndicator(status: downloadStatus),
+                    ],
+                  ],
                 ),
                 subtitle: TrackSubtitle(
                   track: track,
@@ -174,7 +187,6 @@ class TrackTileContent extends StatelessWidget {
                 onTap: onRowTap,
               ),
             ),
-            _DownloadIndicator(status: downloadStatus),
             TrackMenuButton(
               track: track,
               contextTracks: contextTracks,
@@ -206,9 +218,9 @@ class _DownloadIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     if (status == 'complete') {
       return const Tooltip(
-        message: 'Downloaded',
+        message: 'Downloaded on this device',
         child: Icon(
-          Icons.download_for_offline_rounded,
+          Icons.download_done_rounded,
           size: 19,
           color: SpotifinColors.accent,
         ),

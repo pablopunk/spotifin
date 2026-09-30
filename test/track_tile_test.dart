@@ -95,6 +95,7 @@ void main() {
     required bool active,
     required bool playing,
     required bool hovered,
+    String? downloadStatus,
     VoidCallback? onRowTap,
     VoidCallback? onArtworkTap,
     AppDatabase? database,
@@ -109,7 +110,7 @@ void main() {
           body: TrackTileContent(
             track: track,
             contextTracks: [track],
-            downloadStatus: null,
+            downloadStatus: downloadStatus,
             active: active,
             playing: playing,
             hovered: hovered,
@@ -140,6 +141,28 @@ void main() {
     expect(title.style?.color, isNot(SpotifinColors.accent));
     expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
     expect(find.byIcon(Icons.graphic_eq_rounded), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(database.close);
+  });
+
+  testWidgets('downloaded row shows a local download marker by its title', (
+    tester,
+  ) async {
+    final database = await makeDatabase();
+    await tester.pumpWidget(
+      contentApp(
+        track: makeTrack(),
+        active: false,
+        playing: false,
+        hovered: false,
+        downloadStatus: 'complete',
+        database: database,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
+    expect(find.byTooltip('Downloaded on this device'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(database.close);
   });
