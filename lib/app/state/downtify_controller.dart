@@ -81,6 +81,11 @@ class DowntifyController extends Notifier<DowntifyState> {
   static const _scanDebounce = Duration(seconds: 1);
   static const _pollInterval = Duration(seconds: 2);
   static const _catalogInterval = Duration(seconds: 10);
+  static const _settleRefreshDelays = [
+    Duration(seconds: 8),
+    Duration(seconds: 25),
+    Duration(seconds: 60),
+  ];
 
   late AccountScope _scope;
   late ImportScheduler _scheduler;
@@ -936,6 +941,7 @@ class DowntifyController extends Notifier<DowntifyState> {
           );
           if (applied) {
             _addNotice('${song.name} is now available in your library.');
+            _scheduleSettleRefreshes(scope);
           }
         } else if (isImportTimedOut(
           createdAt: current.createdAt,
@@ -958,6 +964,17 @@ class DowntifyController extends Notifier<DowntifyState> {
       }
     } finally {
       if (_catalogLockEpoch == epoch) _catalogLockEpoch = null;
+    }
+  }
+
+  /// Jellyfin keeps enriching a freshly scanned song (title, artist, artwork)
+  /// after the first scan, so re-fetch tracks a few times to settle the library.
+  void _scheduleSettleRefreshes(ImportScope scope) {
+    for (final delay in _settleRefreshDelays) {
+      _scheduler.schedule(delay, () async {
+        if (!_scopeValid(scope)) return;
+        await ref.read(jellyfinLibraryProvider).refreshTracks(scope.lease);
+      });
     }
   }
 
