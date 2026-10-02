@@ -26,8 +26,6 @@ const _retryDelays = [
   Duration(seconds: 2),
   Duration(seconds: 5),
   Duration(seconds: 15),
-  Duration(seconds: 30),
-  Duration(seconds: 60),
 ];
 
 class _ArtworkState extends ConsumerState<Artwork> {

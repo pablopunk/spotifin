@@ -113,6 +113,24 @@ class JellyfinClient {
     return items;
   }
 
+  /// Fetches a single track by id, or null while Jellyfin has not indexed it.
+  Future<TracksCompanion?> fetchTrack(
+    JellyfinSession session,
+    String trackId,
+  ) async {
+    final body = await _getJson(
+      session,
+      _uri(session, '/Users/${session.userId}/Items', {
+        'Ids': trackId,
+        'Fields': 'Genres,Tags,DateCreated,UserData,AlbumId,ArtistItems,ImageTags,NormalizationGain',
+        'EnableUserData': 'true',
+      }),
+    );
+    final items = (body['Items'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    return items.isEmpty ? null : _trackFromJson(items.first);
+  }
+
   /// Jellyfin's Recently Played list for audio.
   ///
   /// This is the source of truth for Spotifin's History list. Jellyfin

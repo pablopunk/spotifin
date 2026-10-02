@@ -52,6 +52,20 @@ class JellyfinLibrary {
   Future<LibraryRefreshResult> refreshTracks(AccountLease lease) =>
       _inLane(lease, () => _refreshTracksNow(lease));
 
+  /// Single-track refresh. Returns true once the track has artwork, so
+  /// callers can stop polling a freshly scanned song.
+  Future<bool> refreshTrack(AccountLease lease, String trackId) async {
+    if (!_scope.isCurrent(lease)) return true;
+    try {
+      final row = await _client.fetchTrack(lease.session, trackId);
+      if (row == null || !_scope.isCurrent(lease)) return row != null;
+      await _scope.commit(lease, () => _database.upsertTracks([row]));
+      return row.imageTag.present && row.imageTag.value != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Recently-played refresh. Partial upsert; an empty history response
   /// never clears tracks.
   Future<LibraryRefreshResult> refreshHistory(
