@@ -1,5 +1,4 @@
 import AppIntents
-import UIKit
 
 @available(iOS 16.0, *)
 struct PlayLibraryIntent: AppIntent {
@@ -11,9 +10,9 @@ struct PlayLibraryIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    if let url = URL(string: "spotifin://play-library") {
-      await UIApplication.shared.open(url)
-    }
+    // The shortcut already launches the app. Pass the request directly to the
+    // Flutter bridge instead of reopening the app through its URL scheme.
+    DeepLinkStore.push("spotifin://play-library")
     return .result()
   }
 }

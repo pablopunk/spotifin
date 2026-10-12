@@ -9,13 +9,17 @@ final class DeepLinkStore {
     self.channel = channel
     channel.setMethodCallHandler { call, result in
       if call.method == "getInitialLink" {
-        let link = pendingLink
-        pendingLink = nil
+        let link = takePendingLink()
         result(link)
       } else {
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  static func takePendingLink() -> String? {
+    defer { pendingLink = nil }
+    return pendingLink
   }
 
   static func store(_ link: String) {

@@ -1,12 +1,16 @@
-import Flutter
-import UIKit
 import XCTest
+@testable import Runner
 
 class RunnerTests: XCTestCase {
 
-  func testExample() {
-    // If you add code to the Runner application, consider adding tests here.
-    // See https://developer.apple.com/documentation/xctest for more information about using XCTest.
+  func testPendingDeepLinkIsConsumedExactlyOnce() {
+    _ = DeepLinkStore.takePendingLink()
+    defer { _ = DeepLinkStore.takePendingLink() }
+    let link = "spotifin://play-library"
+    DeepLinkStore.store(link)
+
+    XCTAssertEqual(DeepLinkStore.takePendingLink(), link)
+    XCTAssertNil(DeepLinkStore.takePendingLink())
   }
 
 }
