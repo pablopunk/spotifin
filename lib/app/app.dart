@@ -39,7 +39,10 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
     WidgetsBinding.instance.addObserver(this);
     _carPlayShuffle = CarPlayShuffle(ref.read(activePlaybackProvider))..start();
     _carPlayUpNext = CarPlayUpNext(ref.read(activePlaybackProvider))..start();
-    _carCleanup = initCarListeners(ref);
+    _carCleanup = initCarListeners(
+      ref,
+      onCarPlayConnectionChange: _carPlayShuffle.resync,
+    );
     Future.microtask(ref.read(appControllerProvider.notifier).initialize);
     Future.microtask(() => configurePlayLibraryShortcut(ref));
     Future.microtask(

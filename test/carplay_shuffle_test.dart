@@ -81,6 +81,58 @@ void main() {
     },
   );
 
+  test('CarPlay retries shuffle state after a native update fails', () async {
+    const channel = MethodChannel('spotifin/test_carplay_shuffle_retry');
+    var attempts = 0;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (_) async {
+      attempts++;
+      if (attempts == 1) {
+        throw PlatformException(code: 'native-not-ready');
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final active = FakeActivePlayback()..emit(_state(shuffle: false));
+    final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+      ..start();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    expect(attempts, 1);
+
+    active.emit(_state(shuffle: false));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(attempts, 2);
+  });
+
+  test('CarPlay resyncs shuffle state when it reconnects', () async {
+    const channel = MethodChannel('spotifin/test_carplay_shuffle_resync');
+    final messages = <bool>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'setShuffle');
+      messages.add(call.arguments as bool);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final active = FakeActivePlayback()..emit(_state(shuffle: true));
+    final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+      ..start();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    expect(messages, [true]);
+
+    controller.resync();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(messages, [true, true]);
+  });
+
   test(
     'CarPlay shuffle ignores presses while the capability is missing',
     () async {

@@ -10,12 +10,21 @@ typedef CarPlayHandler = Future<void> Function(
   List<Track> context,
 );
 typedef CarArtworkUrl = String? Function(String itemId);
+typedef CarPlayQueueHandler = Future<void> Function(
+  List<Track> tracks, {
+  required bool shuffle,
+});
 
 class CarPlayAdapter {
-  CarPlayAdapter({required this.play, this.artworkUrl});
+  CarPlayAdapter({
+    required this.play,
+    required this.playQueue,
+    this.artworkUrl,
+  });
 
   final CarPlayHandler play;
   final CarArtworkUrl? artworkUrl;
+  final CarPlayQueueHandler playQueue;
 
   CPTemplate buildRoot(CarState state) {
     if (!state.signedIn) return signedOutTemplate();
@@ -132,12 +141,26 @@ class CarPlayAdapter {
   );
 
   CPListTemplate allSongsTab(List<Track> tracks) {
-    final scope = buildRecentlyAdded(tracks);
+    final recent = buildRecentlyAdded(tracks, limit: 49);
+    final items = <CPListItem>[
+      CPListItem(
+        text: 'Shuffle Library',
+        detailText: _countLabel(tracks.length),
+        onPress: (complete, _) async {
+          try {
+            await _playShuffledAndShow(tracks);
+          } finally {
+            complete();
+          }
+        },
+      ),
+      ..._trackItems(_refs(recent), recent),
+    ];
     return CPListTemplate(
       title: 'All Songs',
       tabTitle: 'All Songs',
       systemIcon: 'music.note',
-      sections: [CPListSection(items: _trackItems(_refs(scope), scope))],
+      sections: [CPListSection(items: items)],
       emptyViewTitleVariants: const ['No music available'],
     );
   }
@@ -240,6 +263,13 @@ class CarPlayAdapter {
   Future<void> _playAndShow(Track track, List<Track> scope) async {
     try {
       await play(track, scope);
+      await FlutterCarplay.showSharedNowPlaying();
+    } catch (_) {}
+  }
+
+  Future<void> _playShuffledAndShow(List<Track> tracks) async {
+    try {
+      await playQueue(tracks, shuffle: true);
       await FlutterCarplay.showSharedNowPlaying();
     } catch (_) {}
   }

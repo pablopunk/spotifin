@@ -15,6 +15,7 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 - 🎤 **Synced lyrics** — from Jellyfin and LRCLIB, following along as you listen
 - 🎲 **Daily mixes** — auto-generated from your tags, refreshed every day
 - 📡 **Remote play** — control other devices or hand off playback mid-song
+- 🚘 **CarPlay** — browse recent tracks and shuffle-play your full library
 - ⬇️ **Downtify** — add songs from outside your library in one click
 
 ## Download

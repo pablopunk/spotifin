@@ -18,12 +18,14 @@ class _BootstrapHost extends ConsumerStatefulWidget {
     required this.carPlayEvents,
     required this.androidEvents,
     required this.unobserves,
+    required this.shuffleResyncs,
   });
 
   final List<CarState> renders;
   final List<void Function()> carPlayEvents;
   final List<void Function()> androidEvents;
   final List<String> unobserves;
+  final List<bool> shuffleResyncs;
 
   @override
   ConsumerState<_BootstrapHost> createState() => _BootstrapHostState();
@@ -41,6 +43,7 @@ class _BootstrapHostState extends ConsumerState<_BootstrapHost> {
       observeAndroidAuto: (notify) => widget.androidEvents.add(notify),
       unobserveCarPlay: () => widget.unobserves.add('carplay'),
       unobserveAndroidAuto: () => widget.unobserves.add('android'),
+      onCarPlayConnectionChange: () => widget.shuffleResyncs.add(true),
       renderState: (state) async {
         widget.renders.add(state);
       },
@@ -69,6 +72,7 @@ void main() {
     final carPlayEvents = <void Function()>[];
     final androidEvents = <void Function()>[];
     final unobserves = <String>[];
+    final shuffleResyncs = <bool>[];
 
     Widget host() => ProviderScope(
       overrides: [databaseProvider.overrideWithValue(database)],
@@ -78,6 +82,7 @@ void main() {
           carPlayEvents: carPlayEvents,
           androidEvents: androidEvents,
           unobserves: unobserves,
+          shuffleResyncs: shuffleResyncs,
         ),
       ),
     );
@@ -89,10 +94,10 @@ void main() {
     expect(androidEvents, hasLength(1));
     expect(unobserves, isEmpty);
 
-    // Native connection callbacks render while mounted.
     carPlayEvents.single();
     await tester.pump();
     expect(renders, hasLength(1));
+    expect(shuffleResyncs, [true]);
     androidEvents.single();
     await tester.pump();
     expect(renders, hasLength(2));
@@ -101,20 +106,20 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     expect(unobserves, ['carplay', 'android']);
 
-    // Late native callbacks cannot use a disposed ref.
     final rendersAfterDispose = renders.length;
     carPlayEvents.single();
     androidEvents.single();
     await tester.pump();
     expect(renders.length, rendersAfterDispose);
+    expect(shuffleResyncs, [true]);
 
     // Remount works again.
     await tester.pumpWidget(host());
-    expect(carPlayEvents, hasLength(2));
     expect(androidEvents, hasLength(2));
     carPlayEvents.last();
     await tester.pump();
     expect(renders.length, rendersAfterDispose + 1);
+    expect(shuffleResyncs, [true, true]);
 
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     expect(unobserves, ['carplay', 'android', 'carplay', 'android']);

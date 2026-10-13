@@ -19,7 +19,10 @@ Track makeTrack(String id, {String artist = 'Artist'}) => Track(
 );
 
 void main() {
-  CarPlayAdapter carPlay() => CarPlayAdapter(play: (_, _) async {});
+  CarPlayAdapter carPlay() => CarPlayAdapter(
+    play: (_, _) async {},
+    playQueue: (_, {required shuffle}) async {},
+  );
   AndroidAutoAdapter auto() => AndroidAutoAdapter(play: (_, _) async {});
 
   test('carplay signed-out root explains sign in', () {
@@ -89,9 +92,10 @@ void main() {
 
     final carPlayTab = CarPlayAdapter(
       play: (_, _) async {},
+      playQueue: (_, {required shuffle}) async {},
       artworkUrl: artwork,
     ).allSongsTab(tracks);
-    final carPlayItem = carPlayTab.sections.single.items.single as CPListItem;
+    final carPlayItem = carPlayTab.sections.single.items[1] as CPListItem;
     expect(carPlayItem.image, 'https://music.test/album-art.jpg');
 
     final androidAutoTab = AndroidAutoAdapter(
@@ -101,4 +105,37 @@ void main() {
     final androidAutoItem = androidAutoTab.sections.single.items.single;
     expect(androidAutoItem.imageUrl, 'https://music.test/album-art.jpg');
   });
+
+  test(
+    'CarPlay library shuffle queues every song with shuffle enabled',
+    () async {
+      final tracks = List.generate(60, (index) => makeTrack('track-$index'));
+      List<Track>? queued;
+      bool? requestedShuffle;
+      final adapter = CarPlayAdapter(
+        play: (_, _) async {},
+        playQueue: (tracks, {required bool shuffle}) async {
+          queued = tracks;
+          requestedShuffle = shuffle;
+        },
+      );
+
+      final items = adapter
+          .allSongsTab(tracks)
+          .sections
+          .single
+          .items
+          .cast<CPListItem>();
+      expect(items, hasLength(50));
+      expect(items.first.text, 'Shuffle Library');
+      expect(items.first.detailText, '60 songs');
+
+      var completed = false;
+      await items.first.onPress!(() => completed = true, items.first);
+
+      expect(queued, same(tracks));
+      expect(requestedShuffle, isTrue);
+      expect(completed, isTrue);
+    },
+  );
 }

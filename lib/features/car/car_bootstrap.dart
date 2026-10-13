@@ -13,14 +13,20 @@ bool _carConnected(String status) =>
 
 /// Renders [state] to every connected car head unit.
 Future<void> renderCarTemplates(WidgetRef ref, CarState state) async {
-  final play = ref.read(carControllerProvider.notifier).playTrack;
+  final controller = ref.read(carControllerProvider.notifier);
+  final play = controller.playTrack;
   final session = ref.read(appControllerProvider).session;
   final client = ref.read(jellyfinClientProvider);
   String? artworkUrl(String itemId) => session == null
       ? null
       : client.imageUri(session, itemId, width: 128).toString();
   if (_carConnected(FlutterCarplay.connectionStatus)) {
-    await CarPlayAdapter(play: play, artworkUrl: artworkUrl).showRoot(state);
+    await CarPlayAdapter(
+      play: play,
+      playQueue: (tracks, {required shuffle}) =>
+          controller.playTracks(tracks, shuffle: shuffle),
+      artworkUrl: artworkUrl,
+    ).showRoot(state);
   }
   if (_carConnected(FlutterAndroidAuto.connectionStatus)) {
     await AndroidAutoAdapter(
@@ -46,6 +52,7 @@ void Function() initCarListeners(
   void Function(void Function())? observeAndroidAuto,
   void Function()? unobserveCarPlay,
   void Function()? unobserveAndroidAuto,
+  void Function()? onCarPlayConnectionChange,
   Future<void> Function(CarState)? renderState,
   CarTemplateCoordinator Function(Future<void> Function(CarState) render)?
   createCoordinator,
@@ -60,10 +67,16 @@ void Function() initCarListeners(
     coordinator.update(ref.read(carControllerProvider));
   }
 
+  void scheduleCarPlayRender() {
+    if (!alive) return;
+    onCarPlayConnectionChange?.call();
+    scheduleRender();
+  }
+
   (observeCarPlay ??
       ((notify) => FlutterCarplay().addListenerOnConnectionChange(
         (_) => notify(),
-      )))(scheduleRender);
+      )))(scheduleCarPlayRender);
   (observeAndroidAuto ??
       ((notify) => FlutterAndroidAuto().addListenerOnConnectionChange(
         (_) => notify(),
