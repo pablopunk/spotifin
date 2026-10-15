@@ -818,9 +818,12 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> restore(List<Track> catalog) =>
       _enqueue((generation) => _restoreNow(catalog, generation));
 
+  bool get _queueStartedSinceLaunch => _state.loadedEntries.isNotEmpty;
+
   Future<void> _restoreNow(List<Track> catalog, int generation) async {
     final session = _session;
     if (session == null || catalog.isEmpty) return;
+    if (_queueStartedSinceLaunch) return;
     final encoded = await _stateStore.read(_accountId(session));
     if (generation != _accountGeneration) return;
     if (encoded == null) return;

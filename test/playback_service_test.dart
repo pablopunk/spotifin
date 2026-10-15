@@ -95,6 +95,62 @@ void main() {
     expect(harness.player.pauseCalls, greaterThanOrEqualTo(1));
   });
 
+  test('restore keeps a queue started before it ran', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    final catalog = playbackCatalog(10);
+    harness.stateStore.seed(
+      PlaybackHarness.accountId,
+      jsonEncode({
+        'queue': ['track-2', 'track-5'],
+        'index': 0,
+        'positionMilliseconds': 0,
+        'shuffle': false,
+      }),
+    );
+
+    final shuffled = harness.service.replaceQueue(catalog, shuffle: true);
+    final restored = harness.service.restore(catalog);
+    await Future.wait([shuffled, restored]);
+    await harness.settle();
+
+    expect(harness.service.queue, hasLength(catalog.length));
+    expect(harness.service.shuffle, isTrue);
+    expect(harness.player.playing, isTrue);
+    expect(harness.player.pauseCalls, 0);
+    expect(harness.stateStore.reads, isEmpty);
+  });
+
+  test('restore loads the saved queue again after clear', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    final catalog = playbackCatalog(10);
+    await harness.service.replaceQueue(catalog);
+    await harness.service.clear();
+    await harness.configure();
+    harness.stateStore.seed(
+      PlaybackHarness.accountId,
+      jsonEncode({
+        'queue': ['track-2', 'track-5'],
+        'index': 0,
+        'positionMilliseconds': 0,
+        'shuffle': false,
+      }),
+    );
+
+    await harness.service.restore(catalog);
+    await harness.settle();
+
+    expect(harness.service.queue.map((track) => track.id), [
+      'track-2',
+      'track-5',
+    ]);
+  });
+
   test('manual next records the outgoing track once', () async {
     final harness = PlaybackHarness();
     addTearDown(harness.dispose);
