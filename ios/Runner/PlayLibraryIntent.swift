@@ -33,25 +33,23 @@ struct PlayLibraryInOrderIntent: AppIntent {
 @available(iOS 16.0, *)
 struct SpotifinShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
-    [
-      AppShortcut(
-        intent: PlayLibraryIntent(),
-        phrases: [
-          "Shuffle my library in \(.applicationName)",
-          "Play my library shuffled in \(.applicationName)",
-        ],
-        shortTitle: "Shuffle Library",
-        systemImageName: "shuffle"
-      ),
-      AppShortcut(
-        intent: PlayLibraryInOrderIntent(),
-        phrases: [
-          "Play my library in order in \(.applicationName)",
-          "Play library in order in \(.applicationName)",
-        ],
-        shortTitle: "Play in Order",
-        systemImageName: "list.number"
-      ),
-    ]
+    AppShortcut(
+      intent: PlayLibraryIntent(),
+      phrases: [
+        "Shuffle my library in \(.applicationName)",
+        "Play my library shuffled in \(.applicationName)",
+      ],
+      shortTitle: "Shuffle Library",
+      systemImageName: "shuffle"
+    )
+    AppShortcut(
+      intent: PlayLibraryInOrderIntent(),
+      phrases: [
+        "Play my library in order in \(.applicationName)",
+        "Play library in order in \(.applicationName)",
+      ],
+      shortTitle: "Play in Order",
+      systemImageName: "list.number"
+    )
   }
 }
