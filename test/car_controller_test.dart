@@ -228,4 +228,22 @@ void main() {
         .playTracks([track], startIndex: 0, shuffle: true);
     expect(active.actions, ['replaceQueue']);
   });
+
+  test('shuffled playTracks lets the queue pick a random first song', () async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    final active = FakeActivePlayback();
+    final container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+        activePlaybackProvider.overrideWithValue(active),
+      ],
+    );
+    addTearDown(container.dispose);
+    final tracks = [_track('a'), _track('b')];
+    await container
+        .read(carControllerProvider.notifier)
+        .playTracks(tracks, shuffle: true);
+    expect(active.actionArguments['replaceQueue'], [tracks, null, true]);
+  });
 }

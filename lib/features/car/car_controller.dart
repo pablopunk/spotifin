@@ -115,7 +115,7 @@ class CarController extends Notifier<CarState> {
 
   Future<void> playTracks(
     List<Track> tracks, {
-    int startIndex = 0,
+    int? startIndex,
     bool shuffle = false,
   }) => ref
       .read(activePlaybackProvider)
