@@ -33,6 +33,11 @@ class CarPlayShuffle {
     if (!active.state.capabilities.contains(PlaybackCapability.shuffle)) {
       return;
     }
+    final requestedShuffle = call.arguments as bool?;
+    if (requestedShuffle == active.state.shuffle) {
+      resync();
+      return;
+    }
     await active.toggleShuffle();
   }
 

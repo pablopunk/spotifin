@@ -81,6 +81,37 @@ void main() {
     },
   );
 
+  test('a stale CarPlay button redraws instead of inverting shuffle', () async {
+    const channel = MethodChannel('spotifin/test_carplay_shuffle_stale');
+    final messages = <bool>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      messages.add(call.arguments as bool);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final active = FakeActivePlayback()..emit(_state(shuffle: true));
+    final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+      ..start();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    expect(messages, [true]);
+
+    await messenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('toggleShuffle', true),
+      ),
+      (_) {},
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(active.actions, isEmpty);
+    expect(messages, [true, true]);
+  });
+
   test('CarPlay retries shuffle state after a native update fails', () async {
     const channel = MethodChannel('spotifin/test_carplay_shuffle_retry');
     var attempts = 0;

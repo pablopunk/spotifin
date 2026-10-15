@@ -55,8 +55,8 @@ import UIKit
 
 private enum CarPlayShuffle {
   static func attach(channel: FlutterMethodChannel) {
-    let button = CPNowPlayingShuffleButton { _ in
-      channel.invokeMethod("toggleShuffle", arguments: nil)
+    let button = CPNowPlayingShuffleButton { tapped in
+      channel.invokeMethod("toggleShuffle", arguments: !tapped.isSelected)
     }
     CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
     channel.setMethodCallHandler { call, result in
@@ -65,6 +65,7 @@ private enum CarPlayShuffle {
         return
       }
       button.isSelected = enabled
+      CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
       result(nil)
     }
   }
