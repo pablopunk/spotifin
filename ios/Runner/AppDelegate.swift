@@ -1,6 +1,7 @@
 import Flutter
 import AVKit
 import CarPlay
+import MediaPlayer
 import UIKit
 
 @main
@@ -58,13 +59,15 @@ private enum CarPlayShuffle {
     let button = CPNowPlayingShuffleButton { tapped in
       channel.invokeMethod("toggleShuffle", arguments: !tapped.isSelected)
     }
+    let shuffleCommand = MPRemoteCommandCenter.shared().changeShuffleModeCommand
+    shuffleCommand.isEnabled = true
     CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
     channel.setMethodCallHandler { call, result in
       guard call.method == "setShuffle", let enabled = call.arguments as? Bool else {
         result(FlutterMethodNotImplemented)
         return
       }
-      button.isSelected = enabled
+      shuffleCommand.currentShuffleType = enabled ? .items : .off
       CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
       result(nil)
     }

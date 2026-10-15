@@ -43,12 +43,15 @@ void main() {
     );
   });
 
-  test('matches only the exact play library link', () {
+  test('matches only exact play library action links', () {
     expect(isPlayLibraryLink('spotifin://play-library'), isTrue);
+    expect(isPlayLibraryLink('spotifin://play-library-shuffle'), isTrue);
+    expect(isPlayLibraryLink('spotifin://play-library-in-order'), isTrue);
     expect(isPlayLibraryLink(null), isFalse);
     expect(isPlayLibraryLink(''), isFalse);
     expect(isPlayLibraryLink('spotifin://play-librar'), isFalse);
     expect(isPlayLibraryLink('spotifin://play-library/extra'), isFalse);
+    expect(isPlayLibraryLink('spotifin://play-library?shuffle=true'), isFalse);
     expect(isPlayLibraryLink('SPOTIFIN://play-library'), isFalse);
     expect(isPlayLibraryLink('https://play-library'), isFalse);
   });
@@ -79,7 +82,7 @@ void main() {
     expect(dedupe.shouldHandle(null, DateTime.now()), isFalse);
   });
 
-  testWidgets('play library configures locally then replaces via the owner', (
+  testWidgets('library shortcuts choose shuffle or ordered playback', (
     tester,
   ) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
@@ -115,20 +118,37 @@ void main() {
       ),
     );
 
-    await handlePlayLibraryLink(captured!, 'spotifin://play-library?x=1');
+    await handlePlayLibraryLink(
+      captured!,
+      'spotifin://play-library-shuffle?x=1',
+    );
     // Exact-link matching rejects decorated links: nothing runs.
     expect(active.actions, isEmpty);
 
-    await handlePlayLibraryLink(captured!, 'spotifin://play-library');
-    // Local configuration for cold start runs on local playback, while the
-    // final queue replacement routes through the active owner.
+    await handlePlayLibraryLink(captured!, playLibraryShuffleLink);
+    expect(active.actions, ['replaceQueue']);
+    expect(active.actionArguments['replaceQueue']![1], isNull);
+    expect(active.actionArguments['replaceQueue']![2], isTrue);
+
+    // Keep the original URL working as an alias for the shuffled action.
+    await handlePlayLibraryLink(captured!, playLibraryLink);
+    expect(active.actions, ['replaceQueue', 'replaceQueue']);
+    expect(active.actionArguments['replaceQueue']![1], isNull);
+    expect(active.actionArguments['replaceQueue']![2], isTrue);
+
+    await handlePlayLibraryLink(captured!, playLibraryInOrderLink);
+    expect(active.actions, ['replaceQueue', 'replaceQueue', 'replaceQueue']);
+    expect(active.actionArguments['replaceQueue']![1], 0);
+    expect(active.actionArguments['replaceQueue']![2], isFalse);
+
+    // Cold-start configuration remains local; both queue actions route
+    // through the active playback owner.
     verify(
       () => playback.configure(
         any(),
         smallStreaming: any(named: 'smallStreaming'),
         normalization: any(named: 'normalization'),
       ),
-    ).called(1);
-    expect(active.actions, ['replaceQueue']);
+    ).called(3);
   });
 }

@@ -7,12 +7,24 @@ import '../../app/providers.dart';
 import '../../app/state/app_controller.dart';
 
 const playLibraryLink = 'spotifin://play-library';
+const playLibraryShuffleLink = 'spotifin://play-library-shuffle';
+const playLibraryInOrderLink = 'spotifin://play-library-in-order';
 const deepLinkChannelName = 'spotifin/deep-link';
 const playLibraryTimeout = Duration(seconds: 15);
 const playLibraryPollInterval = Duration(milliseconds: 200);
 const playLibraryDedupeWindow = Duration(seconds: 3);
 
-bool isPlayLibraryLink(String? link) => link == playLibraryLink;
+enum PlayLibraryMode { shuffle, inOrder }
+
+PlayLibraryMode? _modeForLink(String? link) {
+  if (link == playLibraryLink || link == playLibraryShuffleLink) {
+    return PlayLibraryMode.shuffle;
+  }
+  if (link == playLibraryInOrderLink) return PlayLibraryMode.inOrder;
+  return null;
+}
+
+bool isPlayLibraryLink(String? link) => _modeForLink(link) != null;
 
 class PlayLibraryDedupe {
   String? lastLink;
@@ -50,13 +62,14 @@ Future<void> configurePlayLibraryShortcut(WidgetRef ref) async {
 }
 
 Future<void> handlePlayLibraryLink(WidgetRef ref, String? link) async {
-  if (!_dedupe.shouldHandle(link, DateTime.now())) return;
+  final mode = _modeForLink(link);
+  if (mode == null || !_dedupe.shouldHandle(link, DateTime.now())) return;
   try {
-    await _playLibrary(ref).timeout(playLibraryTimeout);
+    await _playLibrary(ref, mode).timeout(playLibraryTimeout);
   } catch (_) {}
 }
 
-Future<void> _playLibrary(WidgetRef ref) async {
+Future<void> _playLibrary(WidgetRef ref, PlayLibraryMode mode) async {
   final app = await _waitForReadySession(ref);
   final session = app.session;
   if (session == null) return;
@@ -68,7 +81,13 @@ Future<void> _playLibrary(WidgetRef ref) async {
   );
   final tracks = await ref.read(databaseProvider).allTracksByDateAdded();
   if (tracks.isEmpty) return;
-  await ref.read(activePlaybackProvider).replaceQueue(tracks, startIndex: 0);
+  await ref
+      .read(activePlaybackProvider)
+      .replaceQueue(
+        tracks,
+        startIndex: mode == PlayLibraryMode.inOrder ? 0 : null,
+        shuffle: mode == PlayLibraryMode.shuffle,
+      );
 }
 
 Future<AppState> _waitForReadySession(WidgetRef ref) async {
