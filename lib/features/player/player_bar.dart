@@ -128,7 +128,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
   late int _detailsTab = widget.initialDetailsTab;
   var _followLyrics = true;
   String? _followTrackId;
-  ScrollDirection? _divergeDirection;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +141,6 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
         if (_followTrackId != track.id) {
           _followTrackId = track.id;
           _followLyrics = true;
-          _divergeDirection = null;
         }
         final casting = state.destination == PlaybackDestination.cast;
         final fullQueue = state.queue;
@@ -174,10 +172,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                       if (notification.direction != ScrollDirection.idle &&
                           _detailsTab == 0 &&
                           _followLyrics) {
-                        setState(() {
-                          _followLyrics = false;
-                          _divergeDirection = notification.direction;
-                        });
+                        setState(() => _followLyrics = false);
                       }
                       return false;
                     },
@@ -323,10 +318,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                       ],
                                       onTap: (index) => setState(() {
                                         _detailsTab = index;
-                                        if (index == 0) {
-                                          _followLyrics = true;
-                                          _divergeDirection = null;
-                                        }
+                                        if (index == 0) _followLyrics = true;
                                       }),
                                     ),
                                   ),
@@ -355,10 +347,7 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                     follow: _followLyrics,
                                     onLineTap: () {
                                       if (!_followLyrics) {
-                                        setState(() {
-                                          _followLyrics = true;
-                                          _divergeDirection = null;
-                                        });
+                                        setState(() => _followLyrics = true);
                                       }
                                     },
                                   ),
@@ -438,20 +427,13 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                       right: 16,
                       bottom: 16,
                       child: IconButton.filled(
-                        onPressed: () => setState(() {
-                          _followLyrics = true;
-                          _divergeDirection = null;
-                        }),
+                        onPressed: () => setState(() => _followLyrics = true),
                         tooltip: 'Back to current line',
                         style: IconButton.styleFrom(
                           backgroundColor: SpotifinColors.accent,
                           foregroundColor: SpotifinColors.background,
                         ),
-                        icon: Icon(
-                          _divergeDirection == ScrollDirection.reverse
-                              ? Icons.arrow_downward_rounded
-                              : Icons.arrow_upward_rounded,
-                        ),
+                        icon: const Icon(Icons.my_location_rounded),
                       ),
                     ),
                 ],
