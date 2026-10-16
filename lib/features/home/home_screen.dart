@@ -9,6 +9,7 @@ import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/state/downtify_controller.dart';
 import '../../app/theme.dart';
+import '../../services/playback/recently_played.dart';
 import '../../storage/database.dart';
 import '../../storage/track_artists.dart';
 import '../../services/mixes/mix_generator.dart';
@@ -232,16 +233,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: _EmptyCatalog(),
                 )
               else ...[
-                if (catalog.recent.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _HorizontalSection(
-                      title: 'Recently played',
-                      tracks: catalog.recent.take(12).toList(),
-                      contextTracks: catalog.recent,
-                      onTitleTap: () =>
-                          _openCollection('Recently played', catalog.recent),
-                    ),
-                  ),
+                _RecentlyPlayedSliver(
+                  serverTracks: catalog.recent,
+                  onOpenCollection: _openCollection,
+                ),
                 SliverToBoxAdapter(
                   child: _HorizontalSection(
                     title: 'Recently added',
@@ -296,6 +291,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: SizedBox(height: SpotifinChromeInsets.bottomOf(context)),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RecentlyPlayedSliver extends ConsumerWidget {
+  const _RecentlyPlayedSliver({
+    required this.serverTracks,
+    required this.onOpenCollection,
+  });
+
+  final List<Track> serverTracks;
+  final void Function(String title, List<Track> tracks) onOpenCollection;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(activePlaybackProvider);
+    return ListenableBuilder(
+      listenable: active,
+      builder: (context, _) {
+        final recent = mergeRecentlyPlayed(
+          serverTracks: serverTracks,
+          sessionTracks: [?active.state.track, ...active.state.history],
+        );
+        if (recent.isEmpty) return const SliverToBoxAdapter();
+        return SliverToBoxAdapter(
+          child: _HorizontalSection(
+            title: 'Recently played',
+            tracks: recent.take(12).toList(),
+            contextTracks: recent,
+            onTitleTap: () => onOpenCollection('Recently played', recent),
           ),
         );
       },

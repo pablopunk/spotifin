@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart' show IndexedAudioSource;
 
 import 'support/playback_harness.dart';
 
@@ -302,6 +303,77 @@ void main() {
     expect(harness.service.shuffle, isFalse);
     expect(harness.service.currentTrack?.id, 'track-0');
   });
+
+  test(
+    'toggling shuffle keeps the playing source and position intact',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await harness.service.replaceQueue(playbackCatalog(250), startIndex: 80);
+      await harness.settle();
+      harness.player.emitPosition(const Duration(seconds: 42));
+      final activeSource = harness.player.sources[20];
+      final originalOrder = harness.service.queue
+          .map((track) => track.id)
+          .toList();
+      final setSourcesCalls = harness.player.calls
+          .where((call) => call == 'setAudioSources')
+          .length;
+      final stopCalls = harness.player.stopCalls;
+      final playCalls = harness.player.playCalls;
+
+      await harness.service.toggleShuffle();
+      await harness.settle();
+
+      expect(harness.service.shuffle, isTrue);
+      expect(harness.service.currentTrack?.id, 'track-80');
+      expect(harness.player.currentIndex, 20);
+      expect(harness.player.sources, hasLength(100));
+      expect(
+        harness.service.queue.map((track) => track.id),
+        isNot(equals(originalOrder)),
+      );
+      expect(
+        harness.player.sources.map(
+          (source) => (source as IndexedAudioSource).tag.id as String,
+        ),
+        harness.service.queue.map((track) => track.id),
+      );
+      expect(harness.player.position, const Duration(seconds: 42));
+      expect(identical(harness.player.sources[20], activeSource), isTrue);
+      expect(
+        harness.player.calls.where((call) => call == 'setAudioSources').length,
+        setSourcesCalls,
+      );
+      expect(harness.player.stopCalls, stopCalls);
+      expect(harness.player.playCalls, playCalls);
+
+      final shuffledUpcoming = harness.service.queue
+          .skip(21)
+          .map((track) => track.id)
+          .toList();
+      await harness.service.toggleShuffle();
+      await harness.settle();
+
+      expect(harness.service.shuffle, isFalse);
+      expect(
+        harness.service.queue.skip(21).map((track) => track.id),
+        shuffledUpcoming,
+      );
+      expect(harness.service.currentTrack?.id, 'track-80');
+      expect(harness.player.position, const Duration(seconds: 42));
+      expect(harness.player.stopCalls, stopCalls);
+      expect(harness.player.playCalls, playCalls);
+
+      final nextTrack = harness.service.queue[21].id;
+      harness.player.emitIndex(21);
+      await harness.settle();
+      expect(harness.service.currentTrack?.id, nextTrack);
+      expect(harness.service.history.first.id, 'track-80');
+    },
+  );
 
   test('queue persistence round-trips through restore', () async {
     final harness = PlaybackHarness();

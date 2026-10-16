@@ -717,34 +717,95 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
   Future<void> _toggleShuffleNow(int generation) async {
     final session = _session;
     if (session == null) return;
-    if (_state.shuffle) {
-      final marked = _state.withShuffle(false);
-      _commitState(marked, generation: generation);
-      await _persistCommittedState(generation);
-      unawaited(_reportProgress(force: true));
-      notifyListeners();
-      return;
-    }
     final state = _state;
-    final index = state.currentIndex;
-    if (index == null || state.loadedEntries.isEmpty) {
-      final marked = state.withShuffle(true);
-      _commitState(marked, generation: generation);
-      await _persistCommittedState(generation);
-      unawaited(_reportProgress(force: true));
-      notifyListeners();
-      return;
+    final enabled = !state.shuffle;
+    final candidate = enabled
+        ? state.withShuffle(true).shuffleRemaining(random: _random)
+        : state.withShuffle(false);
+    if (enabled && state.loadedEntries.isNotEmpty) {
+      await _syncShuffleSources(
+        before: state,
+        after: candidate,
+        session: session,
+        generation: generation,
+      );
     }
-    // One candidate through the single commit path: the shuffle flag and
-    // the shuffled order publish together only on successful audio work.
-    final candidate = state.withShuffle(true).shuffleRemaining(random: _random);
-    await _installCollection(
-      candidate: candidate,
-      session: session,
-      generation: generation,
-      initialPosition: _player.position,
-      autoplay: _player.playing,
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    await _persistCommittedState(generation);
+    unawaited(_reportProgress(force: true));
+    notifyListeners();
+  }
+
+  /// Applies a shuffle permutation to the audio playlist without replacing
+  /// the active source. All queue entries before and including the current
+  /// occurrence stay fixed; only future sources are moved/inserted/removed.
+  Future<void> _syncShuffleSources({
+    required QueueState before,
+    required QueueState after,
+    required JellyfinSession session,
+    required int generation,
+  }) async {
+    final priorEntries = before.loadedEntries.toList();
+    final desiredEntries = after.loadedEntries;
+    final currentIndex = before.currentIndex;
+    final suffixStart = currentIndex == null ? 0 : currentIndex + 1;
+    for (var index = 0; index < suffixStart; index++) {
+      if (priorEntries[index].id != desiredEntries[index].id) {
+        throw StateError('Shuffle changed the active queue prefix.');
+      }
+    }
+
+    final existingIds = priorEntries.map((entry) => entry.id).toSet();
+    final missingEntries = desiredEntries
+        .skip(suffixStart)
+        .where((entry) => !existingIds.contains(entry.id))
+        .toList(growable: false);
+    final missingSources = await _sources(
+      session,
+      missingEntries,
+      _sourceRevision,
     );
+    final sourceById = <String, AudioSource>{
+      for (var index = 0; index < missingEntries.length; index++)
+        missingEntries[index].id: missingSources[index],
+    };
+
+    final priorAudio = _capturePriorAudio(session);
+    final workingEntries = List<QueueEntry>.of(priorEntries);
+    var audioMutationStarted = false;
+    try {
+      for (var index = suffixStart; index < desiredEntries.length; index++) {
+        final desired = desiredEntries[index];
+        if (workingEntries[index].id == desired.id) continue;
+        final existingIndex = workingEntries.indexWhere(
+          (entry) => entry.id == desired.id,
+          index + 1,
+        );
+        audioMutationStarted = true;
+        if (existingIndex >= 0) {
+          await _player.moveAudioSource(existingIndex, index);
+          final moved = workingEntries.removeAt(existingIndex);
+          workingEntries.insert(index, moved);
+        } else {
+          await _player.insertAudioSources(index, [sourceById[desired.id]!]);
+          workingEntries.insert(index, desired);
+        }
+        if (generation != _accountGeneration) return;
+      }
+      while (workingEntries.length > desiredEntries.length) {
+        final lastIndex = workingEntries.length - 1;
+        audioMutationStarted = true;
+        await _player.removeAudioSourceAt(lastIndex);
+        workingEntries.removeLast();
+        if (generation != _accountGeneration) return;
+      }
+    } catch (error) {
+      if (audioMutationStarted) {
+        await _recoverPriorAudio(priorAudio, error: error);
+      }
+      rethrow;
+    }
   }
 
   Future<void> cycleRepeat() => _enqueue((generation) async {

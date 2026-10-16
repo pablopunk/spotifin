@@ -4,14 +4,76 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/features/common/design_system.dart';
 import 'package:spotifin/features/common/playlist_artwork.dart';
 import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/home/home_screen.dart';
+import 'package:spotifin/services/playback/active_playback.dart';
 import 'package:spotifin/storage/database.dart';
 
+import 'support/fake_active_playback.dart';
+
 void main() {
+  testWidgets('home recently played includes live and session playback', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.upsertTracks([
+      TracksCompanion.insert(
+        id: 'server-recent',
+        name: 'Older Song',
+        artist: const Value('Artist'),
+        lastPlayed: Value(DateTime.utc(2026, 10, 1)),
+      ),
+    ]);
+    final first = _track('current', 'Current Song');
+    final active = FakeActivePlayback()..emit(_playbackState(first));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          activePlaybackProvider.overrideWithValue(active),
+        ],
+        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recently played'), findsOneWidget);
+    expect(
+      tester
+          .widget<SpotifinCollectionCard>(
+            find.byType(SpotifinCollectionCard).first,
+          )
+          .title,
+      'Current Song',
+    );
+    expect(find.text('Older Song'), findsWidgets);
+
+    final next = _track('next', 'Next Song');
+    active.emit(_playbackState(next, history: [first]));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<SpotifinCollectionCard>(
+            find.byType(SpotifinCollectionCard).first,
+          )
+          .title,
+      'Next Song',
+    );
+    expect(find.text('Current Song'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
   testWidgets('renders generated mixes as valid slivers', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 5000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -195,3 +257,40 @@ Future<void> _secondaryTap(WidgetTester tester, Finder finder) async {
   await gesture.down(position);
   await gesture.up();
 }
+
+Track _track(String id, String name) => Track(
+  id: id,
+  name: name,
+  album: 'Album',
+  albumId: 'album',
+  artist: 'Artist',
+  artistItems: '[]',
+  labels: '',
+  durationTicks: 0,
+  container: '',
+  favorite: false,
+  playCount: 0,
+);
+
+ActivePlaybackState _playbackState(
+  Track current, {
+  List<Track> history = const [],
+}) => ActivePlaybackState(
+  destination: PlaybackDestination.local,
+  track: current,
+  index: 0,
+  entryId: 'entry-${current.id}',
+  queue: [current],
+  upcoming: [current],
+  upcomingOffset: 0,
+  history: history,
+  playing: true,
+  position: Duration.zero,
+  duration: Duration.zero,
+  volumeSlider: 1,
+  shuffle: false,
+  repeatMode: LoopMode.off,
+  busy: false,
+  recovering: false,
+  capabilities: PlaybackCapability.values.toSet(),
+);
