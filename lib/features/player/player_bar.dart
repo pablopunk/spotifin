@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -125,6 +126,8 @@ class _NowPlaying extends ConsumerStatefulWidget {
 
 class _NowPlayingState extends ConsumerState<_NowPlaying> {
   late int _detailsTab = widget.initialDetailsTab;
+  var _followLyrics = true;
+  String? _followTrackId;
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +138,10 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
         final state = active.state;
         final track = state.track;
         if (track == null) return const SizedBox.shrink();
+        if (_followTrackId != track.id) {
+          _followTrackId = track.id;
+          _followLyrics = true;
+        }
         final casting = state.destination == PlaybackDestination.cast;
         final fullQueue = state.queue;
         final queue = state.upcoming;
@@ -158,223 +165,263 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
             child: DefaultTabController(
               initialIndex: _detailsTab,
               length: 3,
-              child: CustomScrollView(
-                controller: controller,
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
-                    sliver: SliverList.list(
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: SpotifinColors.borderStrong,
-                              borderRadius: BorderRadius.circular(2),
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: (notification) {
+                  if (notification.direction != ScrollDirection.idle &&
+                      _detailsTab == 0 &&
+                      _followLyrics) {
+                    setState(() => _followLyrics = false);
+                  }
+                  return false;
+                },
+                child: CustomScrollView(
+                  controller: controller,
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+                      sliver: SliverList.list(
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: SpotifinColors.borderStrong,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                        if (casting)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _CastingBanner(
-                              deviceName:
-                                  state.connectedDeviceName ?? 'Chromecast',
-                              onStop: active.resumeHere,
+                          const SizedBox(height: 32),
+                          if (casting)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _CastingBanner(
+                                deviceName:
+                                    state.connectedDeviceName ?? 'Chromecast',
+                                onStop: active.resumeHere,
+                              ),
                             ),
-                          ),
-                        Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 640),
-                            child: LayoutBuilder(
-                              builder: (context, constraints) => SizedBox(
-                                height: constraints.maxWidth.clamp(0, 420),
-                                child: PlayerArtworkCarousel(
-                                  tracks: fullQueue,
-                                  currentIndex: currentIndex,
-                                  onTrackChanged: active.playQueueIndex,
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 640),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) => SizedBox(
+                                  height: constraints.maxWidth.clamp(0, 420),
+                                  child: PlayerArtworkCarousel(
+                                    tracks: fullQueue,
+                                    currentIndex: currentIndex,
+                                    onTrackChanged: active.playQueueIndex,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 28),
-                        Text(
-                          track.name,
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        PlayerCollectionLinks(
-                          track: track,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: SpotifinColors.textMuted),
-                        ),
-                        const SizedBox(height: 18),
-                        _PositionSlider(active: active),
-                        Wrap(
-                          alignment: WrapAlignment.spaceEvenly,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: SpotifinSpacing.xs,
-                          children: [
-                            IconButton(
-                              tooltip: casting && !canShuffle
-                                  ? 'Stop casting to change shuffle'
-                                  : 'Shuffle',
-                              color: state.shuffle
-                                  ? SpotifinColors.accent
-                                  : null,
-                              onPressed: canShuffle
-                                  ? active.toggleShuffle
-                                  : null,
-                              icon: const Icon(Icons.shuffle_rounded),
-                            ),
-                            IconButton(
-                              iconSize: 42,
-                              tooltip: 'Previous',
-                              onPressed: active.previous,
-                              icon: const Icon(Icons.skip_previous_rounded),
-                            ),
-                            SpotifinPlayButton(
-                              onPressed: active.toggle,
-                              playing: state.playing,
-                              large: true,
-                            ),
-                            IconButton(
-                              iconSize: 42,
-                              tooltip: 'Next',
-                              onPressed: active.next,
-                              icon: const Icon(Icons.skip_next_rounded),
-                            ),
-                            IconButton(
-                              tooltip: casting && !canRepeat
-                                  ? 'Stop casting to change repeat'
-                                  : 'Repeat',
-                              color: state.repeatMode == LoopMode.off
-                                  ? null
-                                  : SpotifinColors.accent,
-                              onPressed: canRepeat ? active.cycleRepeat : null,
-                              icon: Icon(
-                                state.repeatMode == LoopMode.one
-                                    ? Icons.repeat_one_rounded
-                                    : Icons.repeat_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            const Spacer(),
-                            if (AirPlayControl.isSupported) ...[
-                              const AirPlayControl(),
-                              const SizedBox(width: SpotifinSpacing.sm),
-                            ],
-                            const CastButton(),
-                            const SizedBox(width: SpotifinSpacing.sm),
-                            const RemoteDeviceButton(),
-                            const Spacer(),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SpotifinTabBar(
-                                labels: const ['Lyrics', 'Queue', 'History'],
-                                onTap: (index) =>
-                                    setState(() => _detailsTab = index),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ),
-                  ),
-                  if (_detailsTab == 0)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpotifinSpacing.sm,
-                      ),
-                      sliver: SliverToBoxAdapter(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            SpotifinRadii.card,
+                          const SizedBox(height: 28),
+                          Text(
+                            track.name,
+                            style: Theme.of(context).textTheme.headlineLarge,
                           ),
-                          child: ColoredBox(
-                            color: SpotifinColors.raised,
-                            child: _LyricsContent(
-                              track: track,
-                              active: active,
-                              embedded: true,
-                            ),
+                          PlayerCollectionLinks(
+                            track: track,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: SpotifinColors.textMuted),
                           ),
-                        ),
-                      ),
-                    )
-                  else if (_detailsTab == 1)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpotifinSpacing.sm,
-                      ),
-                      sliver: SliverReorderableList(
-                        itemCount: queue.length,
-                        onReorderItem: canEdit
-                            ? (oldIndex, newIndex) =>
-                                  active.reorderUpcoming(oldIndex, newIndex)
-                            : null,
-                        itemBuilder: (context, index) {
-                          final item = queue[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('$index-${item.id}'),
-                            index: index,
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              horizontalTitleGap: SpotifinSpacing.sm,
-                              selected: state.index != null && index == 0,
-                              selectedTileColor: SpotifinColors.interactive,
-                              selectedColor: SpotifinColors.accent,
-                              hoverColor: SpotifinColors.hover,
-                              onTap: () => active.playUpcomingIndex(index),
-                              leading: Artwork(
-                                itemId: item.albumId ?? item.id,
-                                size: 42,
-                                borderRadius: SpotifinRadii.small,
-                              ),
-                              title: Text(
-                                item.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                item.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: IconButton(
-                                tooltip: 'Remove from queue',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 40,
-                                  height: 40,
-                                ),
-                                onPressed: canEdit
-                                    ? () => active.removeUpcomingAt(index)
+                          const SizedBox(height: 18),
+                          _PositionSlider(active: active),
+                          Wrap(
+                            alignment: WrapAlignment.spaceEvenly,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: SpotifinSpacing.xs,
+                            children: [
+                              IconButton(
+                                tooltip: casting && !canShuffle
+                                    ? 'Stop casting to change shuffle'
+                                    : 'Shuffle',
+                                color: state.shuffle
+                                    ? SpotifinColors.accent
                                     : null,
-                                icon: const Icon(Icons.close_rounded),
+                                onPressed: canShuffle
+                                    ? active.toggleShuffle
+                                    : null,
+                                icon: const Icon(Icons.shuffle_rounded),
                               ),
-                            ),
-                          );
-                        },
+                              IconButton(
+                                iconSize: 42,
+                                tooltip: 'Previous',
+                                onPressed: active.previous,
+                                icon: const Icon(Icons.skip_previous_rounded),
+                              ),
+                              SpotifinPlayButton(
+                                onPressed: active.toggle,
+                                playing: state.playing,
+                                large: true,
+                              ),
+                              IconButton(
+                                iconSize: 42,
+                                tooltip: 'Next',
+                                onPressed: active.next,
+                                icon: const Icon(Icons.skip_next_rounded),
+                              ),
+                              IconButton(
+                                tooltip: casting && !canRepeat
+                                    ? 'Stop casting to change repeat'
+                                    : 'Repeat',
+                                color: state.repeatMode == LoopMode.off
+                                    ? null
+                                    : SpotifinColors.accent,
+                                onPressed: canRepeat
+                                    ? active.cycleRepeat
+                                    : null,
+                                icon: Icon(
+                                  state.repeatMode == LoopMode.one
+                                      ? Icons.repeat_one_rounded
+                                      : Icons.repeat_rounded,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              const Spacer(),
+                              if (AirPlayControl.isSupported) ...[
+                                const AirPlayControl(),
+                                const SizedBox(width: SpotifinSpacing.sm),
+                              ],
+                              const CastButton(),
+                              const SizedBox(width: SpotifinSpacing.sm),
+                              const RemoteDeviceButton(),
+                              const Spacer(),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SpotifinTabBar(
+                                  labels: const ['Lyrics', 'Queue', 'History'],
+                                  onTap: (index) => setState(() {
+                                    _detailsTab = index;
+                                    if (index == 0) _followLyrics = true;
+                                  }),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                       ),
-                    )
-                  else
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: 480, child: HistoryList()),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 36)),
-                ],
+                    if (_detailsTab == 0)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpotifinSpacing.sm,
+                        ),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!_followLyrics)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Center(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: () =>
+                                          setState(() => _followLyrics = true),
+                                      icon: const Icon(
+                                        Icons.my_location_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Back to current line'),
+                                    ),
+                                  ),
+                                ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  SpotifinRadii.card,
+                                ),
+                                child: ColoredBox(
+                                  color: SpotifinColors.raised,
+                                  child: _LyricsContent(
+                                    track: track,
+                                    active: active,
+                                    embedded: true,
+                                    follow: _followLyrics,
+                                    onLineTap: () {
+                                      if (!_followLyrics) {
+                                        setState(() => _followLyrics = true);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_detailsTab == 1)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpotifinSpacing.sm,
+                        ),
+                        sliver: SliverReorderableList(
+                          itemCount: queue.length,
+                          onReorderItem: canEdit
+                              ? (oldIndex, newIndex) =>
+                                    active.reorderUpcoming(oldIndex, newIndex)
+                              : null,
+                          itemBuilder: (context, index) {
+                            final item = queue[index];
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey('$index-${item.id}'),
+                              index: index,
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                horizontalTitleGap: SpotifinSpacing.sm,
+                                selected: state.index != null && index == 0,
+                                selectedTileColor: SpotifinColors.interactive,
+                                selectedColor: SpotifinColors.accent,
+                                hoverColor: SpotifinColors.hover,
+                                onTap: () => active.playUpcomingIndex(index),
+                                leading: Artwork(
+                                  itemId: item.albumId ?? item.id,
+                                  size: 42,
+                                  borderRadius: SpotifinRadii.small,
+                                ),
+                                title: Text(
+                                  item.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  item.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: IconButton(
+                                  tooltip: 'Remove from queue',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 40,
+                                    height: 40,
+                                  ),
+                                  onPressed: canEdit
+                                      ? () => active.removeUpcomingAt(index)
+                                      : null,
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    else
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 480, child: HistoryList()),
+                      ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 36)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -456,11 +503,15 @@ class _LyricsContent extends ConsumerStatefulWidget {
     required this.track,
     required this.active,
     this.embedded = false,
+    this.follow = true,
+    this.onLineTap,
   });
 
   final Track track;
   final ActivePlayback active;
   final bool embedded;
+  final bool follow;
+  final VoidCallback? onLineTap;
 
   @override
   ConsumerState<_LyricsContent> createState() => _LyricsContentState();
@@ -470,6 +521,9 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
   Object? _session;
   String? _trackId;
   Future<List<LyricLine>>? _lyrics;
+  List<GlobalKey> _lineKeys = const [];
+  var _activeIndex = -1;
+  var _wasFollowing = true;
 
   @override
   Widget build(BuildContext context) {
@@ -481,6 +535,9 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
       _session = session;
       _trackId = widget.track.id;
       _lyrics = ref.read(lyricsProvider).find(session, widget.track);
+      _lineKeys = const [];
+      _activeIndex = -1;
+      _wasFollowing = true;
     }
     return FutureBuilder<List<LyricLine>>(
       future: _lyrics,
@@ -497,6 +554,9 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
         }
         final lines = snapshot.data ?? const [];
         if (lines.isEmpty) return const Center(child: Text('No lyrics found'));
+        if (_lineKeys.length != lines.length) {
+          _lineKeys = List.generate(lines.length, (_) => GlobalKey());
+        }
         // Lyric highlighting and seeking share the active owner, so the
         // highlighted line and the seek target never diverge by destination.
         return ListenableBuilder(
@@ -504,6 +564,7 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
           builder: (context, _) {
             final position = widget.active.state.position;
             final active = _activeLine(lines, position);
+            _followActiveLine(active);
             return ListView.builder(
               shrinkWrap: widget.embedded,
               physics: widget.embedded
@@ -517,9 +578,13 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
               itemBuilder: (context, index) {
                 final line = lines[index];
                 return InkWell(
+                  key: _lineKeys[index],
                   onTap: line.start == null
                       ? null
-                      : () => widget.active.seek(line.start!),
+                      : () {
+                          widget.onLineTap?.call();
+                          widget.active.seek(line.start!);
+                        },
                   borderRadius: BorderRadius.circular(SpotifinRadii.small),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -548,6 +613,29 @@ class _LyricsContentState extends ConsumerState<_LyricsContent> {
         );
       },
     );
+  }
+
+  void _followActiveLine(int index) {
+    final follow = widget.follow;
+    final changed = index != _activeIndex;
+    final resumed = follow && !_wasFollowing;
+    _wasFollowing = follow;
+    if (index >= 0) _activeIndex = index;
+    if (!follow || index < 0) return;
+    if (!changed && !resumed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_activeIndex != index) return;
+      if (index >= _lineKeys.length) return;
+      final lineContext = _lineKeys[index].currentContext;
+      if (lineContext == null || !lineContext.mounted) return;
+      Scrollable.ensureVisible(
+        lineContext,
+        alignment: 0.4,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   int _activeLine(List<LyricLine> lines, Duration position) {
