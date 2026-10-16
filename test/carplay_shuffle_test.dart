@@ -81,8 +81,45 @@ void main() {
     },
   );
 
-  test('a stale CarPlay button redraws instead of inverting shuffle', () async {
-    const channel = MethodChannel('spotifin/test_carplay_shuffle_stale');
+  test(
+    'a CarPlay tap toggles shuffle despite a stale selected state',
+    () async {
+      const channel = MethodChannel('spotifin/test_carplay_shuffle_stale');
+      final messages = <bool>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        messages.add(call.arguments as bool);
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final active = FakeActivePlayback()..emit(_state(shuffle: true));
+      final controller = CarPlayShuffle(active, channel: channel, enabled: true)
+        ..start();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      expect(messages, [true]);
+
+      await messenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('toggleShuffle'),
+        ),
+        (_) {},
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(active.actions, ['toggleShuffle']);
+
+      active.emit(_state(shuffle: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(messages, [true, false]);
+    },
+  );
+
+  test('CarPlay remote mode requests only toggle when state differs', () async {
+    const channel = MethodChannel('spotifin/test_carplay_shuffle_mode');
     final messages = <bool>[];
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -92,24 +129,37 @@ void main() {
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-    final active = FakeActivePlayback()..emit(_state(shuffle: true));
+    final active = FakeActivePlayback()..emit(_state(shuffle: false));
     final controller = CarPlayShuffle(active, channel: channel, enabled: true)
       ..start();
     addTearDown(controller.dispose);
     await Future<void>.delayed(Duration.zero);
-    expect(messages, [true]);
+    expect(messages, [false]);
 
     await messenger.handlePlatformMessage(
       channel.name,
       const StandardMethodCodec().encodeMethodCall(
-        const MethodCall('toggleShuffle', true),
+        const MethodCall('setShuffle', true),
       ),
       (_) {},
     );
     await Future<void>.delayed(Duration.zero);
+    expect(active.actions, ['toggleShuffle']);
 
-    expect(active.actions, isEmpty);
-    expect(messages, [true, true]);
+    active.emit(_state(shuffle: true));
+    await Future<void>.delayed(Duration.zero);
+    expect(messages, [false, true]);
+
+    await messenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('setShuffle', true),
+      ),
+      (_) {},
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(active.actions, ['toggleShuffle']);
+    expect(messages, [false, true, true]);
   });
 
   test('CarPlay retries shuffle state after a native update fails', () async {

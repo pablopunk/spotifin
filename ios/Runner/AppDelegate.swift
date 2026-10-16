@@ -56,11 +56,18 @@ import UIKit
 
 private enum CarPlayShuffle {
   static func attach(channel: FlutterMethodChannel) {
-    let button = CPNowPlayingShuffleButton { tapped in
-      channel.invokeMethod("toggleShuffle", arguments: !tapped.isSelected)
+    let button = CPNowPlayingShuffleButton { _ in
+      channel.invokeMethod("toggleShuffle", arguments: nil)
     }
     let shuffleCommand = MPRemoteCommandCenter.shared().changeShuffleModeCommand
     shuffleCommand.isEnabled = true
+    shuffleCommand.addTarget { event in
+      guard let event = event as? MPChangeShuffleModeCommandEvent else {
+        return .commandFailed
+      }
+      channel.invokeMethod("setShuffle", arguments: event.shuffleType != .off)
+      return .success
+    }
     CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
     channel.setMethodCallHandler { call, result in
       guard call.method == "setShuffle", let enabled = call.arguments as? Bool else {

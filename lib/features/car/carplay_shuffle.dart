@@ -29,11 +29,16 @@ class CarPlayShuffle {
   }
 
   Future<void> _handleCall(MethodCall call) async {
-    if (call.method != 'toggleShuffle') return;
     if (!active.state.capabilities.contains(PlaybackCapability.shuffle)) {
       return;
     }
+    if (call.method == 'toggleShuffle') {
+      await active.toggleShuffle();
+      return;
+    }
+    if (call.method != 'setShuffle') return;
     final requestedShuffle = call.arguments as bool?;
+    if (requestedShuffle == null) return;
     if (requestedShuffle == active.state.shuffle) {
       resync();
       return;
