@@ -12,6 +12,9 @@ output="$root/dist/Spotifin-$version-linux-$architecture.AppImage"
 workspace="$(mktemp -d)"
 app_dir="$workspace/Spotifin.AppDir"
 appimagetool="$workspace/appimagetool.AppImage"
+# Keep the download URL and checksums tied to a numbered release: continuous
+# assets are replaced upstream and invalidate otherwise-correct pinned hashes.
+appimagetool_release="1.9.1"
 libmpv_release="20260810"
 libmpv_archive="$workspace/libmpv_$architecture.zip"
 
@@ -66,12 +69,12 @@ X-AppImage-Version=$version
 EOF
 
 curl --fail --location --retry 3 \
-  "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$architecture.AppImage" \
+  "https://github.com/AppImage/appimagetool/releases/download/$appimagetool_release/appimagetool-$architecture.AppImage" \
   --output "$appimagetool"
 
 case "$architecture" in
-  x86_64) expected_sha256="a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0" ;;
-  aarch64) expected_sha256="1b00524ba8c6b678dc15ef88a5c25ec24def36cdfc7e3abb32ddcd068e8007fe" ;;
+  x86_64) expected_sha256="ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0" ;;
+  aarch64) expected_sha256="f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158" ;;
   *) echo "Unsupported architecture: $architecture" >&2; exit 1 ;;
 esac
 echo "$expected_sha256  $appimagetool" | sha256sum -c - >/dev/null
