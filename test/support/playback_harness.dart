@@ -332,6 +332,7 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
 
 /// In-memory [PlaybackStateStore] with per-account values and write records.
 class FakePlaybackStateStore extends PlaybackStateStore {
+  Completer<void>? writeGate;
   final Map<String, String> values = {};
   final List<String> reads = [];
   final List<RecordedWrite> writes = [];
@@ -349,6 +350,8 @@ class FakePlaybackStateStore extends PlaybackStateStore {
 
   @override
   Future<void> write(String accountId, String value) async {
+    final gate = writeGate;
+    if (gate != null) await gate.future;
     values[accountId] = value;
     writes.add(RecordedWrite(accountId, value));
   }
@@ -378,8 +381,12 @@ class _MockDownloadService extends Mock implements DownloadService {}
 /// default. The [JellyfinClient] uses a [MockClient] that records playback
 /// report bodies and answers `204` without network access.
 class PlaybackHarness {
-  PlaybackHarness({math.Random? random, Map<String, Uri>? localFiles})
-    : random = random ?? math.Random(42) {
+  PlaybackHarness({
+    math.Random? random,
+    Map<String, Uri>? localFiles,
+    Future<http.Response> Function(http.Request)? reportResponse,
+    Duration requestTimeout = const Duration(seconds: 10),
+  }) : random = random ?? math.Random(42) {
     player = FakeAudioPlayer();
     stateStore = FakePlaybackStateStore();
     downloads = _MockDownloadService();
@@ -399,8 +406,10 @@ class PlaybackHarness {
           }
         }
         reports.add(RecordedReport(endpoint: endpoint, body: body));
+        if (reportResponse != null) return reportResponse(request);
         return http.Response('', 204);
       }),
+      requestTimeout: requestTimeout,
     );
     service = PlaybackService(
       client,

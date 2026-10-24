@@ -1044,9 +1044,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _sourceRevision = revision;
     _commitState(candidate, generation: generation);
     _rememberTracks(candidate.collectionTracks);
-    await _reconcileActiveSource(generation);
-    // Never await AudioPlayer.play().
-    if (autoplay) unawaited(_player.play());
+    await _reconcileActiveSource(generation, autoplay: autoplay);
     unawaited(_reportProgress(force: true));
   }
 
@@ -1170,7 +1168,11 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     return loaded[eventIndex];
   }
 
-  Future<void> _finalizeTransition(QueueEntry entry, int generation) async {
+  Future<void> _finalizeTransition(
+    QueueEntry entry,
+    int generation, {
+    bool autoplay = false,
+  }) async {
     if (generation != _accountGeneration) return;
     final candidate = _state.selectEntry(entry.id);
     if (!identical(candidate, _state)) {
@@ -1179,13 +1181,21 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     _lastProcessedOccurrenceId = entry.id;
     unawaited(_extendQueueIfNeeded());
     await _applyGain(entry.track);
+    if (generation != _accountGeneration) return;
+    // Start audio as soon as the source and gain are ready. Saving the queue
+    // and reporting to Jellyfin must not delay hearing a downloaded track.
+    // Never await AudioPlayer.play(): it completes when playback stops.
+    if (autoplay) unawaited(_player.play());
     _schedulePlayingReport(entry);
     await _persistCommittedState(generation);
     notifyListeners();
   }
 
   /// Reconciles the actual active source once after a committed install.
-  Future<void> _reconcileActiveSource(int generation) async {
+  Future<void> _reconcileActiveSource(
+    int generation, {
+    required bool autoplay,
+  }) async {
     if (generation != _accountGeneration) return;
     final loaded = _state.loadedEntries;
     if (loaded.isEmpty) return;
@@ -1206,7 +1216,7 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     }
     active ??= _state.currentEntry;
     if (active == null) return;
-    await _finalizeTransition(active, generation);
+    await _finalizeTransition(active, generation, autoplay: autoplay);
   }
 
   Future<void> _extendQueueIfNeeded() =>

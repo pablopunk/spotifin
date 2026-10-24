@@ -1,10 +1,101 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart';
 
 import 'support/playback_harness.dart';
 
 void main() {
+  test('local audio starts before the queue save completes', () async {
+    final local = Uri.file('/downloads/song.mp3');
+    final harness = PlaybackHarness(localFiles: {'track-0': local});
+    addTearDown(harness.dispose);
+    await harness.configure();
+    final gate = Completer<void>();
+    harness.stateStore.writeGate = gate;
+    final replacement = harness.service.replaceQueue(playbackCatalog(2));
+    try {
+      await harness.settle();
+      expect(harness.stateStore.writes, isEmpty);
+      expect(harness.player.playing, isTrue);
+      expect((harness.player.sources.first as UriAudioSource).uri, local);
+      expect((harness.player.sources[1] as UriAudioSource).uri.scheme, 'https');
+      await harness.waitForReports(1);
+      expect(
+        harness.reportsFor('/Sessions/Playing').single.body['IsPaused'],
+        isFalse,
+      );
+    } finally {
+      gate.complete();
+      await replacement;
+    }
+    expect(harness.stateStore.writes, isNotEmpty);
+  });
+
+  test(
+    'stalled Jellyfin reports do not block local playback or next',
+    () async {
+      final stalled = Completer<http.Response>();
+      final local = Uri.file('/downloads/song.mp3');
+      final harness = PlaybackHarness(
+        localFiles: {'track-0': local, 'track-1': local},
+        reportResponse: (_) => stalled.future,
+      );
+      addTearDown(harness.dispose);
+      await harness.configure();
+      try {
+        await harness.service.replaceQueue(playbackCatalog(2));
+        await harness.waitForReports(1);
+        expect(stalled.isCompleted, isFalse);
+        expect(harness.player.playing, isTrue);
+        expect((harness.player.sources.first as UriAudioSource).uri, local);
+        await harness.service.next();
+        expect(harness.service.currentTrack?.id, 'track-1');
+        expect(harness.player.playing, isTrue);
+      } finally {
+        stalled.complete(http.Response('', 204));
+      }
+      await harness.settle();
+      expect(harness.reportsFor('/Sessions/Playing/Stopped'), isNotEmpty);
+      expect(
+        harness.reportsFor('/Sessions/Playing').last.body['ItemId'],
+        'track-1',
+      );
+    },
+  );
+
+  test('a timed out report releases the reporting lane', () async {
+    final stalled = Completer<http.Response>();
+    var requests = 0;
+    final harness = PlaybackHarness(
+      requestTimeout: const Duration(milliseconds: 20),
+      reportResponse: (_) {
+        requests++;
+        return requests == 1
+            ? stalled.future
+            : Future.value(http.Response('', 204));
+      },
+    );
+    addTearDown(harness.dispose);
+    await harness.configure();
+    try {
+      await harness.service.replaceQueue(playbackCatalog(2));
+      await harness.service.next();
+      await harness.waitForReports(3);
+      expect(harness.player.playing, isTrue);
+      expect(stalled.isCompleted, isFalse);
+      expect(
+        harness.reportsFor('/Sessions/Playing').last.body['ItemId'],
+        'track-1',
+      );
+      expect(requests, greaterThan(1));
+    } finally {
+      stalled.complete(http.Response('', 204));
+    }
+  });
+
   test('constructs and disposes without native audio', () async {
     final harness = PlaybackHarness();
     await harness.configure();
