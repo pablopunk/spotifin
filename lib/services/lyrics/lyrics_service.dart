@@ -10,14 +10,18 @@ import '../jellyfin/session.dart';
 import 'lyric_line.dart';
 
 class LyricsService {
-  LyricsService(this._jellyfin, {http.Client? httpClient})
-    : _http = httpClient ?? http.Client();
+  LyricsService(
+    this._jellyfin, {
+    http.Client? httpClient,
+    this.requestTimeout = const Duration(seconds: 10),
+  }) : _http = httpClient ?? http.Client();
 
   static const _headers = {'Lrclib-Client': 'Spotifin/1.0'};
   static const _durationTolerance = 3;
 
   final JellyfinClient _jellyfin;
   final http.Client _http;
+  final Duration requestTimeout;
 
   Future<List<LyricLine>> find(JellyfinSession session, Track track) async {
     final jellyfin = await _jellyfin.fetchLyrics(session, track.id);
@@ -122,10 +126,9 @@ class LyricsService {
   }
 
   Future<Object?> _get(String path, Map<String, String> query) async {
-    final response = await _http.get(
-      Uri.https('lrclib.net', path, query),
-      headers: _headers,
-    );
+    final response = await _http
+        .get(Uri.https('lrclib.net', path, query), headers: _headers)
+        .timeout(requestTimeout);
     if (response.statusCode < 200 || response.statusCode >= 300) return null;
     return jsonDecode(response.body);
   }

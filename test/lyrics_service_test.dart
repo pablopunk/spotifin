@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,52 @@ import 'package:spotifin/services/lyrics/lyrics_service.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
+  test('times out when the exact LRCLIB request stalls', () async {
+    final stalled = Completer<http.Response>();
+    final service = LyricsService(
+      _jellyfinClient(),
+      httpClient: MockClient((_) => stalled.future),
+      requestTimeout: const Duration(milliseconds: 20),
+    );
+
+    await _expectTimeout(service.find(_session, _track));
+  });
+
+  test('times out when a subsequent LRCLIB search stalls', () async {
+    final stalled = Completer<http.Response>();
+    final requests = <Uri>[];
+    final service = LyricsService(
+      _jellyfinClient(),
+      httpClient: MockClient((request) {
+        requests.add(request.url);
+        if (request.url.path == '/api/get') {
+          return Future.value(http.Response('', 404));
+        }
+        return stalled.future;
+      }),
+      requestTimeout: const Duration(milliseconds: 20),
+    );
+
+    await _expectTimeout(service.find(_session, _track));
+
+    expect(requests.map((request) => request.path), [
+      '/api/get',
+      '/api/search',
+    ]);
+  });
+
+  test('times out when reading the LRCLIB response body stalls', () async {
+    final client = _StallingBodyClient();
+    addTearDown(client.close);
+    final service = LyricsService(
+      _jellyfinClient(),
+      httpClient: client,
+      requestTimeout: const Duration(milliseconds: 20),
+    );
+
+    await _expectTimeout(service.find(_session, _track));
+  });
+
   test('uses the browser-safe LRCLIB client header', () async {
     late http.Request lrclibRequest;
     final jellyfin = JellyfinClient(
@@ -20,6 +67,7 @@ void main() {
         lrclibRequest = request;
         return http.Response(jsonEncode({'plainLyrics': 'A lyric'}), 200);
       }),
+      requestTimeout: const Duration(milliseconds: 200),
     );
 
     final lyrics = await service.find(_session, _track);
@@ -42,6 +90,7 @@ void main() {
         }
         return http.Response('[]', 200);
       }),
+      requestTimeout: const Duration(milliseconds: 200),
     );
 
     final lyrics = await service.find(_session, _zebraheadTrack);
@@ -104,6 +153,14 @@ void main() {
   });
 }
 
+Future<void> _expectTimeout(Future<Object?> request) async {
+  final result = await Future.any<Object?>([
+    request.then<Object?>((value) => value, onError: (Object error) => error),
+    Future<Object?>.delayed(const Duration(milliseconds: 250), _NoTimeout.new),
+  ]);
+  expect(result, isA<TimeoutException>());
+}
+
 JellyfinClient _jellyfinClient() =>
     JellyfinClient(httpClient: MockClient((_) async => http.Response('', 204)));
 
@@ -150,6 +207,19 @@ const _session = JellyfinSession(
   userName: 'Pablo',
   accessToken: 'token',
 );
+
+class _NoTimeout {}
+
+class _StallingBodyClient extends http.BaseClient {
+  final _body = StreamController<List<int>>();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(_body.stream, 200, request: request);
+
+  @override
+  void close() => unawaited(_body.close());
+}
 
 const _track = Track(
   id: 'track',
