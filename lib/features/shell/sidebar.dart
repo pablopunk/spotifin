@@ -58,12 +58,7 @@ class SpotifinSidebar extends StatelessWidget {
             const Spacer(),
           if (footer != null)
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                extended ? 20 : 0,
-                0,
-                extended ? 20 : 0,
-                SpotifinSpacing.sm,
-              ),
+              padding: const EdgeInsets.only(bottom: SpotifinSpacing.sm),
               child: Align(
                 alignment: extended ? Alignment.centerLeft : Alignment.center,
                 child: footer,
