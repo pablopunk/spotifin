@@ -388,8 +388,13 @@ class _SearchResults extends StatelessWidget {
     stream: results,
     builder: (context, snapshot) {
       final tracks = snapshot.data ?? const [];
-      final artists = _matchingArtistGroups(tracks, query);
-      final albums = _matchingGroups(tracks, query, (track) => [track.album]);
+      // Song search is capped; collection membership must use the full library.
+      final artists = _matchingArtistGroups(libraryTracks, query);
+      final albums = _matchingGroups(
+        libraryTracks,
+        query,
+        (track) => [track.album],
+      );
       final visibleExternal = filter == _SearchFilter.all
           ? externalResults
                 .where(

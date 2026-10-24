@@ -207,6 +207,65 @@ void main() {
     await tester.runAsync(database.close);
   });
 
+  for (final searchArtist in [true, false]) {
+    testWidgets(
+      'search ${searchArtist ? 'artist albums' : 'albums'} include songs beyond the search limit',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1200, 2000));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final database = AppDatabase.forTesting(NativeDatabase.memory());
+        await database.upsertTracks([
+          for (var index = 0; index < 40; index++)
+            TracksCompanion.insert(
+              id: 'track-$index',
+              name: 'Song ${index.toString().padLeft(2, '0')}',
+              artist: const Value('zebrahead'),
+              album: const Value('The Bonus Brothers'),
+              albumId: const Value('bonus-brothers'),
+            ),
+        ]);
+        final active = FakeActivePlayback();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(database),
+              activePlaybackProvider.overrideWithValue(active),
+            ],
+            child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(TextField),
+          searchArtist ? 'zebrahead' : 'The Bonus Brothers',
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(SpotifinCollectionCard).first);
+        await tester.pumpAndSettle();
+        if (searchArtist) {
+          await tester.tap(find.widgetWithText(Tab, 'Albums'));
+          await tester.pumpAndSettle();
+          final card = tester.widget<SpotifinCollectionCard>(
+            find.byType(SpotifinCollectionCard),
+          );
+          expect(card.subtitle, '40 songs');
+          await tester.tap(find.byType(SpotifinCollectionCard));
+          await tester.pumpAndSettle();
+        }
+        expect(find.textContaining('40 songs'), findsOneWidget);
+        await tester.tap(find.byType(SpotifinPlayButton));
+        await tester.pumpAndSettle();
+        final queued =
+            active.actionArguments['replaceQueue']!.first as List<Track>;
+        expect(queued, hasLength(40));
+        expect(queued.map((track) => track.id), contains('track-39'));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 1));
+        await tester.runAsync(database.close);
+      },
+    );
+  }
+
   testWidgets('search album results keep artwork on the detail page', (
     tester,
   ) async {
