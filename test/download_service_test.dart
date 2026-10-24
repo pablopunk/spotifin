@@ -68,14 +68,21 @@ class _FakeStore implements DownloadStore {
     String trackId,
     Uri source,
     Map<String, String> headers,
-    String extension,
-  ) => onSave();
+    String extension, {
+    Duration timeout = const Duration(minutes: 5),
+  }) => onSave();
 
   @override
   Future<Uri?> resolve(String storedUri) async => null;
 
   @override
   Future<void> remove(String storedUri) async {}
+
+  @override
+  Future<void> cancel(String accountId, String trackId) async {}
+
+  @override
+  Future<void> cancelAll() async {}
 
   @override
   void dispose() {}

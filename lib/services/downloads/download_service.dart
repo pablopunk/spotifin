@@ -22,6 +22,8 @@ class DownloadService extends ChangeNotifier {
   final DownloadStore _store;
   final ArtworkStore _artwork;
   final Set<String> _active = {};
+  final Map<String, _DownloadTask> _activeTasks = {};
+  final Map<String, Completer<void>> _activeCompletions = {};
   final Set<String> _pending = {};
   final Set<String> _cancelled = {};
   final Queue<_DownloadTask> _queue = Queue();
@@ -152,6 +154,9 @@ class DownloadService extends ChangeNotifier {
 
   Future<void> _run(_DownloadTask task) async {
     if (_isCancelled(task) || !_active.add(task.track.id)) return;
+    final activeCompletion = Completer<void>();
+    _activeTasks[task.track.id] = task;
+    _activeCompletions[task.track.id] = activeCompletion;
     _notifyChanged();
     try {
       await _database.putDownload(
@@ -199,6 +204,13 @@ class DownloadService extends ChangeNotifier {
       await _finishDownload(task, localUri);
     } finally {
       _active.remove(task.track.id);
+      if (identical(_activeTasks[task.track.id], task)) {
+        _activeTasks.remove(task.track.id);
+      }
+      if (identical(_activeCompletions[task.track.id], activeCompletion)) {
+        _activeCompletions.remove(task.track.id);
+      }
+      if (!activeCompletion.isCompleted) activeCompletion.complete();
       _notifyChanged();
     }
   }
@@ -292,6 +304,19 @@ class DownloadService extends ChangeNotifier {
   bool _isCancelled(_DownloadTask task) =>
       task.generation != _generation || _cancelled.contains(task.track.id);
 
+  String _accountId(_DownloadTask task) {
+    final session = _sessionFor(task);
+    return '${session.serverId}.${session.userId}';
+  }
+
+  Future<void> _cancelActiveTask(String trackId) async {
+    final task = _activeTasks[trackId];
+    if (task == null) return;
+    final activeCompletion = _activeCompletions[trackId];
+    await _store.cancel(_accountId(task), trackId);
+    await activeCompletion?.future;
+  }
+
   void _notifyChanged() {
     if (!_disposed) notifyListeners();
   }
@@ -350,6 +375,7 @@ class DownloadService extends ChangeNotifier {
     _cancelled.add(trackId);
     _pending.remove(trackId);
     _queue.removeWhere((task) => task.track.id == trackId);
+    await _cancelActiveTask(trackId);
     final row = await (_database.select(
       _database.downloads,
     )..where((row) => row.trackId.equals(trackId))).getSingleOrNull();
@@ -366,6 +392,7 @@ class DownloadService extends ChangeNotifier {
       _cancelled.add(download.trackId);
       _pending.remove(download.trackId);
       _queue.removeWhere((task) => task.track.id == download.trackId);
+      await _cancelActiveTask(download.trackId);
       if (download.localUri != null) await _removeFile(download.localUri!);
       await _database.removeDownload(download.trackId);
     }
@@ -394,6 +421,7 @@ class DownloadService extends ChangeNotifier {
       _pending.clear();
       _queue.clear();
       _latestSession = null;
+      await _store.cancelAll();
       await _waitForActiveDownloads();
       final current = {
         for (final download in await _database.allDownloads())
@@ -423,6 +451,7 @@ class DownloadService extends ChangeNotifier {
       _pending.clear();
       _cancelled.clear();
       _queue.clear();
+      await _store.cancelAll();
       await _waitForActiveDownloads();
       final rows = await _database.select(_database.downloads).get();
       for (var start = 0; start < rows.length; start += 8) {
