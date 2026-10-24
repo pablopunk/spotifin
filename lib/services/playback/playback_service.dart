@@ -557,6 +557,8 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final candidate = state.selectEntry(target.id);
     _commitState(candidate, generation: generation);
     _lastProcessedOccurrenceId = target.id;
+    await _applyGain(target.track);
+    if (generation != _accountGeneration) return;
     _schedulePlayingReport(target);
     unawaited(_persistCommittedState(generation));
     unawaited(_extendQueueIfNeeded());
@@ -600,6 +602,8 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final candidate = state.selectEntry(target.id);
     _commitState(candidate, generation: generation);
     _lastProcessedOccurrenceId = target.id;
+    await _applyGain(target.track);
+    if (generation != _accountGeneration) return;
     _schedulePlayingReport(target);
     // Never await AudioPlayer.play().
     unawaited(_player.play());
@@ -633,7 +637,11 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
         _commitState(candidate, generation: generation);
         final entry = candidate.currentEntry;
         _lastProcessedOccurrenceId = entry?.id;
-        if (entry != null) _schedulePlayingReport(entry);
+        if (entry != null) {
+          await _applyGain(entry.track);
+          if (generation != _accountGeneration) return;
+          _schedulePlayingReport(entry);
+        }
       }
       return;
     }
@@ -661,6 +669,8 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final candidate = state.selectEntry(entry.id);
     _commitState(candidate, generation: generation);
     _lastProcessedOccurrenceId = entry.id;
+    await _applyGain(entry.track);
+    if (generation != _accountGeneration) return;
     _schedulePlayingReport(entry);
     // Never await AudioPlayer.play().
     unawaited(_player.play());

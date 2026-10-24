@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' show IndexedAudioSource;
@@ -225,6 +226,251 @@ void main() {
     expect(harness.service.history.map((track) => track.id), ['track-0']);
   });
 
+  test(
+    'manual next applies the selected gain and ignores index echoes',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure(normalization: true);
+      await harness.service.setVolume(0.8);
+
+      final tracks = [
+        playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+        playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+        playbackTrack(2, albumId: 'album-2', normalizationGain: -18),
+      ];
+      await harness.service.replaceQueue(tracks, startIndex: 0);
+      await harness.settle();
+      expect(
+        harness.player.lastVolume,
+        closeTo(_volumeForGain(0.8, -6), 0.0001),
+      );
+
+      await harness.service.next();
+      await harness.settle();
+      expect(harness.service.currentTrack?.id, 'track-1');
+      expect(
+        harness.player.lastVolume,
+        closeTo(_volumeForGain(0.8, -12), 0.0001),
+      );
+      expect(harness.service.history.map((track) => track.id), ['track-0']);
+
+      harness.player.emitIndex(1);
+      await harness.settle();
+      final playingReports = harness.reportsFor('/Sessions/Playing').length;
+      harness.player.emitIndex(0, updateCurrentIndex: false);
+      await harness.settle();
+
+      expect(harness.service.currentTrack?.id, 'track-1');
+      expect(harness.service.history.map((track) => track.id), ['track-0']);
+      expect(
+        harness.player.lastVolume,
+        closeTo(_volumeForGain(0.8, -12), 0.0001),
+      );
+      expect(
+        harness.reportsFor('/Sessions/Playing'),
+        hasLength(playingReports),
+      );
+    },
+  );
+
+  test('manual previous applies gain when history is available', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    final tracks = [
+      playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+      playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+    ];
+    await harness.service.replaceQueue(tracks, startIndex: 0);
+    harness.player.emitIndex(1);
+    await harness.settle();
+    expect(harness.service.history.map((track) => track.id), ['track-0']);
+    expect(
+      harness.player.lastVolume,
+      closeTo(_volumeForGain(0.8, -12), 0.0001),
+    );
+
+    await harness.service.previous();
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-0');
+    expect(harness.service.history, isEmpty);
+    expect(harness.player.lastVolume, closeTo(_volumeForGain(0.8, -6), 0.0001));
+  });
+
+  test('manual previous applies gain without history', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    final tracks = [
+      playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+      playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+    ];
+    await harness.service.replaceQueue(tracks, startIndex: 1);
+    await harness.settle();
+    expect(harness.service.history, isEmpty);
+
+    await harness.service.previous();
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-0');
+    expect(harness.service.history, isEmpty);
+    expect(harness.player.lastVolume, closeTo(_volumeForGain(0.8, -6), 0.0001));
+  });
+
+  test('forward queue selection applies the selected gain', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    final tracks = [
+      playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+      playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+      playbackTrack(2, albumId: 'album-2', normalizationGain: -18),
+    ];
+    await harness.service.replaceQueue(tracks, startIndex: 0);
+    await harness.settle();
+
+    await harness.service.playQueueIndex(2);
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-2');
+    expect(harness.service.history.map((track) => track.id), ['track-0']);
+    expect(
+      harness.player.lastVolume,
+      closeTo(_volumeForGain(0.8, -18), 0.0001),
+    );
+  });
+
+  test('backward queue selection applies the selected gain', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    final tracks = [
+      playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+      playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+      playbackTrack(2, albumId: 'album-2', normalizationGain: -18),
+    ];
+    await harness.service.replaceQueue(tracks, startIndex: 2);
+    await harness.settle();
+
+    await harness.service.playQueueIndex(0);
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-0');
+    expect(harness.player.lastVolume, closeTo(_volumeForGain(0.8, -6), 0.0001));
+  });
+
+  test(
+    'manual transition to a track without gain resets the multiplier',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure(normalization: true);
+      await harness.service.setVolume(0.8);
+
+      await harness.service.replaceQueue([
+        playbackTrack(0, albumId: 'album-0', normalizationGain: -12),
+        playbackTrack(1, albumId: 'album-1'),
+      ], startIndex: 0);
+      await harness.settle();
+      expect(
+        harness.player.lastVolume,
+        closeTo(_volumeForGain(0.8, -12), 0.0001),
+      );
+
+      await harness.service.next();
+      await harness.settle();
+
+      expect(harness.service.currentTrack?.id, 'track-1');
+      expect(harness.player.lastVolume, closeTo(0.8, 0.0001));
+    },
+  );
+
+  test('manual transition uses album gain for a single-album queue', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    await harness.service.replaceQueue([
+      playbackTrack(
+        0,
+        albumId: 'album-all',
+        normalizationGain: -20,
+        albumNormalizationGain: -3,
+      ),
+      playbackTrack(
+        1,
+        albumId: 'album-all',
+        normalizationGain: -20,
+        albumNormalizationGain: -6,
+      ),
+    ], startIndex: 0);
+    await harness.settle();
+    expect(harness.player.lastVolume, closeTo(_volumeForGain(0.8, -3), 0.0001));
+
+    await harness.service.next();
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-1');
+    expect(harness.player.lastVolume, closeTo(_volumeForGain(0.8, -6), 0.0001));
+  });
+
+  test(
+    'manual transitions leave user volume unchanged when normalization is off',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+      await harness.service.setVolume(0.65);
+
+      await harness.service.replaceQueue([
+        playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+        playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+      ], startIndex: 0);
+      await harness.settle();
+      expect(harness.player.lastVolume, closeTo(0.65, 0.0001));
+
+      await harness.service.next();
+      await harness.settle();
+
+      expect(harness.service.currentTrack?.id, 'track-1');
+      expect(harness.player.lastVolume, closeTo(0.65, 0.0001));
+    },
+  );
+
+  test('failed manual seek leaves selection and gain unchanged', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure(normalization: true);
+    await harness.service.setVolume(0.8);
+
+    await harness.service.replaceQueue([
+      playbackTrack(0, albumId: 'album-0', normalizationGain: -6),
+      playbackTrack(1, albumId: 'album-1', normalizationGain: -12),
+    ], startIndex: 0);
+    await harness.settle();
+    final volumeBefore = harness.player.lastVolume;
+    harness.player.seekError = Exception('seek failed');
+
+    await expectLater(harness.service.next(), throwsException);
+    harness.player.seekError = null;
+    await harness.settle();
+
+    expect(harness.service.currentTrack?.id, 'track-0');
+    expect(harness.service.history, isEmpty);
+    expect(harness.player.lastVolume, volumeBefore);
+  });
+
   test('duplicate occurrences record one history entry each', () async {
     final harness = PlaybackHarness();
     addTearDown(harness.dispose);
@@ -391,6 +637,9 @@ void main() {
     expect(decoded['index'], 21);
   });
 }
+
+double _volumeForGain(double userVolume, double gain) =>
+    userVolume * math.pow(10, gain / 20).toDouble();
 
 /// Occurrence id currently reported as playing for [trackId], if any.
 String? _playingEntryId(PlaybackHarness harness, String trackId) {

@@ -122,8 +122,8 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   );
 
   /// Emit a current-index event as if the player advanced.
-  void emitIndex(int? index) {
-    _currentIndex = index;
+  void emitIndex(int? index, {bool updateCurrentIndex = true}) {
+    if (updateCurrentIndex) _currentIndex = index;
     if (!_currentIndexController.isClosed) {
       _currentIndexController.add(index);
     }
@@ -445,7 +445,8 @@ class PlaybackHarness {
   Map<String, Uri> get localFiles => _localFiles;
 
   /// Configures the service session with an async no-op audio session.
-  Future<void> configure() => service.configure(session);
+  Future<void> configure({bool normalization = false}) =>
+      service.configure(session, normalization: normalization);
 
   /// Yields to the event loop so serialized reports and stream events flush.
   Future<void> settle() async {
@@ -488,18 +489,24 @@ class PlaybackHarness {
 }
 
 /// Builds a deterministic library track fixture.
-Track playbackTrack(int index) => Track(
+Track playbackTrack(
+  int index, {
+  String? albumId,
+  double? normalizationGain,
+  double? albumNormalizationGain,
+}) => Track(
   id: 'track-$index',
   name: 'Song $index',
-  album: 'Album',
+  album: albumId == null ? 'Album' : 'Album $albumId',
+  albumId: albumId,
   artist: 'Artist',
   artistItems: '[]',
   labels: '[]',
   durationTicks: 1800000000,
   favorite: false,
   playCount: 0,
-  normalizationGain: null,
-  albumNormalizationGain: null,
+  normalizationGain: normalizationGain,
+  albumNormalizationGain: albumNormalizationGain,
   container: 'mp3',
 );
 
