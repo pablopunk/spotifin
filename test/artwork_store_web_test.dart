@@ -31,7 +31,14 @@ void main() {
   tearDown(() async {
     fetch.restore();
     for (final key in testKeys) {
-      await cache.delete(key.toJS).toDart;
+      final requests =
+          (await cache
+                  .keys(key.toJS, web.CacheQueryOptions(ignoreSearch: true))
+                  .toDart)
+              .toDart;
+      for (final request in requests) {
+        await cache.delete(request.url.toJS).toDart;
+      }
     }
     testKeys.clear();
   });
@@ -58,7 +65,7 @@ void main() {
       expect(results, everyElement(isNull));
       expect(fetch.calls, 1);
       expect(fetch.aborts, 1);
-      expect(await cache.match(key.toJS).toDart, isNull);
+      expect(await _cacheText(cache, key), isNull);
 
       fetch.respond((_, _) => web.Response('healthy artwork'.toJS));
       expect(await _resolve(store, itemId), isNotNull);
@@ -93,8 +100,39 @@ void main() {
     try {
       expect(await _resolve(store, itemId), isNotNull);
       expect(fetch.calls, 1);
-      expect(await cache.match(key.toJS).toDart, isNotNull);
+      expect(await _cacheText(cache, key), 'fresh artwork');
     } finally {
+      store.dispose();
+    }
+  });
+
+  test('cleans a failed cache write and allows a later retry', () async {
+    final itemId = _nextItemId();
+    final key = _key(itemId);
+    testKeys.add(key);
+    final store = ArtworkStore(timeout: const Duration(seconds: 1));
+    final cachePut = _CachePutGate(cache)..install();
+    fetch.respond((_, _) => web.Response('partial artwork'.toJS));
+
+    try {
+      final failed = _resolve(store, itemId);
+      await fetch.waitForCalls(1).timeout(const Duration(seconds: 1));
+      await cachePut.waitForCalls(1).timeout(const Duration(seconds: 1));
+      await cachePut.failFirstAfterWriting();
+      expect(await failed, isNull);
+      expect(await _cacheText(cache, key), isNull);
+
+      fetch.respond((_, _) => web.Response('recovered artwork'.toJS));
+      final retry = _resolve(store, itemId);
+      await fetch.waitForCalls(2).timeout(const Duration(seconds: 1));
+      await cachePut.waitForCalls(2).timeout(const Duration(seconds: 1));
+      await cachePut.completeSecond();
+      expect(await retry, isNotNull);
+      expect(await _cacheText(cache, key), 'recovered artwork');
+    } finally {
+      await cachePut.completeFirst();
+      await cachePut.completeSecond();
+      cachePut.restore();
       store.dispose();
     }
   });
@@ -111,7 +149,7 @@ void main() {
     try {
       expect(await _resolve(store, itemId), isNull);
       expect(fetch.calls, 1);
-      expect(await cache.match(key.toJS).toDart, isNull);
+      expect(await _cacheText(cache, key), isNull);
     } finally {
       store.dispose();
     }
@@ -218,21 +256,81 @@ void main() {
         final concurrentRetry = _resolve(store, itemId);
         expect(identical(concurrentRetry, retry), isTrue);
 
-        cachePut.completeFirst();
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        expect(identical(_resolve(store, itemId), retry), isTrue);
-        expect(fetch.calls, 2);
-
         await cachePut.completeSecond();
         final results = await Future.wait([retry, concurrentRetry])
             .timeout(const Duration(seconds: 1));
         expect(results, everyElement(isNotNull));
+
+        // Cache.put cannot be aborted. Execute the timed-out write only after
+        // the retry has completely written its newer response.
+        await cachePut.completeFirst();
+
+        final verificationStore = ArtworkStore(
+          timeout: const Duration(seconds: 1),
+        );
+        try {
+          expect(await _resolve(verificationStore, itemId), isNotNull);
+          expect(fetch.calls, 2);
+        } finally {
+          verificationStore.dispose();
+        }
         expect(await _cacheText(cache, key), 'retry artwork');
       } finally {
-        cachePut.completeFirst();
+        await cachePut.completeFirst();
         await cachePut.completeSecond();
         cachePut.restore();
         store.dispose();
+      }
+    },
+  );
+
+  test(
+    'a late cache write after dispose cannot replace replacement content',
+    () async {
+      final itemId = _nextItemId();
+      final key = _key(itemId);
+      testKeys.add(key);
+      final oldStore = ArtworkStore(timeout: const Duration(milliseconds: 300));
+      final replacementStore = ArtworkStore(
+        timeout: const Duration(seconds: 1),
+      );
+      final cachePut = _CachePutGate(cache)..install();
+      fetch.respond((_, _) => web.Response('old artwork'.toJS));
+
+      try {
+        final oldResolution = _resolve(oldStore, itemId);
+        await fetch.waitForCalls(1).timeout(const Duration(seconds: 1));
+        await cachePut.waitForCalls(1).timeout(const Duration(seconds: 1));
+        oldStore.dispose();
+
+        fetch.respond((_, _) => web.Response('replacement artwork'.toJS));
+        final replacement = _resolve(replacementStore, itemId);
+        await fetch.waitForCalls(2).timeout(const Duration(seconds: 1));
+        await cachePut.waitForCalls(2).timeout(const Duration(seconds: 1));
+        await cachePut.completeSecond();
+        expect(await replacement, isNotNull);
+
+        // The disposed store's Cache.put still completes, but its older write
+        // must not become the logical cache entry.
+        await cachePut.completeFirst();
+        expect(await oldResolution.timeout(const Duration(seconds: 1)), isNull);
+
+        final verificationStore = ArtworkStore(
+          timeout: const Duration(seconds: 1),
+        );
+        try {
+          expect(await _resolve(verificationStore, itemId), isNotNull);
+          expect(fetch.calls, 2);
+        } finally {
+          verificationStore.dispose();
+        }
+        expect(await _cacheText(cache, key), 'replacement artwork');
+      } finally {
+        await cachePut.completeFirst();
+        await cachePut.completeSecond();
+        cachePut.restore();
+        oldStore.dispose();
+        replacementStore.dispose();
       }
     },
   );
@@ -339,6 +437,8 @@ class _CachePutGate {
   final firstCall = Completer<void>();
   final secondCall = Completer<void>();
   late JSFunction _originalPut;
+  JSAny? _firstRequest;
+  JSAny? _firstResponse;
   JSAny? _secondRequest;
   JSAny? _secondResponse;
   int calls = 0;
@@ -350,6 +450,8 @@ class _CachePutGate {
         ((JSAny? receiver, JSAny? request, JSAny? response) {
           calls++;
           if (calls == 1) {
+            _firstRequest = request;
+            _firstResponse = response;
             firstCall.complete();
             return firstPut.future.toJS;
           }
@@ -369,8 +471,26 @@ class _CachePutGate {
     if (target == 2) await secondCall.future;
   }
 
-  void completeFirst() {
-    if (!firstPut.isCompleted) firstPut.complete(null);
+  Future<void> completeFirst() async {
+    if (_firstRequest == null || _firstResponse == null) return;
+    if (firstPut.isCompleted) return;
+    await (_originalPut.callAsFunction(
+      cache,
+      _firstRequest,
+      _firstResponse,
+    ) as JSPromise<JSAny?>).toDart;
+    firstPut.complete(null);
+  }
+
+  Future<void> failFirstAfterWriting() async {
+    if (_firstRequest == null || _firstResponse == null) return;
+    if (firstPut.isCompleted) return;
+    await (_originalPut.callAsFunction(
+      cache,
+      _firstRequest,
+      _firstResponse,
+    ) as JSPromise<JSAny?>).toDart;
+    firstPut.completeError(StateError('simulated Cache.put failure'));
   }
 
   Future<void> completeSecond() async {
@@ -396,7 +516,32 @@ class _CachePutGate {
 }
 
 Future<String?> _cacheText(web.Cache cache, String key) async {
-  final response = await cache.match(key.toJS).toDart;
+  final requests =
+      (await cache
+              .keys(key.toJS, web.CacheQueryOptions(ignoreSearch: true))
+              .toDart)
+          .toDart;
+  web.Request? latestRequest;
+  var latestRevision = -1;
+  for (final request in requests) {
+    final revision = _cacheRevision(request.url, key);
+    if (revision != null && revision > latestRevision) {
+      latestRequest = request;
+      latestRevision = revision;
+    }
+  }
+  if (latestRequest == null) return null;
+  final response = await cache.match(latestRequest.url.toJS).toDart;
   if (response == null) return null;
   return (await response.text().toDart).toDart;
+}
+
+int? _cacheRevision(String requestUrl, String key) {
+  final keyStart = requestUrl.lastIndexOf(key);
+  if (keyStart < 0) return null;
+  final suffix = requestUrl.substring(keyStart + key.length);
+  if (suffix.isEmpty) return 0;
+  if (!suffix.startsWith('?')) return null;
+  final query = Uri.splitQueryString(suffix.substring(1));
+  return int.tryParse(query['__spotifin_artwork_revision'] ?? '');
 }
