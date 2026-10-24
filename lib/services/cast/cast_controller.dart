@@ -184,8 +184,9 @@ class CastController extends ChangeNotifier {
   double get remoteVolume => _remote.volume;
 
   /// Position updates mirrored from the receiver (drives sliders).
-  Stream<Duration> get positionStream =>
-      _sender.remoteStateStream.map((state) => state.position);
+  Stream<Duration> get positionStream => _sender.remoteStateStream
+      .where(_shouldPublishRemoteState)
+      .map((state) => state.position);
   String? get error => _error;
   JellyfinSession? get session => _session;
 
@@ -335,6 +336,22 @@ class CastController extends ChangeNotifier {
   }
 
   void _onRemote(CastRemoteState state) {
+    if (_isKnownStaleRemoteState(state)) {
+      // Volume belongs to the receiver, not the media item. Preserve a useful
+      // volume update without publishing the stale item's transport state.
+      if (state.volume != _remote.volume) {
+        _remote = _remote.copyWith(
+          volume: state.volume,
+          occurrenceId: _remote.occurrenceId,
+          loadId: _remote.loadId,
+          mediaSessionId: _remote.mediaSessionId,
+        );
+        _safeNotify();
+      }
+      return;
+    }
+    if (_isUnidentifiedCompletion(state)) return;
+
     _remote = state;
     _adoptRecovery(state);
     if (state.finishReason == CastFinishReason.finished) {
@@ -342,6 +359,22 @@ class CastController extends ChangeNotifier {
     }
     _safeNotify();
   }
+
+  bool _shouldPublishRemoteState(CastRemoteState state) =>
+      !_isKnownStaleRemoteState(state) && !_isUnidentifiedCompletion(state);
+
+  bool _isKnownStaleRemoteState(CastRemoteState state) {
+    final loadId = state.loadId;
+    if (loadId != null && loadId != _currentLoadId) return true;
+
+    final occurrenceId = state.occurrenceId;
+    final currentOccurrenceId = _castSnapshot?.queue.currentEntry?.id;
+    return occurrenceId != null && occurrenceId != currentOccurrenceId;
+  }
+
+  bool _isUnidentifiedCompletion(CastRemoteState state) =>
+      state.finishReason == CastFinishReason.finished &&
+      (state.loadId == null || state.occurrenceId == null);
 
   void _queueNaturalCompletion(CastRemoteState state) {
     final loadId = state.loadId;

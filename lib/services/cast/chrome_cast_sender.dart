@@ -18,6 +18,8 @@ import 'cast_sender.dart';
 
 const _spotifinCastLoadIdKey = 'spotifinCastLoadId';
 
+typedef _CastLoadIdentity = ({String loadId, String? occurrenceId});
+
 /// Real [CastSender] backed by the Google Cast SDK via `flutter_chrome_cast`.
 ///
 /// iOS uses the official Cast SDK (~4.8.4 XCFramework with arm64 simulator
@@ -42,6 +44,11 @@ class ChromeCastSender implements CastSender {
   CastConnectionState _connection = CastConnectionState.disconnected;
   CastDevice? _connectedDevice;
   CastRemoteState _remote = const CastRemoteState();
+  // A status can omit mediaInformation while retaining mediaSessionID. Only
+  // resolve that status when this sender previously observed the session ID
+  // alongside Spotifin's own load ID. A reused session ID becomes ambiguous;
+  // never infer its latest load from timing or receiver state.
+  final Map<int, _CastLoadIdentity?> _loadIdentityByMediaSession = {};
   String _receiverAppId = 'F007D354';
   bool _initialized = false;
 
@@ -148,17 +155,63 @@ class ChromeCastSender implements CastSender {
       (status) {
         if (status == null) return;
         final customData = status.mediaInformation?.customData;
-        final loadId = customData?[_spotifinCastLoadIdKey];
-        final occurrenceId = customData?['playlistItemId'];
+        final rawLoadId = customData?[_spotifinCastLoadIdKey];
+        final rawOccurrenceId = customData?['playlistItemId'];
+        final mediaSessionId = status.mediaSessionID;
+        final knownIdentity = mediaSessionId == 0
+            ? null
+            : _loadIdentityByMediaSession[mediaSessionId];
+        final hasKnownIdentity =
+            mediaSessionId != 0 &&
+            _loadIdentityByMediaSession.containsKey(mediaSessionId);
+        final directLoadId = rawLoadId is String ? rawLoadId : null;
+        final directOccurrenceId = rawOccurrenceId is String
+            ? rawOccurrenceId
+            : null;
+
+        if (directLoadId != null && mediaSessionId != 0) {
+          final sameKnownLoad =
+              knownIdentity != null &&
+              knownIdentity.loadId == directLoadId &&
+              (directOccurrenceId == null ||
+                  knownIdentity.occurrenceId == directOccurrenceId);
+          if (!hasKnownIdentity || sameKnownLoad) {
+            _loadIdentityByMediaSession[mediaSessionId] = (
+              loadId: directLoadId,
+              occurrenceId:
+                  directOccurrenceId ??
+                  (sameKnownLoad ? knownIdentity.occurrenceId : null),
+            );
+          } else {
+            // A native session ID observed for multiple loads cannot identify
+            // a later mediaInformation-null status safely.
+            _loadIdentityByMediaSession[mediaSessionId] = null;
+          }
+        }
+
+        final sessionIdentity = mediaSessionId == 0
+            ? null
+            : _loadIdentityByMediaSession[mediaSessionId];
+        final loadId =
+            directLoadId ??
+            (directOccurrenceId == null ||
+                    sessionIdentity?.occurrenceId == directOccurrenceId
+                ? sessionIdentity?.loadId
+                : null);
+        final occurrenceId =
+            directOccurrenceId ??
+            (directLoadId == null || sessionIdentity?.loadId == directLoadId
+                ? sessionIdentity?.occurrenceId
+                : null);
         _remote = CastRemoteState(
           playerState: _mapPlayer(status.playerState),
           position: _remote.position,
           duration: status.mediaInformation?.duration,
           volume: _remote.volume,
           finishReason: _mapFinishReason(status),
-          occurrenceId: occurrenceId is String ? occurrenceId : null,
-          loadId: loadId is String ? loadId : null,
-          mediaSessionId: status.mediaSessionID,
+          occurrenceId: occurrenceId,
+          loadId: loadId,
+          mediaSessionId: mediaSessionId,
         );
         if (!_remoteController.isClosed) _remoteController.add(_remote);
       },
@@ -202,6 +255,7 @@ class ChromeCastSender implements CastSender {
     if (_connection == CastConnectionState.disconnected) {
       _connectedDevice = null;
       _remote = const CastRemoteState();
+      _loadIdentityByMediaSession.clear();
       if (!_remoteController.isClosed) _remoteController.add(_remote);
     }
     if (!_connectionController.isClosed) {
@@ -472,6 +526,7 @@ class ChromeCastSender implements CastSender {
     _mediaSub?.cancel();
     _positionSub?.cancel();
     _volumeSub?.cancel();
+    _loadIdentityByMediaSession.clear();
     _devicesController.close();
     _connectionController.close();
     _remoteController.close();

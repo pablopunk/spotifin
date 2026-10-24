@@ -436,11 +436,87 @@ void main() {
 
       await cast.connect(livingRoom);
       await cast.next();
+
+      final currentLoad = sender.loadedStates[1];
+      final observedPositions = <Duration>[];
+      final positionSubscription = cast.positionStream.listen(
+        observedPositions.add,
+      );
+      addTearDown(positionSubscription.cancel);
+      sender.emitRemote(
+        CastRemoteState(
+          playerState: CastPlayerState.playing,
+          position: const Duration(seconds: 45),
+          duration: currentLoad.duration,
+          occurrenceId: currentLoad.occurrenceId,
+          loadId: currentLoad.loadId,
+          mediaSessionId: currentLoad.mediaSessionId,
+        ),
+      );
+      await pump();
+      observedPositions.clear();
+
       sender.emitCompletionForLoad(0);
       await pump();
 
       expect(cast.remoteTrack?.id, 'b');
       expect(sender.loads, hasLength(2));
+      expect(cast.remotePlaying, isTrue);
+      expect(cast.remotePosition, const Duration(seconds: 45));
+      expect(observedPositions, isEmpty);
+
+      await cast.disconnect();
+
+      expect(playback.restoredSnapshots, hasLength(1));
+      expect(
+        playback.restoredSnapshots.single.position,
+        const Duration(seconds: 45),
+      );
+      expect(playback.restoredSnapshots.single.playing, isTrue);
+    },
+  );
+
+  test(
+    'unknown completion identity is ignored, untagged position is kept',
+    () async {
+      final playback = FakePlayback(queue: [track('a'), track('b')]);
+      final sender = FakeSender(devices: [livingRoom]);
+      final cast = controller(playback: playback, sender: sender);
+      addTearDown(sender.dispose);
+      addTearDown(cast.dispose);
+
+      await cast.connect(livingRoom);
+      final observedPositions = <Duration>[];
+      final positionSubscription = cast.positionStream.listen(
+        observedPositions.add,
+      );
+      addTearDown(positionSubscription.cancel);
+
+      sender.emitRemote(
+        const CastRemoteState(
+          playerState: CastPlayerState.playing,
+          position: Duration(seconds: 20),
+          duration: Duration(minutes: 3),
+        ),
+      );
+      await pump();
+      expect(observedPositions, [const Duration(seconds: 20)]);
+
+      sender.emitRemote(
+        const CastRemoteState(
+          playerState: CastPlayerState.idle,
+          position: Duration(minutes: 3),
+          duration: Duration(minutes: 3),
+          finishReason: CastFinishReason.finished,
+        ),
+      );
+      await pump();
+
+      expect(cast.remoteTrack?.id, 'a');
+      expect(cast.remotePlaying, isTrue);
+      expect(cast.remotePosition, const Duration(seconds: 20));
+      expect(observedPositions, [const Duration(seconds: 20)]);
+      expect(sender.loads, hasLength(1));
     },
   );
 
