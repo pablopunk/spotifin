@@ -61,6 +61,7 @@ class CastController extends ChangeNotifier {
   final bool Function() _isSupported;
   final math.Random _random;
   int _castIds = 0;
+  int _castLoadSequence = 0;
 
   static const _queueExtensionThreshold = 15;
 
@@ -87,6 +88,10 @@ class CastController extends ChangeNotifier {
   CastConnectionState _connection = CastConnectionState.disconnected;
   CastDevice? _connectedDevice;
   CastRemoteState _remote = const CastRemoteState();
+  String? _currentLoadId;
+  String? _lastCompletedLoadId;
+  String? _pendingNaturalCompletionLoadId;
+  Future<void>? _pendingNaturalCompletion;
 
   /// Last usable media position/playing decision, kept separately from the
   /// transport display [_remote]. Unknown/empty transport-reset events never
@@ -294,6 +299,8 @@ class CastController extends ChangeNotifier {
     _connectedDevice = null;
     _castSnapshot = null;
     _localSnapshot = null;
+    _currentLoadId = null;
+    _lastCompletedLoadId = null;
     _playback.setCastingActive(false);
     _setOwnership(CastOwnership.local);
     _safeNotify();
@@ -330,7 +337,50 @@ class CastController extends ChangeNotifier {
   void _onRemote(CastRemoteState state) {
     _remote = state;
     _adoptRecovery(state);
+    if (state.finishReason == CastFinishReason.finished) {
+      _queueNaturalCompletion(state);
+    }
     _safeNotify();
+  }
+
+  void _queueNaturalCompletion(CastRemoteState state) {
+    final loadId = state.loadId;
+    final occurrenceId = state.occurrenceId;
+    if (_ownership != CastOwnership.remote ||
+        loadId == null ||
+        loadId != _currentLoadId ||
+        occurrenceId == null ||
+        occurrenceId != _castSnapshot?.queue.currentEntry?.id ||
+        loadId == _lastCompletedLoadId ||
+        loadId == _pendingNaturalCompletionLoadId) {
+      return;
+    }
+
+    final lifecycleGeneration = _generation;
+    final completion = _enqueue((generation) async {
+      if (generation != lifecycleGeneration ||
+          _ownership != CastOwnership.remote ||
+          loadId != _currentLoadId ||
+          loadId == _lastCompletedLoadId ||
+          occurrenceId != _castSnapshot?.queue.currentEntry?.id) {
+        return;
+      }
+      _lastCompletedLoadId = loadId;
+      await _advanceToNext(
+        generation: generation,
+        natural: true,
+        expectedOccurrenceId: occurrenceId,
+      );
+    });
+    _pendingNaturalCompletionLoadId = loadId;
+    _pendingNaturalCompletion = completion;
+    unawaited(
+      completion.catchError((Object _) {}).whenComplete(() {
+        if (_pendingNaturalCompletionLoadId != loadId) return;
+        _pendingNaturalCompletionLoadId = null;
+        _pendingNaturalCompletion = null;
+      }),
+    );
   }
 
   /// Keeps the last usable position/playing decision apart from transport
@@ -478,6 +528,7 @@ class CastController extends ChangeNotifier {
       rethrow;
     }
     _playback.setCastingActive(false);
+    _currentLoadId = null;
     _setOwnership(CastOwnership.local);
     await _playback.reportCurrentState();
   }
@@ -489,6 +540,7 @@ class CastController extends ChangeNotifier {
     String? playlistItemId,
     required bool autoplay,
   }) async {
+    final loadId = _newCastLoadId();
     try {
       final payload = _adapter.buildPayload(
         session,
@@ -499,14 +551,24 @@ class CastController extends ChangeNotifier {
       await _sender.loadSingle(
         payload,
         position: payload.startPosition,
+        loadId: loadId,
         autoplay: autoplay,
       );
+      _currentLoadId = loadId;
+      final mediaSessionId = _remote.loadId == loadId
+          ? _remote.mediaSessionId
+          : null;
       _remote = _remote.copyWith(
         position: payload.startPosition,
         duration: payload.duration,
         playerState: autoplay
             ? CastPlayerState.playing
             : CastPlayerState.paused,
+        occurrenceId: payload.customData['playlistItemId'] is String
+            ? payload.customData['playlistItemId'] as String
+            : null,
+        loadId: loadId,
+        mediaSessionId: mediaSessionId,
       );
       return;
     } on CastException {
@@ -516,6 +578,7 @@ class CastController extends ChangeNotifier {
     // transient load error): retry once with the AAC/m4a profile before
     // surfacing a failure, mirroring the local `small` streaming fallback.
     try {
+      final fallbackLoadId = _newCastLoadId();
       final fallback = _adapter.buildPayload(
         session,
         track,
@@ -526,14 +589,24 @@ class CastController extends ChangeNotifier {
       await _sender.loadSingle(
         fallback,
         position: fallback.startPosition,
+        loadId: fallbackLoadId,
         autoplay: autoplay,
       );
+      _currentLoadId = fallbackLoadId;
+      final mediaSessionId = _remote.loadId == fallbackLoadId
+          ? _remote.mediaSessionId
+          : null;
       _remote = _remote.copyWith(
         position: fallback.startPosition,
         duration: fallback.duration,
         playerState: autoplay
             ? CastPlayerState.playing
             : CastPlayerState.paused,
+        occurrenceId: fallback.customData['playlistItemId'] is String
+            ? fallback.customData['playlistItemId'] as String
+            : null,
+        loadId: fallbackLoadId,
+        mediaSessionId: mediaSessionId,
       );
       return;
     } on CastException catch (error) {
@@ -568,36 +641,98 @@ class CastController extends ChangeNotifier {
   Future<void> setVolume(double volume) =>
       _castGuarded(() => _sender.setVolume(volume.clamp(0.0, 1.0)));
 
-  Future<void> next() => _remoteGuarded((generation) async {
-    final snapshot = _castSnapshot;
+  Future<void> next() {
+    final pending = _pendingNaturalCompletion;
+    if (_pendingNaturalCompletionLoadId == _currentLoadId && pending != null) {
+      return pending;
+    }
+    return _remoteGuarded(
+      (generation) => _advanceToNext(generation: generation),
+    );
+  }
+
+  Future<void> _advanceToNext({
+    required int generation,
+    bool natural = false,
+    String? expectedOccurrenceId,
+  }) async {
+    var snapshot = _castSnapshot;
     if (snapshot == null) {
+      if (natural) return;
       throw const CastException('Nothing is casting right now.');
+    }
+    if (natural && snapshot.queue.currentEntry?.id != expectedOccurrenceId) {
+      return;
     }
     var queue = snapshot.queue;
     if (queue.loadedEntries.isEmpty) {
-      await _sender.next();
+      if (natural) {
+        _finishNaturalQueue(snapshot);
+      } else {
+        await _sender.next();
+      }
       return;
     }
-    // Extend the queue model near the tail before resolving the next entry.
-    if (queue.hasUnloadedTail &&
+
+    final repeatCurrent = natural && snapshot.repeatMode == LoopMode.one;
+    if (!repeatCurrent &&
+        queue.hasUnloadedTail &&
         queue.currentIndex != null &&
         queue.loadedEntries.length - queue.currentIndex! <=
             _queueExtensionThreshold) {
       queue = queue.extend();
-      _castSnapshot = snapshot.copyWith(queue: queue);
+      snapshot = snapshot.copyWith(queue: queue);
+      _castSnapshot = snapshot;
     }
-    final at = (queue.currentIndex ?? -1) + 1;
-    if (at >= queue.loadedEntries.length) {
-      throw const CastException('You\u2019re at the end of the queue.');
+
+    final int targetIndex;
+    if (repeatCurrent) {
+      targetIndex = queue.currentIndex ?? 0;
+    } else {
+      final at = (queue.currentIndex ?? -1) + 1;
+      if (at < queue.loadedEntries.length) {
+        targetIndex = at;
+      } else if (natural && snapshot.repeatMode == LoopMode.all) {
+        if (queue.windowStart > 0) {
+          queue = QueueState.restore(
+            queue.collectionTracks,
+            index: 0,
+            shuffle: queue.shuffle,
+            newId: _newCastId,
+          );
+          snapshot = snapshot.copyWith(queue: queue);
+          _castSnapshot = snapshot;
+        }
+        targetIndex = 0;
+      } else if (natural) {
+        _finishNaturalQueue(snapshot);
+        return;
+      } else {
+        throw const CastException('You\u2019re at the end of the queue.');
+      }
     }
+
+    final target = queue.loadedEntries[targetIndex];
     await _selectRemoteEntry(
       candidate: queue,
-      targetIndex: at,
+      targetIndex: targetIndex,
       position: Duration.zero,
       autoplay: true,
       generation: generation,
     );
-  });
+    if (generation != _generation ||
+        _castSnapshot?.queue.currentEntry?.id != target.id) {
+      return;
+    }
+  }
+
+  void _finishNaturalQueue(PlaybackSnapshot snapshot) {
+    final position = _remote.position;
+    _castSnapshot = snapshot.copyWith(position: position, playing: false);
+    _recoveryPosition = position;
+    _recoveryPlaying = false;
+    _safeNotify();
+  }
 
   Future<void> previous() => _remoteGuarded((generation) async {
     // Mirror local behavior: restart the track when well into it.
@@ -919,6 +1054,8 @@ class CastController extends ChangeNotifier {
 
   String _newCastId() => 'cast-${_castIds++}';
 
+  String _newCastLoadId() => 'cast-load-$_generation-${_castLoadSequence++}';
+
   Future<void> _remoteGuarded(Future<void> Function(int generation) action) =>
       _enqueue((generation) async {
         if (_ownership != CastOwnership.remote) {
@@ -1003,10 +1140,12 @@ class CastController extends ChangeNotifier {
     if (generation != _generation) return;
     _connection = CastConnectionState.disconnected;
     _connectedDevice = null;
+    _currentLoadId = null;
     if (_session == null || snapshot == null) {
       // Account invalidation discards the snapshot and never restores it.
       _castSnapshot = null;
       _localSnapshot = null;
+      _lastCompletedLoadId = null;
       _playback.setCastingActive(false);
       _setOwnership(CastOwnership.local);
       _safeNotify();
@@ -1027,6 +1166,7 @@ class CastController extends ChangeNotifier {
     await _playback.reportCurrentState();
     _castSnapshot = null;
     _localSnapshot = null;
+    _lastCompletedLoadId = null;
     _error = null;
     _safeNotify();
   }

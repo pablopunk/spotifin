@@ -16,6 +16,8 @@ import 'cast_device.dart';
 import 'cast_media.dart';
 import 'cast_sender.dart';
 
+const _spotifinCastLoadIdKey = 'spotifinCastLoadId';
+
 /// Real [CastSender] backed by the Google Cast SDK via `flutter_chrome_cast`.
 ///
 /// iOS uses the official Cast SDK (~4.8.4 XCFramework with arm64 simulator
@@ -145,9 +147,18 @@ class ChromeCastSender implements CastSender {
     _mediaSub ??= GoogleCastRemoteMediaClient.instance.mediaStatusStream.listen(
       (status) {
         if (status == null) return;
-        _remote = _remote.copyWith(
+        final customData = status.mediaInformation?.customData;
+        final loadId = customData?[_spotifinCastLoadIdKey];
+        final occurrenceId = customData?['playlistItemId'];
+        _remote = CastRemoteState(
           playerState: _mapPlayer(status.playerState),
+          position: _remote.position,
           duration: status.mediaInformation?.duration,
+          volume: _remote.volume,
+          finishReason: _mapFinishReason(status),
+          occurrenceId: occurrenceId is String ? occurrenceId : null,
+          loadId: loadId is String ? loadId : null,
+          mediaSessionId: status.mediaSessionID,
         );
         if (!_remoteController.isClosed) _remoteController.add(_remote);
       },
@@ -207,6 +218,17 @@ class ChromeCastSender implements CastSender {
         CastMediaPlayerState.idle => CastPlayerState.idle,
         CastMediaPlayerState.unknown => CastPlayerState.unknown,
       };
+
+  static CastFinishReason? _mapFinishReason(GoggleCastMediaStatus status) {
+    if (_mapPlayer(status.playerState) != CastPlayerState.idle) return null;
+    return switch (status.idleReason) {
+      GoogleCastMediaIdleReason.finished => CastFinishReason.finished,
+      GoogleCastMediaIdleReason.cancelled => CastFinishReason.cancelled,
+      GoogleCastMediaIdleReason.interrupted => CastFinishReason.interrupted,
+      GoogleCastMediaIdleReason.error => CastFinishReason.error,
+      GoogleCastMediaIdleReason.none || null => CastFinishReason.unknown,
+    };
+  }
 
   @override
   Future<void> startDiscovery() async {
@@ -295,18 +317,23 @@ class ChromeCastSender implements CastSender {
   Future<void> loadSingle(
     CastTrackPayload payload, {
     required Duration position,
+    required String loadId,
     bool autoplay = true,
   }) async {
     _guardSupported();
     _guardConnected();
     try {
+      final customData = <String, dynamic>{
+        ...payload.customData,
+        _spotifinCastLoadIdKey: loadId,
+      };
       final info = GoogleCastMediaInformation(
         contentId: payload.contentId,
         streamType: CastMediaStreamType.buffered,
         contentUrl: payload.contentUrl,
         contentType: payload.contentType,
         duration: payload.duration,
-        customData: payload.customData,
+        customData: customData,
         metadata: GoogleCastMusicMediaMetadata(
           title: payload.title,
           artist: payload.artist,
@@ -326,14 +353,23 @@ class ChromeCastSender implements CastSender {
         info,
         autoPlay: autoplay,
         playPosition: position,
-        customData: payload.customData,
+        customData: customData,
       );
-      _remote = _remote.copyWith(
+      final mediaSessionId = _remote.loadId == loadId
+          ? _remote.mediaSessionId
+          : null;
+      _remote = CastRemoteState(
         position: position,
         duration: payload.duration,
         playerState: autoplay
             ? CastPlayerState.playing
             : CastPlayerState.paused,
+        volume: _remote.volume,
+        occurrenceId: payload.customData['playlistItemId'] is String
+            ? payload.customData['playlistItemId'] as String
+            : null,
+        loadId: loadId,
+        mediaSessionId: mediaSessionId,
       );
       if (!_remoteController.isClosed) _remoteController.add(_remote);
     } catch (error) {

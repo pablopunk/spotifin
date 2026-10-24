@@ -12,6 +12,9 @@ enum CastConnectionState { disconnected, connecting, connected }
 /// Remote player state mirrored from the receiver.
 enum CastPlayerState { idle, playing, paused, buffering, unknown }
 
+/// Why the receiver entered its idle state.
+enum CastFinishReason { finished, cancelled, interrupted, error, unknown }
+
 /// Snapshot of the receiver transport state.
 class CastRemoteState {
   const CastRemoteState({
@@ -19,12 +22,24 @@ class CastRemoteState {
     this.position = Duration.zero,
     this.duration,
     this.volume = 1,
+    this.finishReason,
+    this.occurrenceId,
+    this.loadId,
+    this.mediaSessionId,
   });
 
   final CastPlayerState playerState;
   final Duration position;
   final Duration? duration;
   final double volume;
+  final CastFinishReason? finishReason;
+
+  /// Queue occurrence and sender load that produced this receiver status.
+  final String? occurrenceId;
+  final String? loadId;
+
+  /// Native Cast media session identity, when supplied by the SDK.
+  final int? mediaSessionId;
 
   bool get isPlaying => playerState == CastPlayerState.playing;
 
@@ -33,11 +48,20 @@ class CastRemoteState {
     Duration? position,
     Duration? duration,
     double? volume,
+    CastFinishReason? finishReason,
+    String? occurrenceId,
+    String? loadId,
+    int? mediaSessionId,
   }) => CastRemoteState(
     playerState: playerState ?? this.playerState,
     position: position ?? this.position,
     duration: duration ?? this.duration,
     volume: volume ?? this.volume,
+    // Completion is an event, so ordinary transport updates must clear it.
+    finishReason: finishReason,
+    occurrenceId: occurrenceId,
+    loadId: loadId,
+    mediaSessionId: mediaSessionId,
   );
 }
 
@@ -76,6 +100,7 @@ abstract interface class CastSender {
   Future<void> loadSingle(
     CastTrackPayload payload, {
     required Duration position,
+    required String loadId,
     bool autoplay = true,
   });
 

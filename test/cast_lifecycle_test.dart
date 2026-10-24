@@ -148,6 +148,7 @@ class LifecycleSender implements CastSender {
   Future<void> loadSingle(
     CastTrackPayload payload, {
     required Duration position,
+    required String loadId,
     bool autoplay = true,
   }) async {
     loads.add(payload);

@@ -66,6 +66,7 @@ class FakeSender implements CastSender {
   bool failDisconnect = false;
   final loads = <CastTrackPayload>[];
   final loadPositions = <Duration>[];
+  final loadedStates = <CastRemoteState>[];
   final calls = <String>[];
 
   void emitDevices(List<CastDevice> devices) {
@@ -85,6 +86,24 @@ class FakeSender implements CastSender {
   void emitRemote(CastRemoteState state) {
     _remote = state;
     remoteController.add(state);
+  }
+
+  void emitCompletionForLoad(
+    int index, {
+    CastFinishReason reason = CastFinishReason.finished,
+  }) {
+    final loaded = loadedStates[index];
+    emitRemote(
+      CastRemoteState(
+        playerState: CastPlayerState.idle,
+        position: loaded.duration ?? Duration.zero,
+        duration: loaded.duration,
+        finishReason: reason,
+        occurrenceId: loaded.occurrenceId,
+        loadId: loaded.loadId,
+        mediaSessionId: loaded.mediaSessionId,
+      ),
+    );
   }
 
   @override
@@ -149,6 +168,7 @@ class FakeSender implements CastSender {
   Future<void> loadSingle(
     CastTrackPayload payload, {
     required Duration position,
+    required String loadId,
     bool autoplay = true,
   }) async {
     loads.add(payload);
@@ -161,7 +181,11 @@ class FakeSender implements CastSender {
       position: position,
       duration: payload.duration,
       playerState: autoplay ? CastPlayerState.playing : CastPlayerState.paused,
+      occurrenceId: payload.customData['playlistItemId'] as String?,
+      loadId: loadId,
+      mediaSessionId: loadedStates.length + 1,
     );
+    loadedStates.add(_remote);
     remoteController.add(_remote);
   }
 
@@ -219,13 +243,17 @@ class FakeSender implements CastSender {
 }
 
 class FakePlayback implements CastPlaybackSource {
-  FakePlayback({required List<Track> queue, int index = 0})
-    : _queue = List.of(queue),
-      // ignore: prefer_initializing_formals
-      _index = index;
+  FakePlayback({
+    required List<Track> queue,
+    int index = 0,
+    this.repeatMode = LoopMode.off,
+  }) : _queue = List.of(queue),
+       // ignore: prefer_initializing_formals
+       _index = index;
 
   List<Track> _queue;
   int _index;
+  final LoopMode repeatMode;
   Duration _position = const Duration(seconds: 12);
   bool castingActive = false;
   bool _playing = true;
@@ -301,7 +329,7 @@ class FakePlayback implements CastPlaybackSource {
     ),
     position: _position,
     playing: _playing,
-    repeatMode: LoopMode.off,
+    repeatMode: repeatMode,
     history: const [],
   );
 
@@ -344,6 +372,227 @@ const livingRoom = CastDevice(id: 'room', friendlyName: 'Living Room');
 Future<void> pump() => Future<void>.delayed(Duration.zero);
 
 void main() {
+  test('natural completion advances to the next queued track', () async {
+    final playback = FakePlayback(queue: [track('a'), track('b')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    expect(cast.remoteTrack?.id, 'a');
+    expect(sender.loadedStates.single.occurrenceId, cast.remoteEntryId);
+
+    sender.emitCompletionForLoad(0);
+    await pump();
+
+    expect(cast.remoteTrack?.id, 'b');
+    expect(sender.loads, hasLength(2));
+  });
+
+  test('duplicate natural completion advances only once', () async {
+    final playback = FakePlayback(queue: [track('a'), track('b'), track('c')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    sender.emitCompletionForLoad(0);
+    sender.emitCompletionForLoad(0);
+    await pump();
+    await pump();
+
+    expect(cast.remoteTrack?.id, 'b');
+    expect(sender.loads, hasLength(2));
+  });
+
+  test('manual next racing completion advances one occurrence', () async {
+    final playback = FakePlayback(queue: [track('a'), track('b'), track('c')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    sender.emitCompletionForLoad(0);
+    await cast.next();
+    await pump();
+
+    expect(cast.remoteTrack?.id, 'b');
+    expect(sender.loads, hasLength(2));
+  });
+
+  test(
+    'completion from a prior load cannot advance the current item',
+    () async {
+      final playback = FakePlayback(
+        queue: [track('a'), track('b'), track('c')],
+      );
+      final sender = FakeSender(devices: [livingRoom]);
+      final cast = controller(playback: playback, sender: sender);
+      addTearDown(sender.dispose);
+      addTearDown(cast.dispose);
+
+      await cast.connect(livingRoom);
+      await cast.next();
+      sender.emitCompletionForLoad(0);
+      await pump();
+
+      expect(cast.remoteTrack?.id, 'b');
+      expect(sender.loads, hasLength(2));
+    },
+  );
+
+  test('pause and non-natural idle reasons do not advance', () async {
+    final playback = FakePlayback(queue: [track('a'), track('b')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    await cast.pause();
+    await pump();
+    for (final reason in [
+      CastFinishReason.cancelled,
+      CastFinishReason.interrupted,
+      CastFinishReason.error,
+      CastFinishReason.unknown,
+    ]) {
+      sender.emitCompletionForLoad(0, reason: reason);
+      await pump();
+    }
+    sender.emitRemote(
+      CastRemoteState(
+        playerState: CastPlayerState.idle,
+        occurrenceId: sender.loadedStates.single.occurrenceId,
+        loadId: sender.loadedStates.single.loadId,
+        mediaSessionId: sender.loadedStates.single.mediaSessionId,
+      ),
+    );
+    await pump();
+
+    expect(cast.remoteTrack?.id, 'a');
+    expect(sender.loads, hasLength(1));
+  });
+
+  test('natural completion at queue end stops without an error', () async {
+    final playback = FakePlayback(queue: [track('a')]);
+    final sender = FakeSender(devices: [livingRoom]);
+    final cast = controller(playback: playback, sender: sender);
+    addTearDown(sender.dispose);
+    addTearDown(cast.dispose);
+
+    await cast.connect(livingRoom);
+    sender.emitCompletionForLoad(0);
+    await pump();
+
+    expect(cast.remoteTrack?.id, 'a');
+    expect(cast.remotePlaying, isFalse);
+    expect(cast.error, isNull);
+    expect(sender.loads, hasLength(1));
+  });
+
+  test('natural completion follows repeat one and repeat all', () async {
+    final repeatOnePlayback = FakePlayback(
+      queue: [track('a'), track('b')],
+      repeatMode: LoopMode.one,
+    );
+    final repeatOneSender = FakeSender(devices: [livingRoom]);
+    final repeatOne = controller(
+      playback: repeatOnePlayback,
+      sender: repeatOneSender,
+    );
+    addTearDown(repeatOneSender.dispose);
+    addTearDown(repeatOne.dispose);
+
+    await repeatOne.connect(livingRoom);
+    final firstOccurrence = repeatOneSender.loadedStates.single.occurrenceId;
+    repeatOneSender.emitCompletionForLoad(0);
+    await pump();
+
+    expect(repeatOne.remoteTrack?.id, 'a');
+    expect(repeatOneSender.loads, hasLength(2));
+    expect(repeatOneSender.loadedStates.last.occurrenceId, firstOccurrence);
+    expect(
+      repeatOneSender.loadedStates.last.loadId,
+      isNot(repeatOneSender.loadedStates.first.loadId),
+    );
+
+    final repeatAllPlayback = FakePlayback(
+      queue: [track('a'), track('b')],
+      repeatMode: LoopMode.all,
+    );
+    final repeatAllSender = FakeSender(devices: [livingRoom]);
+    final repeatAll = controller(
+      playback: repeatAllPlayback,
+      sender: repeatAllSender,
+    );
+    addTearDown(repeatAllSender.dispose);
+    addTearDown(repeatAll.dispose);
+
+    await repeatAll.connect(livingRoom);
+    repeatAllSender.emitCompletionForLoad(0);
+    await pump();
+    repeatAllSender.emitCompletionForLoad(1);
+    await pump();
+
+    expect(repeatAll.remoteTrack?.id, 'a');
+    expect(repeatAll.remoteIndex, 0);
+    expect(repeatAllSender.loads, hasLength(3));
+  });
+
+  test(
+    'failed automatic load restores receiver without local playback',
+    () async {
+      final playback = FakePlayback(queue: [track('a'), track('b')]);
+      final sender = FakeSender(devices: [livingRoom]);
+      final cast = controller(playback: playback, sender: sender);
+      addTearDown(sender.dispose);
+      addTearDown(cast.dispose);
+
+      await cast.connect(livingRoom);
+      sender.failLoadCount = 2;
+      sender.emitCompletionForLoad(0);
+      await pump();
+
+      expect(cast.remoteTrack?.id, 'a');
+      expect(cast.ownership, CastOwnership.remote);
+      expect(playback.playCalls, 0);
+      expect(sender.loads, hasLength(4));
+      expect(cast.error, contains('Receiver rejected this track.'));
+    },
+  );
+
+  test(
+    'completion after disconnect or account invalidation is ignored',
+    () async {
+      final playback = FakePlayback(queue: [track('a'), track('b')]);
+      final sender = FakeSender(devices: [livingRoom]);
+      final cast = controller(playback: playback, sender: sender);
+      addTearDown(sender.dispose);
+      addTearDown(cast.dispose);
+
+      await cast.connect(livingRoom);
+      await cast.disconnect();
+      sender.emitCompletionForLoad(0);
+      await pump();
+      expect(cast.ownership, CastOwnership.local);
+      expect(sender.loads, hasLength(1));
+
+      await cast.connect(livingRoom);
+      sender.emitCompletionForLoad(1);
+      final signOut = cast.configure(null);
+      await signOut;
+      await pump();
+
+      expect(cast.ownership, CastOwnership.local);
+      expect(cast.castQueue, isEmpty);
+      expect(sender.loads, hasLength(2));
+    },
+  );
+
   test('discovers, connects, and hands off with queue preserved', () async {
     final playback = FakePlayback(
       queue: [track('a'), track('b'), track('c')],
