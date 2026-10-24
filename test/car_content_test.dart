@@ -10,6 +10,7 @@ Track makeTrack({
   String album = 'Album',
   String? albumId,
   String artist = 'Artist',
+  String artistItems = '[]',
   bool favorite = false,
   DateTime? lastPlayed,
   DateTime? dateCreated,
@@ -20,7 +21,7 @@ Track makeTrack({
   album: album,
   albumId: albumId,
   artist: artist,
-  artistItems: '[]',
+  artistItems: artistItems,
   labels: '[]',
   durationTicks: 0,
   container: 'mp3',
@@ -95,6 +96,95 @@ void main() {
     final groups = groupArtists(tracks);
     expect(groups.map((group) => group.title), ['Miles', 'Coltrane']);
     expect(groups.first.trackCount, 2);
+  });
+
+  test('artist groups include collaborations and deduplicate credits', () {
+    final tracks = [
+      makeTrack(id: 'alice-solo', artist: 'Alice'),
+      makeTrack(id: 'bob-solo', artist: 'Bob'),
+      makeTrack(
+        id: 'collaboration',
+        artist: 'Alice, Bob, Unknown artist',
+        artistItems: jsonEncode([
+          {'id': 'alice', 'name': 'Alice'},
+          {'id': 'bob', 'name': 'Bob'},
+          {'id': 'unknown', 'name': 'Unknown artist'},
+        ]),
+      ),
+      makeTrack(
+        id: 'duplicate-credits',
+        artist: 'Alice, Bob',
+        artistItems: jsonEncode([
+          {'id': 'alice', 'name': 'Alice'},
+          {'id': 'alice-feature', 'name': 'Alice'},
+          {'id': 'bob', 'name': 'Bob'},
+          {'id': 'bob-feature', 'name': 'Bob'},
+        ]),
+      ),
+      makeTrack(id: 'fallback', artist: 'Cara, Dana'),
+    ];
+
+    final groups = groupArtists(tracks);
+
+    expect(groups.map((group) => group.title), [
+      'Alice',
+      'Bob',
+      'Cara',
+      'Dana',
+    ]);
+    expect(groups.map((group) => group.trackCount), [3, 3, 1, 1]);
+  });
+
+  test('artist selection includes collaborative tracks and sorts by name', () {
+    final aliceSolo = makeTrack(
+      id: 'alice-solo',
+      name: 'Alice Solo',
+      artist: 'Alice',
+    );
+    final bobSolo = makeTrack(id: 'bob-solo', name: 'Bob Solo', artist: 'Bob');
+    final collaboration = makeTrack(
+      id: 'collaboration',
+      name: 'Collaboration',
+      artist: 'Alice, Bob',
+      artistItems: jsonEncode([
+        {'id': 'alice', 'name': 'Alice'},
+        {'id': 'bob', 'name': 'Bob'},
+      ]),
+    );
+    final unrelated = makeTrack(id: 'unrelated', artist: 'Carol');
+    final tracks = [unrelated, collaboration, bobSolo, aliceSolo];
+
+    expect(tracksForArtist(tracks, ' Alice ').map((track) => track.id), [
+      'alice-solo',
+      'collaboration',
+    ]);
+    expect(tracksForArtist(tracks, 'Bob').map((track) => track.id), [
+      'bob-solo',
+      'collaboration',
+    ]);
+    expect(tracksForArtist(tracks, 'Alice').contains(unrelated), isFalse);
+  });
+
+  test('artist selection splits comma fallback when artistItems are empty', () {
+    final fallback = makeTrack(id: 'fallback', artist: 'Cara, Dana');
+
+    expect(tracksForArtist([fallback], 'Cara'), [fallback]);
+    expect(tracksForArtist([fallback], 'Dana'), [fallback]);
+  });
+
+  test('artist groups keep popularity order and respect the limit', () {
+    final tracks = [
+      makeTrack(id: 'beta-1', artist: 'Beta'),
+      makeTrack(id: 'alpha-1', artist: 'Alpha'),
+      makeTrack(id: 'beta-2', artist: 'Beta'),
+      makeTrack(id: 'gamma-1', artist: 'Gamma'),
+      makeTrack(id: 'alpha-2', artist: 'Alpha'),
+    ];
+
+    final groups = groupArtists(tracks, limit: 2);
+
+    expect(groups.map((group) => group.title), ['Alpha', 'Beta']);
+    expect(groups.map((group) => group.trackCount), [2, 2]);
   });
 
   test('album groups key on albumId when present', () {

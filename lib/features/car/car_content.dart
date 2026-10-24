@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../services/search/search_text.dart';
 
 import '../../storage/database.dart';
+import '../../storage/track_artists.dart';
 import 'car_media_ids.dart';
 
 enum CarSection { recents, favorites, playlists, artists, songs }
@@ -99,9 +100,15 @@ List<Track> buildRecentlyAdded(List<Track> tracks, {int limit = 50}) {
 List<CarGroup> groupArtists(List<Track> tracks, {int limit = 50}) {
   final counts = <String, int>{};
   for (final track in tracks) {
-    final name = track.artist.trim();
-    if (name.isEmpty || name == 'Unknown artist') continue;
-    counts[name] = (counts[name] ?? 0) + 1;
+    final names = <String>{};
+    for (final credit in track.artistCredits) {
+      final name = credit.name.trim();
+      if (name.isEmpty || name == 'Unknown artist') continue;
+      names.add(name);
+    }
+    for (final name in names) {
+      counts[name] = (counts[name] ?? 0) + 1;
+    }
   }
   final groups =
       counts.entries
@@ -149,8 +156,9 @@ int _compareGroups(CarGroup a, CarGroup b) {
 }
 
 List<Track> tracksForArtist(List<Track> tracks, String artistName) {
+  final artist = TrackArtist(name: artistName.trim());
   final matches =
-      tracks.where((track) => track.artist.trim() == artistName.trim()).toList()
+      tracks.where((track) => includesArtist(track, artist)).toList()
         ..sort((a, b) => a.name.compareTo(b.name));
   return matches;
 }
