@@ -59,9 +59,9 @@ class SpotifinSidebar extends StatelessWidget {
           if (footer != null)
             Padding(
               padding: EdgeInsets.fromLTRB(
-                extended ? SpotifinSpacing.md : 0,
+                extended ? 20 : 0,
                 0,
-                extended ? SpotifinSpacing.md : 0,
+                extended ? 20 : 0,
                 SpotifinSpacing.sm,
               ),
               child: Align(
