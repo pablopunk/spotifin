@@ -11,6 +11,7 @@ import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../common/native_app_link.dart';
 import '../coverflow/coverflow_overlay.dart';
 import '../coverflow/coverflow_controller.dart';
 import '../downloads/downloads_screen.dart';
@@ -243,7 +244,16 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                     extendedContent: SidebarPlaylists(
                       onSelected: _openPlaylist,
                     ),
-                    footer: const RemoteDeviceButton(),
+                    footer: Flex(
+                      direction: width >= SpotifinBreakpoints.extendedRail
+                          ? Axis.horizontal
+                          : Axis.vertical,
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        RemoteDeviceButton(),
+                        if (kIsWeb) NativeAppLink(iconOnly: true),
+                      ],
+                    ),
                   ),
                   Expanded(
                     child: Row(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -7,6 +8,7 @@ import '../../app/theme.dart';
 import '../common/brand_logo.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../common/native_app_link.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -144,6 +146,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               state.syncing ? 'CONNECTING…' : 'CONNECT',
                             ),
                           ),
+                          if (kIsWeb) ...[
+                            const SizedBox(height: SpotifinSpacing.sm),
+                            const Center(child: NativeAppLink()),
+                          ],
                         ],
                       ),
                     ),
