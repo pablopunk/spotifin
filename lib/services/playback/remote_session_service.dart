@@ -19,13 +19,16 @@ class RemoteSessionService extends ChangeNotifier {
   RemoteSessionService(
     this._client,
     RemotePlayback playback,
-    AppDatabase database,
-  ) : _commands = RemoteCommandHandler(playback, database),
-      _handoff = PlaybackHandoff(_client, playback, database);
+    AppDatabase database, {
+    WebSocketChannel Function(Uri)? socketConnector,
+  }) : _commands = RemoteCommandHandler(playback, database),
+       _handoff = PlaybackHandoff(_client, playback, database),
+       _socketConnector = socketConnector ?? WebSocketChannel.connect;
 
   final JellyfinClient _client;
   final RemoteCommandHandler _commands;
   final PlaybackHandoff _handoff;
+  final WebSocketChannel Function(Uri) _socketConnector;
   JellyfinSession? _session;
   WebSocketChannel? _channel;
   StreamSubscription<Object?>? _socketSubscription;
@@ -57,20 +60,22 @@ class RemoteSessionService extends ChangeNotifier {
       try {
         await _client.advertiseRemoteCapabilities(session);
       } catch (error) {
+        if (!_isCurrent(generation, session)) return;
         _error = redactSecrets(error);
       }
+      if (!_isCurrent(generation, session)) return;
       await refresh();
-      if (generation != _generation) return;
+      if (!_isCurrent(generation, session)) return;
       unawaited(_connect(generation));
       _pollTimer = Timer.periodic(
         const Duration(seconds: 15),
         (_) => unawaited(refresh()),
       );
     } catch (error) {
-      if (generation != _generation) return;
+      if (!_isCurrent(generation, session)) return;
       _error = redactSecrets(error);
     } finally {
-      if (generation == _generation) {
+      if (_isCurrent(generation, session)) {
         _loading = false;
         notifyListeners();
       }
@@ -80,11 +85,15 @@ class RemoteSessionService extends ChangeNotifier {
   Future<void> refresh() async {
     final session = _session;
     if (session == null) return;
+    final generation = _generation;
     try {
-      _sessions = await _client.fetchSessions(session);
+      final sessions = await _client.fetchSessions(session);
+      if (!_isCurrent(generation, session)) return;
+      _sessions = sessions;
       _error = null;
       notifyListeners();
     } catch (error) {
+      if (!_isCurrent(generation, session)) return;
       _error = redactSecrets(error);
       notifyListeners();
     }
@@ -174,9 +183,9 @@ class RemoteSessionService extends ChangeNotifier {
     final session = _session;
     if (session == null || generation != _generation) return;
     try {
-      final channel = WebSocketChannel.connect(_client.webSocketUri(session));
+      final channel = _socketConnector(_client.webSocketUri(session));
       await channel.ready.timeout(const Duration(seconds: 10));
-      if (generation != _generation) {
+      if (!_isCurrent(generation, session)) {
         await channel.sink.close(socket_status.goingAway);
         return;
       }
@@ -192,7 +201,7 @@ class RemoteSessionService extends ChangeNotifier {
       );
       notifyListeners();
     } catch (error) {
-      if (generation != _generation) return;
+      if (!_isCurrent(generation, session)) return;
       _error = 'Live device updates are unavailable: ${redactSecrets(error)}';
       _socketClosed(generation);
     }
@@ -221,8 +230,12 @@ class RemoteSessionService extends ChangeNotifier {
       final data = message['Data'];
       if (data is! Map<String, dynamic>) return;
       _commandQueue = _commandQueue
-          .then((_) => _commands.handle(type, data))
+          .then<void>((_) async {
+            if (generation != _generation) return;
+            await _commands.handle(type, data);
+          })
           .catchError((Object error) {
+            if (generation != _generation) return;
             _error = 'A remote command failed: ${redactSecrets(error)}';
             notifyListeners();
           });
@@ -277,8 +290,12 @@ class RemoteSessionService extends ChangeNotifier {
     try {
       await _client.advertiseRemoteCapabilities(session);
     } catch (_) {}
+    if (!_isCurrent(generation, session)) return;
     await _connect(generation);
   }
+
+  bool _isCurrent(int generation, JellyfinSession session) =>
+      generation == _generation && identical(_session, session);
 
   Future<void> clear() async {
     _generation++;
