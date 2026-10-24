@@ -14,7 +14,10 @@ import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/downloads/download_service.dart';
 import 'package:spotifin/services/jellyfin/account_scope.dart';
 import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
+import 'package:spotifin/services/jellyfin/library_cache_owner_store.dart';
+import 'package:spotifin/services/jellyfin/secure_storage_config.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
+import 'package:spotifin/services/jellyfin/session_store.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
 import 'package:spotifin/services/playback/remote_session_service.dart';
 import 'package:spotifin/storage/database.dart';
@@ -44,6 +47,174 @@ class _MockDownload extends Mock implements DownloadService {}
 class _MockRemote extends Mock implements RemoteSessionService {}
 
 class _MockCast extends Mock implements CastController {}
+
+class _FailingClearDatabase extends AppDatabase {
+  _FailingClearDatabase(super.executor) : super.forTesting();
+
+  @override
+  Future<void> clearAccountData() async {
+    throw StateError('database clear failed');
+  }
+}
+
+class _FailingOwnerStore extends LibraryCacheOwnerStore {
+  @override
+  Future<void> clear() async {
+    throw StateError('owner clear failed');
+  }
+}
+
+class _DelegatingSessionStore extends SessionStore {
+  _DelegatingSessionStore(this.delegate) : super(buildSessionSecureStorage());
+
+  final SessionStore delegate;
+
+  @override
+  Future<JellyfinSession?> load() => delegate.load();
+
+  @override
+  Future<String> getDeviceId() => delegate.getDeviceId();
+
+  @override
+  Future<void> save(JellyfinSession session) => delegate.save(session);
+
+  @override
+  Future<void> clear() => delegate.clear();
+}
+
+class _FailingSessionStore extends _DelegatingSessionStore {
+  _FailingSessionStore(super.delegate);
+
+  int clearAttempts = 0;
+
+  @override
+  Future<void> clear() async {
+    clearAttempts++;
+    throw StateError('token=credential-secret');
+  }
+}
+
+class _ObservedSessionStore extends _DelegatingSessionStore {
+  _ObservedSessionStore(super.delegate);
+
+  final _savedTokens = <String>{};
+  final _saveWaiters = <String, Completer<void>>{};
+
+  Future<void> waitForSave(String token) {
+    if (_savedTokens.contains(token)) return Future<void>.value();
+    return (_saveWaiters[token] ??= Completer<void>()).future;
+  }
+
+  @override
+  Future<void> save(JellyfinSession session) async {
+    await super.save(session);
+    _savedTokens.add(session.accessToken);
+    final waiter = _saveWaiters[session.accessToken];
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+  }
+}
+
+class _LogoutHarness {
+  const _LogoutHarness({
+    required this.database,
+    required this.scope,
+    required this.client,
+    required this.container,
+    required this.sessionStore,
+    required this.ownerStore,
+  });
+
+  final AppDatabase database;
+  final AccountScope scope;
+  final JellyfinClient client;
+  final ProviderContainer container;
+  final SessionStore sessionStore;
+  final LibraryCacheOwnerStore ownerStore;
+
+  AppController get controller =>
+      container.read(appControllerProvider.notifier);
+
+  Future<void> seedSession() => scope.exclusive(() async {
+    await sessionStore.save(_sessionA);
+    await ownerStore.saveOwner(_sessionA);
+  });
+
+  Future<void> close() async {
+    container.dispose();
+    scope.dispose();
+    client.close();
+    await database.close();
+  }
+}
+
+Future<_LogoutHarness> _createLogoutHarness({
+  AppDatabase? database,
+  _MockDownload? downloads,
+  _MockRemote? remote,
+  SessionStore? sessionStore,
+  LibraryCacheOwnerStore? ownerStore,
+  String accessToken = 'token-a',
+  bool resetPersistence = true,
+}) async {
+  if (resetPersistence) {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+  }
+  final actualDatabase =
+      database ?? AppDatabase.forTesting(NativeDatabase.memory());
+  final scope = AccountScope();
+  final playback = _MockPlayback();
+  final actualDownloads = downloads ?? _MockDownload();
+  final actualRemote = remote ?? _MockRemote();
+  final cast = _MockCast();
+  _stubMocks(playback, actualDownloads, actualRemote, cast);
+  final client = JellyfinClient(
+    httpClient: MockClient((request) async {
+      if (request.url.path == '/System/Info/Public') {
+        return http.Response('{"Id":"server"}', 200);
+      }
+      if (request.url.path == '/Users/AuthenticateByName') {
+        return http.Response(
+          '{"AccessToken":"$accessToken","User":{"Id":"user-a","Name":"User A"}}',
+          200,
+        );
+      }
+      if (request.url.path == '/Users/Me') {
+        return http.Response(
+          '{"Id":"user-a","Name":"User A","ServerId":"server"}',
+          200,
+        );
+      }
+      if (request.url.path.contains('/Items')) {
+        return http.Response('{"Items":[],"TotalRecordCount":0}', 200);
+      }
+      return http.Response('', 204);
+    }),
+  );
+  final container = ProviderContainer(
+    overrides: [
+      databaseProvider.overrideWithValue(actualDatabase),
+      jellyfinClientProvider.overrideWithValue(client),
+      accountScopeProvider.overrideWithValue(scope),
+      playbackProvider.overrideWithValue(playback),
+      downloadProvider.overrideWithValue(actualDownloads),
+      remoteSessionProvider.overrideWithValue(actualRemote),
+      castControllerProvider.overrideWithValue(cast),
+      if (sessionStore != null)
+        sessionStoreProvider.overrideWithValue(sessionStore),
+      if (ownerStore != null)
+        libraryCacheOwnerStoreProvider.overrideWithValue(ownerStore),
+    ],
+  );
+  return _LogoutHarness(
+    database: actualDatabase,
+    scope: scope,
+    client: client,
+    container: container,
+    sessionStore: sessionStore ?? container.read(sessionStoreProvider),
+    ownerStore: ownerStore ?? container.read(libraryCacheOwnerStoreProvider),
+  );
+}
 
 void _stubMocks(
   _MockPlayback playback,
@@ -550,5 +721,178 @@ void main() {
       expect(resumeCalls, resumesBefore);
       expect(container.read(appControllerProvider).status, AppStatus.signedOut);
     });
+  });
+
+  group('AppController logout persistence', () {
+    test(
+      'successful sign-out clears the saved session and owner marker',
+      () async {
+        final harness = await _createLogoutHarness();
+        addTearDown(harness.close);
+        await harness.seedSession();
+
+        await harness.controller.signOut().timeout(const Duration(seconds: 5));
+
+        expect(await harness.sessionStore.load(), isNull);
+        expect(await harness.ownerStore.load(), isNull);
+        expect(
+          harness.container.read(appControllerProvider).status,
+          AppStatus.signedOut,
+        );
+      },
+    );
+
+    test(
+      'failed account-data removal clears credentials but retains owner',
+      () async {
+        final harness = await _createLogoutHarness(
+          database: _FailingClearDatabase(NativeDatabase.memory()),
+        );
+        addTearDown(harness.close);
+        await harness.seedSession();
+
+        await harness.controller.signOut().timeout(const Duration(seconds: 5));
+        final savedAfterSignOut = await harness.sessionStore.load();
+        final retainedOwner = await harness.ownerStore.load();
+
+        final restarted = await _createLogoutHarness(resetPersistence: false);
+        addTearDown(restarted.close);
+        await restarted.controller.initialize().timeout(
+          const Duration(seconds: 5),
+        );
+        await restarted.controller
+            .refresh(force: true)
+            .timeout(const Duration(seconds: 5));
+        final restartedState = restarted.container.read(appControllerProvider);
+
+        expect(retainedOwner?.userId, 'user-a');
+        expect(savedAfterSignOut, isNull);
+        expect(restartedState.status, AppStatus.signedOut);
+        expect(restartedState.session, isNull);
+      },
+    );
+
+    test(
+      'failed owner removal clears credentials and retains owner marker',
+      () async {
+        final harness = await _createLogoutHarness(
+          ownerStore: _FailingOwnerStore(),
+        );
+        addTearDown(harness.close);
+        await harness.seedSession();
+
+        await harness.controller.signOut().timeout(const Duration(seconds: 5));
+
+        expect(await harness.sessionStore.load(), isNull);
+        expect((await harness.ownerStore.load())?.userId, 'user-a');
+      },
+    );
+
+    test('credentials are cleared before blocked download cleanup', () async {
+      final downloads = _MockDownload();
+      final clearStarted = Completer<void>();
+      final allowClear = Completer<void>();
+      final harness = await _createLogoutHarness(downloads: downloads);
+      addTearDown(harness.close);
+      when(() => downloads.clear()).thenAnswer((_) {
+        if (!clearStarted.isCompleted) clearStarted.complete();
+        return allowClear.future;
+      });
+      await harness.seedSession();
+
+      final signOut = harness.controller.signOut();
+      await clearStarted.future.timeout(const Duration(seconds: 5));
+      final savedBeforeDownloadCleanup = await harness.sessionStore.load();
+      allowClear.complete();
+      await signOut.timeout(const Duration(seconds: 5));
+
+      expect(savedBeforeDownloadCleanup, isNull);
+    });
+
+    test(
+      'remote teardown failure does not bypass credential removal',
+      () async {
+        final remote = _MockRemote();
+        final harness = await _createLogoutHarness(remote: remote);
+        addTearDown(harness.close);
+        when(() => remote.clear())
+            .thenThrow(StateError('remote teardown failed'));
+        await harness.seedSession();
+
+        Object? signOutError;
+        try {
+          await harness.controller.signOut().timeout(
+            const Duration(seconds: 5),
+          );
+        } catch (error) {
+          signOutError = error;
+        }
+        final savedAfterSignOut = await harness.sessionStore.load();
+
+        expect(savedAfterSignOut, isNull);
+        expect(signOutError, isNull);
+        expect(await harness.ownerStore.load(), isNull);
+      },
+    );
+
+    test('an older logout cannot clear a newly saved session', () async {
+      final downloads = _MockDownload();
+      final clearStarted = Completer<void>();
+      final allowClear = Completer<void>();
+      final observedStore = _ObservedSessionStore(
+        SessionStore(buildSessionSecureStorage()),
+      );
+      final harness = await _createLogoutHarness(
+        downloads: downloads,
+        sessionStore: observedStore,
+        accessToken: 'token-b',
+      );
+      addTearDown(harness.close);
+      when(() => downloads.clear()).thenAnswer((_) {
+        if (!clearStarted.isCompleted) clearStarted.complete();
+        return allowClear.future;
+      });
+      await harness.seedSession();
+      final savedTokenB = observedStore.waitForSave('token-b');
+
+      final signOut = harness.controller.signOut();
+      await clearStarted.future.timeout(const Duration(seconds: 5));
+      final signIn = harness.controller.signIn(
+        'https://music.example.com',
+        'user-a',
+        'password',
+      );
+      await savedTokenB.timeout(const Duration(seconds: 5));
+      final savedBeforeCleanupContinues = await observedStore.load();
+      allowClear.complete();
+      await signOut.timeout(const Duration(seconds: 5));
+      final signInResult = await signIn.timeout(const Duration(seconds: 5));
+      final savedAfterBothOperations = await observedStore.load();
+
+      expect(savedBeforeCleanupContinues?.accessToken, 'token-b');
+      expect(signInResult, isTrue);
+      expect(savedAfterBothOperations?.accessToken, 'token-b');
+    });
+
+    test(
+      'credential-clear failure is attempted and surfaced redacted',
+      () async {
+        final failingStore = _FailingSessionStore(
+          SessionStore(buildSessionSecureStorage()),
+        );
+        final harness = await _createLogoutHarness(sessionStore: failingStore);
+        addTearDown(harness.close);
+        await harness.seedSession();
+
+        await harness.controller.signOut().timeout(const Duration(seconds: 5));
+        final stillSaved = await failingStore.load();
+        final error = harness.container.read(appControllerProvider).error;
+
+        expect(failingStore.clearAttempts, 1);
+        expect(stillSaved?.accessToken, 'token-a');
+        expect(error, contains('<redacted>'));
+        expect(error, isNot(contains('credential-secret')));
+      },
+    );
   });
 }

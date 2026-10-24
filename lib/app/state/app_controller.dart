@@ -9,6 +9,7 @@ import '../../services/jellyfin/jellyfin_client.dart';
 import '../../services/jellyfin/library_cache_owner_store.dart';
 import '../../services/jellyfin/secure_storage_config.dart';
 import '../../services/jellyfin/session.dart';
+import '../../services/redaction.dart';
 import '../../storage/database.dart';
 import '../providers.dart';
 import 'development_login.dart';
@@ -691,6 +692,7 @@ class AppController extends Notifier<AppState> {
     // Invalidate synchronously before any awaited cleanup so late work
     // observes the new generation immediately.
     scope.invalidate();
+    final logoutGeneration = scope.generation;
     _refreshRetryTimer?.cancel();
     _refreshRetryTimer = null;
     _refreshRetryAttempt = 0;
@@ -705,7 +707,22 @@ class AppController extends Notifier<AppState> {
       clearCacheConflict: true,
     );
     await _enqueueLifecycle(() async {
-      await ref.read(remoteSessionProvider).clear();
+      // Remove credentials before resource cleanup can block or fail. This
+      // local write is fenced, but no network or native work holds the fence.
+      try {
+        await scope.exclusive(() => ref.read(sessionStoreProvider).clear());
+      } catch (error) {
+        if (scope.generation == logoutGeneration &&
+            state.status == AppStatus.signedOut &&
+            !state.syncing) {
+          state = state.copyWith(
+            error: 'Could not clear the saved session: ${redactSecrets(error)}',
+          );
+        }
+      }
+      try {
+        await ref.read(remoteSessionProvider).clear();
+      } catch (_) {}
       try {
         await ref.read(castControllerProvider).configure(null);
       } catch (_) {}
@@ -734,9 +751,6 @@ class AppController extends Notifier<AppState> {
     } catch (_) {
       return;
     }
-    try {
-      await scope.exclusive(() => ref.read(sessionStoreProvider).clear());
-    } catch (_) {}
   }
 
   /// Clears a conflicting saved library after explicit user confirmation.
