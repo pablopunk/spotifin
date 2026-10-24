@@ -38,6 +38,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<Track>? _cachedTracks;
   _HomeCatalog? _cachedCatalog;
+  final _searchController = TextEditingController();
   late final FocusNode _searchFocusNode;
   Timer? _searchDebounce;
   String _query = '';
@@ -53,6 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     if (widget.searchFocusNode == null) _searchFocusNode.dispose();
     super.dispose();
   }
@@ -176,9 +178,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: SearchBar(
+                      controller: _searchController,
                       focusNode: _searchFocusNode,
                       hintText: 'What do you want to listen to?',
                       leading: const Icon(Icons.search_rounded),
+                      trailing: [
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () {
+                              _searchController.clear();
+                              _search('');
+                              _searchFocusNode.requestFocus();
+                            },
+                          ),
+                      ],
                       onChanged: _search,
                     ),
                   ),
