@@ -57,6 +57,18 @@ class _FailingClearDatabase extends AppDatabase {
   }
 }
 
+class _CountingClearDatabase extends AppDatabase {
+  _CountingClearDatabase(super.executor) : super.forTesting();
+
+  int clearAccountDataCalls = 0;
+
+  @override
+  Future<void> clearAccountData() async {
+    clearAccountDataCalls++;
+    await super.clearAccountData();
+  }
+}
+
 class _FailingOwnerStore extends LibraryCacheOwnerStore {
   @override
   Future<void> clear() async {
@@ -153,7 +165,9 @@ Future<_LogoutHarness> _createLogoutHarness({
   _MockRemote? remote,
   SessionStore? sessionStore,
   LibraryCacheOwnerStore? ownerStore,
+  _MockPlayback? playback,
   String accessToken = 'token-a',
+  List<String>? authenticationTokens,
   bool resetPersistence = true,
 }) async {
   if (resetPersistence) {
@@ -163,19 +177,25 @@ Future<_LogoutHarness> _createLogoutHarness({
   final actualDatabase =
       database ?? AppDatabase.forTesting(NativeDatabase.memory());
   final scope = AccountScope();
-  final playback = _MockPlayback();
+  final actualPlayback = playback ?? _MockPlayback();
   final actualDownloads = downloads ?? _MockDownload();
   final actualRemote = remote ?? _MockRemote();
   final cast = _MockCast();
-  _stubMocks(playback, actualDownloads, actualRemote, cast);
+  _stubMocks(actualPlayback, actualDownloads, actualRemote, cast);
+  var authenticationIndex = 0;
   final client = JellyfinClient(
     httpClient: MockClient((request) async {
       if (request.url.path == '/System/Info/Public') {
         return http.Response('{"Id":"server"}', 200);
       }
       if (request.url.path == '/Users/AuthenticateByName') {
+        final token =
+            authenticationTokens != null &&
+                authenticationIndex < authenticationTokens.length
+            ? authenticationTokens[authenticationIndex++]
+            : accessToken;
         return http.Response(
-          '{"AccessToken":"$accessToken","User":{"Id":"user-a","Name":"User A"}}',
+          '{"AccessToken":"$token","User":{"Id":"user-a","Name":"User A"}}',
           200,
         );
       }
@@ -196,7 +216,7 @@ Future<_LogoutHarness> _createLogoutHarness({
       databaseProvider.overrideWithValue(actualDatabase),
       jellyfinClientProvider.overrideWithValue(client),
       accountScopeProvider.overrideWithValue(scope),
-      playbackProvider.overrideWithValue(playback),
+      playbackProvider.overrideWithValue(actualPlayback),
       downloadProvider.overrideWithValue(actualDownloads),
       remoteSessionProvider.overrideWithValue(actualRemote),
       castControllerProvider.overrideWithValue(cast),
@@ -873,6 +893,68 @@ void main() {
       expect(signInResult, isTrue);
       expect(savedAfterBothOperations?.accessToken, 'token-b');
     });
+
+    test(
+      'queued logout preserves a newer sign-in session and account data',
+      () async {
+        final configureStarted = Completer<void>();
+        final allowConfigure = Completer<void>();
+        final playback = _MockPlayback();
+        var configureCalls = 0;
+        final database = _CountingClearDatabase(NativeDatabase.memory());
+        final observedStore = _ObservedSessionStore(
+          SessionStore(buildSessionSecureStorage()),
+        );
+        final harness = await _createLogoutHarness(
+          database: database,
+          playback: playback,
+          sessionStore: observedStore,
+          authenticationTokens: ['token-a', 'token-b'],
+        );
+        addTearDown(harness.close);
+        when(
+          () => playback.configure(
+            any(),
+            smallStreaming: any(named: 'smallStreaming'),
+            normalization: any(named: 'normalization'),
+          ),
+        ).thenAnswer((_) async {
+          configureCalls++;
+          if (configureCalls == 1) {
+            configureStarted.complete();
+            await allowConfigure.future;
+          }
+        });
+        await harness.seedSession();
+
+        final firstSignIn = harness.controller.signIn(
+          'https://music.example.com',
+          'user-a',
+          'password',
+        );
+        await configureStarted.future.timeout(const Duration(seconds: 5));
+        expect((await observedStore.load())?.accessToken, 'token-a');
+
+        final signOut = harness.controller.signOut();
+        final savedTokenB = observedStore.waitForSave('token-b');
+        final secondSignIn = harness.controller.signIn(
+          'https://music.example.com',
+          'user-a',
+          'password',
+        );
+        await savedTokenB.timeout(const Duration(seconds: 5));
+        expect((await observedStore.load())?.accessToken, 'token-b');
+
+        allowConfigure.complete();
+        await firstSignIn.timeout(const Duration(seconds: 5));
+        await signOut.timeout(const Duration(seconds: 5));
+        expect(await secondSignIn.timeout(const Duration(seconds: 5)), isTrue);
+
+        expect((await observedStore.load())?.accessToken, 'token-b');
+        expect(database.clearAccountDataCalls, 0);
+        expect((await harness.ownerStore.load())?.userId, 'user-a');
+      },
+    );
 
     test(
       'credential-clear failure is attempted and surfaced redacted',

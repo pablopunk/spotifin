@@ -693,6 +693,8 @@ class AppController extends Notifier<AppState> {
     // observes the new generation immediately.
     scope.invalidate();
     final logoutGeneration = scope.generation;
+    bool isCurrentLogout() =>
+        scope.generation == logoutGeneration && scope.current == null;
     _refreshRetryTimer?.cancel();
     _refreshRetryTimer = null;
     _refreshRetryAttempt = 0;
@@ -707,12 +709,18 @@ class AppController extends Notifier<AppState> {
       clearCacheConflict: true,
     );
     await _enqueueLifecycle(() async {
+      // A newer sign-in can win while this callback waits behind earlier
+      // lifecycle work. In that case the queued logout must not tear down it.
+      if (!isCurrentLogout()) return;
       // Remove credentials before resource cleanup can block or fail. This
       // local write is fenced, but no network or native work holds the fence.
       try {
-        await scope.exclusive(() => ref.read(sessionStoreProvider).clear());
+        await scope.exclusive(() async {
+          if (!isCurrentLogout()) return;
+          await ref.read(sessionStoreProvider).clear();
+        });
       } catch (error) {
-        if (scope.generation == logoutGeneration &&
+        if (isCurrentLogout() &&
             state.status == AppStatus.signedOut &&
             !state.syncing) {
           state = state.copyWith(
@@ -720,6 +728,7 @@ class AppController extends Notifier<AppState> {
           );
         }
       }
+      if (!isCurrentLogout()) return;
       try {
         await ref.read(remoteSessionProvider).clear();
       } catch (_) {}
@@ -736,18 +745,24 @@ class AppController extends Notifier<AppState> {
         await ref.read(downloadProvider).clear();
       } catch (_) {}
     });
+    if (!isCurrentLogout()) return;
     // Local persistence runs on the serialized fence after already-started
     // writes. The owner marker is cleared only after account data is gone;
     // failures retain the marker (fail closed).
     try {
       await scope.exclusive(() async {
+        if (!isCurrentLogout()) return;
         await ref.read(databaseProvider).clearAccountData();
       });
     } catch (_) {
       return;
     }
+    if (!isCurrentLogout()) return;
     try {
-      await scope.exclusive(() => _ownerStore.clear());
+      await scope.exclusive(() async {
+        if (!isCurrentLogout()) return;
+        await _ownerStore.clear();
+      });
     } catch (_) {
       return;
     }
