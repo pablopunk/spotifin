@@ -17,6 +17,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build
+      - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
       - run: flutter test --platform chrome test/session_store_test.dart test/database_startup_test.dart
