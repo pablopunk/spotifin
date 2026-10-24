@@ -8,6 +8,45 @@ import 'package:just_audio/just_audio.dart';
 import 'support/playback_harness.dart';
 
 void main() {
+  Future<void> restoreSavedQueue(
+    PlaybackHarness harness, {
+    required List<String> queueIds,
+    required int index,
+    required List<int> availableTrackIndices,
+    int positionMilliseconds = 45000,
+    bool shuffle = false,
+  }) async {
+    harness.stateStore.seed(
+      PlaybackHarness.accountId,
+      jsonEncode({
+        'queue': queueIds,
+        'index': index,
+        'positionMilliseconds': positionMilliseconds,
+        'shuffle': shuffle,
+      }),
+    );
+    await harness.service.restore(
+      availableTrackIndices.map(playbackTrack).toList(),
+    );
+    await harness.settle();
+  }
+
+  void expectRestoredQueue(
+    PlaybackHarness harness, {
+    required List<String> queueIds,
+    required int index,
+    required Duration position,
+    bool shuffle = false,
+  }) {
+    expect(harness.service.queue.map((track) => track.id), queueIds);
+    expect(harness.service.currentIndex, index);
+    expect(harness.service.currentTrack?.id, queueIds[index]);
+    expect(harness.player.lastSetInitialIndex, index);
+    expect(harness.player.lastSetInitialPosition, position);
+    expect(harness.player.playCalls, 0);
+    expect(harness.service.shuffle, shuffle);
+  }
+
   test('local audio starts before the queue save completes', () async {
     final local = Uri.file('/downloads/song.mp3');
     final harness = PlaybackHarness(localFiles: {'track-0': local});
@@ -184,6 +223,204 @@ void main() {
     expect(harness.player.lastSetInitialPosition, const Duration(seconds: 45));
     expect(harness.player.playCalls, 0);
     expect(harness.player.pauseCalls, greaterThanOrEqualTo(1));
+  });
+
+  test(
+    'restore keeps the saved occurrence when an earlier track is missing',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      final savedQueue = playbackCatalog(4);
+      harness.stateStore.seed(
+        PlaybackHarness.accountId,
+        jsonEncode({
+          'queue': savedQueue.map((track) => track.id).toList(),
+          'index': 2,
+          'positionMilliseconds': 45000,
+          'shuffle': false,
+        }),
+      );
+
+      await harness.service.restore(savedQueue.sublist(1));
+      await harness.settle();
+
+      expect(harness.service.queue.map((track) => track.id), [
+        'track-1',
+        'track-2',
+        'track-3',
+      ]);
+      expect(harness.service.currentIndex, 1);
+      expect(harness.service.currentTrack?.id, 'track-2');
+      expect(harness.player.lastSetInitialIndex, 1);
+      expect(
+        harness.player.lastSetInitialPosition,
+        const Duration(seconds: 45),
+      );
+      expect(harness.player.playCalls, 0);
+    },
+  );
+
+  test(
+    'restore keeps the saved position when a later track is missing',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await restoreSavedQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-2', 'track-3'],
+        index: 1,
+        availableTrackIndices: [0, 1, 3],
+      );
+
+      expectRestoredQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-3'],
+        index: 1,
+        position: const Duration(seconds: 45),
+      );
+    },
+  );
+
+  test(
+    'restore chooses the next surviving track when current is missing',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await restoreSavedQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-2', 'track-3', 'track-4'],
+        index: 2,
+        availableTrackIndices: [0, 1, 3, 4],
+        shuffle: true,
+      );
+
+      expectRestoredQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-3', 'track-4'],
+        index: 2,
+        position: Duration.zero,
+        shuffle: true,
+      );
+    },
+  );
+
+  test(
+    'restore chooses the previous surviving track when current is last',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await restoreSavedQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-2', 'track-3'],
+        index: 3,
+        availableTrackIndices: [0, 1, 2],
+      );
+
+      expectRestoredQueue(
+        harness,
+        queueIds: ['track-0', 'track-1', 'track-2'],
+        index: 2,
+        position: Duration.zero,
+      );
+    },
+  );
+
+  test(
+    'restore leaves playback unstarted when every saved track is missing',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await restoreSavedQueue(
+        harness,
+        queueIds: ['missing-a', 'missing-b'],
+        index: 1,
+        availableTrackIndices: [0],
+      );
+
+      expect(harness.service.queue, isEmpty);
+      expect(harness.service.currentIndex, isNull);
+      expect(harness.service.currentTrack, isNull);
+      expect(harness.player.sources, isEmpty);
+      expect(harness.player.lastSetInitialIndex, isNull);
+      expect(harness.player.lastSetInitialPosition, isNull);
+      expect(harness.player.playCalls, 0);
+    },
+  );
+
+  test(
+    'restore preserves the selected duplicate occurrence after filtering',
+    () async {
+      final harness = PlaybackHarness();
+      addTearDown(harness.dispose);
+      await harness.configure();
+
+      await restoreSavedQueue(
+        harness,
+        queueIds: ['missing', 'track-0', 'track-0'],
+        index: 2,
+        availableTrackIndices: [0],
+      );
+
+      expectRestoredQueue(
+        harness,
+        queueIds: ['track-0', 'track-0'],
+        index: 1,
+        position: const Duration(seconds: 45),
+      );
+      expect(harness.service.currentEntryId, isNotNull);
+    },
+  );
+
+  test('restore clamps an oversized legacy index before filtering', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    await restoreSavedQueue(
+      harness,
+      queueIds: ['track-0', 'track-1', 'track-2', 'track-3'],
+      index: 99,
+      availableTrackIndices: [0, 2],
+      shuffle: true,
+    );
+
+    expectRestoredQueue(
+      harness,
+      queueIds: ['track-0', 'track-2'],
+      index: 1,
+      position: Duration.zero,
+      shuffle: true,
+    );
+  });
+
+  test('restore clamps a negative legacy index before filtering', () async {
+    final harness = PlaybackHarness();
+    addTearDown(harness.dispose);
+    await harness.configure();
+
+    await restoreSavedQueue(
+      harness,
+      queueIds: ['missing', 'track-0', 'track-1'],
+      index: -99,
+      availableTrackIndices: [0, 1],
+    );
+
+    expectRestoredQueue(
+      harness,
+      queueIds: ['track-0', 'track-1'],
+      index: 0,
+      position: Duration.zero,
+    );
   });
 
   test('restore keeps a queue started before it ran', () async {

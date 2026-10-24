@@ -902,19 +902,40 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     final ids = (snapshot['queue'] as List<dynamic>? ?? const [])
         .cast<String>();
     final byId = {for (final track in catalog) track.id: track};
-    final tracks = ids.map((id) => byId[id]).whereType<Track>().toList();
-    if (tracks.isEmpty) return;
+    final retained = <(int, Track)>[];
+    for (var index = 0; index < ids.length; index++) {
+      final track = byId[ids[index]];
+      if (track != null) retained.add((index, track));
+    }
+    if (retained.isEmpty) return;
+    final selectedOriginalIndex = (snapshot['index'] as int? ?? 0).clamp(
+      0,
+      ids.length - 1,
+    );
+    var selectedIndex = retained.indexWhere(
+      (entry) => entry.$1 == selectedOriginalIndex,
+    );
+    final selectedOccurrenceSurvived = selectedIndex >= 0;
+    if (!selectedOccurrenceSurvived) {
+      selectedIndex = retained.indexWhere(
+        (entry) => entry.$1 > selectedOriginalIndex,
+      );
+      if (selectedIndex < 0) selectedIndex = retained.length - 1;
+    }
+    final tracks = [for (final entry in retained) entry.$2];
     // Older snapshots may contain a persisted 'history' list from when the
     // app maintained its own duplicate history. It is intentionally ignored:
     // Jellyfin is the durable history store and the session overlay starts
     // empty on every launch.
     final candidate = QueueState.restore(
       tracks,
-      index: (snapshot['index'] as int? ?? 0),
+      index: selectedIndex,
       shuffle: snapshot['shuffle'] as bool? ?? false,
       newId: _newPlaylistItemId,
     );
-    final milliseconds = snapshot['positionMilliseconds'] as int? ?? 0;
+    final milliseconds = selectedOccurrenceSurvived
+        ? snapshot['positionMilliseconds'] as int? ?? 0
+        : 0;
     await _installCollection(
       candidate: candidate,
       session: session,
