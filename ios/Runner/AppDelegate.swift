@@ -54,9 +54,11 @@ import UIKit
   }
 }
 
-private enum CarPlayShuffle {
+enum CarPlayShuffle {
   static func attach(channel: FlutterMethodChannel) {
-    let button = CPNowPlayingShuffleButton { _ in
+    // System shuffle buttons own their selected appearance. Use an image button
+    // so the playback owner's acknowledged state also controls the highlight.
+    let button = CPNowPlayingImageButton(image: UIImage(systemName: "shuffle")!) { _ in
       channel.invokeMethod("toggleShuffle", arguments: nil)
     }
     let shuffleCommand = MPRemoteCommandCenter.shared().changeShuffleModeCommand
@@ -75,6 +77,7 @@ private enum CarPlayShuffle {
         return
       }
       shuffleCommand.currentShuffleType = enabled ? .items : .off
+      button.isSelected = enabled
       CPNowPlayingTemplate.shared.updateNowPlayingButtons([button])
       result(nil)
     }
