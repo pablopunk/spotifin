@@ -12,6 +12,7 @@ class DownloadStore {
 
   final Map<String, String> _objectUrls = {};
   final Map<(String, String), _WebTransfer> _active = {};
+  final Map<(String, String), Future<void>> _startTails = {};
   var _disposed = false;
 
   Future<String> save(
@@ -26,22 +27,29 @@ class DownloadStore {
       throw const DownloadStoreException('Download store is disposed.');
     }
     final key = (accountId, trackId);
-    final previous = _active[key];
-    if (previous != null) await previous.cancelAndWait();
-    if (_disposed) {
-      throw const DownloadStoreException('Download store is disposed.');
-    }
+    final previousStart = _startTails[key];
+    final startGate = Completer<void>();
+    _startTails[key] = startGate.future;
+    late final _WebTransfer transfer;
+    late final Future<String> operation;
+    try {
+      if (previousStart != null) await previousStart;
+      final previous = _active[key];
+      if (previous != null) await previous.cancelAndWait();
+      if (_disposed) {
+        throw const DownloadStoreException('Download store is disposed.');
+      }
 
-    final transfer = _WebTransfer(key, web.AbortController());
-    _active[key] = transfer;
-    final operation = _save(
-      transfer,
-      source,
-      requestHeaders,
-      accountId,
-      trackId,
-    );
-    transfer.completion = operation;
+      transfer = _WebTransfer(key, web.AbortController());
+      _active[key] = transfer;
+      operation = _save(transfer, source, requestHeaders, accountId, trackId);
+      transfer.completion = operation;
+    } finally {
+      if (identical(_startTails[key], startGate.future)) {
+        _startTails.remove(key);
+      }
+      startGate.complete();
+    }
     try {
       return await operation.timeout(
         timeout,

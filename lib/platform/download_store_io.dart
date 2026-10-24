@@ -8,13 +8,18 @@ import 'download_store_exception.dart';
 import 'safe_path_segment.dart';
 
 class DownloadStore {
-  DownloadStore({http.Client Function()? clientFactory})
-    : _clientFactory = clientFactory ?? (() => http.Client());
+  DownloadStore({
+    http.Client Function()? clientFactory,
+    IOSink Function(File file)? sinkFactory,
+  }) : _clientFactory = clientFactory ?? (() => http.Client()),
+       _sinkFactory = sinkFactory ?? ((file) => file.openWrite());
 
   static const _defaultTimeout = Duration(minutes: 5);
 
   final http.Client Function() _clientFactory;
+  final IOSink Function(File file) _sinkFactory;
   final Map<(String, String), _IoTransfer> _active = {};
+  final Map<(String, String), Future<void>> _startTails = {};
   var _nextOperationId = 0;
   var _disposed = false;
 
@@ -30,16 +35,29 @@ class DownloadStore {
       throw const DownloadStoreException('Download store is disposed.');
     }
     final key = (accountId, trackId);
-    final previous = _active[key];
-    if (previous != null) await previous.cancelAndWait();
-    if (_disposed) {
-      throw const DownloadStoreException('Download store is disposed.');
-    }
+    final previousStart = _startTails[key];
+    final startGate = Completer<void>();
+    _startTails[key] = startGate.future;
+    late final _IoTransfer transfer;
+    late final Future<String> operation;
+    try {
+      if (previousStart != null) await previousStart;
+      final previous = _active[key];
+      if (previous != null) await previous.cancelAndWait();
+      if (_disposed) {
+        throw const DownloadStoreException('Download store is disposed.');
+      }
 
-    final transfer = _IoTransfer(key, ++_nextOperationId, _clientFactory());
-    _active[key] = transfer;
-    final operation = _save(transfer, source, headers, extension);
-    transfer.completion = operation;
+      transfer = _IoTransfer(key, ++_nextOperationId, _clientFactory());
+      _active[key] = transfer;
+      operation = _save(transfer, source, headers, extension);
+      transfer.completion = operation;
+    } finally {
+      if (identical(_startTails[key], startGate.future)) {
+        _startTails.remove(key);
+      }
+      startGate.complete();
+    }
     try {
       return await operation.timeout(
         timeout,
@@ -63,6 +81,7 @@ class DownloadStore {
     File? backup;
     File? target;
     IOSink? sink;
+    Future<void>? sinkDone;
     var installedTarget = false;
     try {
       final root = await getApplicationDocumentsDirectory();
@@ -88,35 +107,48 @@ class DownloadStore {
         );
       }
 
-      sink = temporary.openWrite();
+      sink = _sinkFactory(temporary);
       transfer.sink = sink;
-      final bodyComplete = Completer<void>();
-      transfer.bodyComplete = bodyComplete;
-      transfer.subscription = response.stream.listen(
-        (chunk) {
-          if (!transfer.cancelled) sink!.add(chunk);
-        },
+      final writeFailure = Completer<_IoWriteFailure>();
+      sinkDone = sink.done.then<void>(
+        (_) {},
         onError: (Object error, StackTrace stackTrace) {
-          if (!bodyComplete.isCompleted) {
-            bodyComplete.completeError(error, stackTrace);
+          if (!transfer.cancelled && !writeFailure.isCompleted) {
+            writeFailure.complete(_IoWriteFailure(error, stackTrace));
           }
         },
-        onDone: () {
-          if (!bodyComplete.isCompleted) bodyComplete.complete();
-        },
-        cancelOnError: true,
       );
+      final iterator = StreamIterator<List<int>>(response.stream);
+      transfer.iterator = iterator;
       try {
-        await bodyComplete.future;
-      } catch (error) {
+        _throwIfCancelled(transfer);
+        while (await _raceWithSink(
+          iterator.moveNext(),
+          writeFailure.future,
+          transfer,
+        )) {
+          _throwIfCancelled(transfer);
+          sink.add(iterator.current);
+          await _raceWithSink(
+            sink.flush().then<void>((_) {}),
+            writeFailure.future,
+            transfer,
+          );
+        }
+      } catch (error, stackTrace) {
+        await transfer.stopBody();
         if (transfer.cancelled) _throwCancelled();
-        rethrow;
+        Error.throwWithStackTrace(error, stackTrace);
+      } finally {
+        if (identical(transfer.iterator, iterator)) transfer.iterator = null;
       }
       _throwIfCancelled(transfer);
 
       await sink.flush();
       await sink.close();
       transfer.sink = null;
+      sink = null;
+      await sinkDone;
       _throwIfCancelled(transfer);
 
       if (await target.exists()) {
@@ -143,13 +175,18 @@ class DownloadStore {
       }
       rethrow;
     } finally {
-      try {
-        transfer.client.close();
-      } catch (_) {}
+      transfer.closeClient();
+      await transfer.stopBody();
       final activeSink = transfer.sink ?? sink;
       if (activeSink != null) {
         try {
           await activeSink.close();
+        } catch (_) {}
+      }
+      transfer.sink = null;
+      if (sinkDone != null) {
+        try {
+          await sinkDone;
         } catch (_) {}
       }
       if (temporary != null && await temporary.exists()) {
@@ -171,6 +208,23 @@ class DownloadStore {
 
   static Never _throwCancelled() =>
       throw const DownloadStoreException('Download cancelled.');
+
+  static Future<T> _raceWithSink<T>(
+    Future<T> operation,
+    Future<_IoWriteFailure> writeFailure,
+    _IoTransfer transfer,
+  ) async {
+    final result = await Future.any<Object>([
+      operation.then<Object>((value) => _IoOperationResult<T>(value)),
+      writeFailure,
+      transfer.cancelledSignal.future.then<Object>((_) => const _IoCancelled()),
+    ]);
+    if (result is _IoWriteFailure) {
+      Error.throwWithStackTrace(result.error, result.stackTrace);
+    }
+    if (result is _IoCancelled) _throwCancelled();
+    return (result as _IoOperationResult<T>).value;
+  }
 
   Future<Uri?> resolve(String storedUri) async {
     final uri = Uri.parse(storedUri);
@@ -210,12 +264,31 @@ class _IoTransfer {
   final (String, String) key;
   final int operationId;
   final http.Client client;
+  final Completer<void> cancelledSignal = Completer<void>();
   bool cancelled = false;
+  bool _clientClosed = false;
   IOSink? sink;
-  StreamSubscription<List<int>>? subscription;
-  Completer<void>? bodyComplete;
+  StreamIterator<List<int>>? iterator;
   Future<String>? completion;
   Future<void>? _cancelFuture;
+  Future<void>? _iteratorCancelFuture;
+
+  void closeClient() {
+    if (_clientClosed) return;
+    _clientClosed = true;
+    try {
+      client.close();
+    } catch (_) {}
+  }
+
+  Future<void> stopBody() async {
+    closeClient();
+    final currentIterator = iterator;
+    if (currentIterator == null) return;
+    try {
+      await (_iteratorCancelFuture ??= currentIterator.cancel());
+    } catch (_) {}
+  }
 
   Future<void> cancelAndWait() async {
     await (_cancelFuture ??= _cancel());
@@ -229,24 +302,24 @@ class _IoTransfer {
 
   Future<void> _cancel() async {
     cancelled = true;
-    try {
-      client.close();
-    } catch (_) {}
-    final subscription = this.subscription;
-    if (subscription != null) {
-      try {
-        await subscription.cancel();
-      } catch (_) {}
-    }
-    final bodyComplete = this.bodyComplete;
-    if (bodyComplete != null && !bodyComplete.isCompleted) {
-      bodyComplete.complete();
-    }
-    final sink = this.sink;
-    if (sink != null) {
-      try {
-        await sink.close();
-      } catch (_) {}
-    }
+    if (!cancelledSignal.isCompleted) cancelledSignal.complete();
+    await stopBody();
   }
+}
+
+class _IoWriteFailure {
+  const _IoWriteFailure(this.error, this.stackTrace);
+
+  final Object error;
+  final StackTrace stackTrace;
+}
+
+class _IoOperationResult<T> {
+  const _IoOperationResult(this.value);
+
+  final T value;
+}
+
+class _IoCancelled {
+  const _IoCancelled();
 }

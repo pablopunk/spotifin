@@ -70,6 +70,193 @@ void main() {
     },
   );
 
+  test(
+    'a sink write failure aborts the body and preserves the existing file',
+    () async {
+      final writeError = FileSystemException('controlled write failure');
+      final writeFailed = Completer<void>();
+      final uncaughtErrors = <Object>[];
+      final scenario = runZonedGuarded<Future<_WriteFailureObservation>>(
+        () async {
+          final harness = await _DownloadHarness.create(
+            trickleModes: [true],
+            sinkFactory: (file) {
+              file.createSync();
+              return IOSink(_FailingWriteTarget(writeError, writeFailed));
+            },
+          );
+          final existingTarget = File(
+            '${harness.root.path}/downloads/$_accountId/$_trackId.mp3',
+          );
+          await existingTarget.parent.create(recursive: true);
+          await existingTarget.writeAsBytes([9, 8, 7]);
+
+          try {
+            final saving = harness.store.save(
+              _accountId,
+              _trackId,
+              Uri.parse('http://download.example/audio'),
+              const {},
+              'mp3',
+              timeout: const Duration(seconds: 2),
+            );
+            final outcome = saving.then<Object>(
+              (uri) => uri,
+              onError: (Object error, StackTrace _) => error,
+            );
+            final client = await harness.clientAt(0);
+            await client.headersSent.future.timeout(const Duration(seconds: 1));
+            await writeFailed.future.timeout(const Duration(seconds: 1));
+            final result = await outcome.timeout(
+              const Duration(milliseconds: 250),
+              onTimeout: () =>
+                  TimeoutException('Save did not reject promptly.'),
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+
+            return _WriteFailureObservation(
+              result,
+              client.closed,
+              client.responseSubscriptionCancelled,
+              await existingTarget.readAsBytes(),
+              await harness.partialFiles(),
+            );
+          } finally {
+            await harness.close();
+          }
+        },
+        (error, _) => uncaughtErrors.add(error),
+      );
+      final observation = await scenario!.timeout(const Duration(seconds: 3));
+
+      expect(observation.outcome, same(writeError));
+      expect(observation.clientClosed, isTrue);
+      expect(observation.responseSubscriptionCancelled, isTrue);
+      expect(observation.existingTargetBytes, [9, 8, 7]);
+      expect(observation.partialFiles, isEmpty);
+      expect(uncaughtErrors, isEmpty);
+    },
+  );
+
+  test('a sink open failure preserves the existing file', () async {
+    FileSystemException? openError;
+    final uncaughtErrors = <Object>[];
+    final scenario = runZonedGuarded<Future<_OpenFailureObservation>>(() async {
+      final harness = await _DownloadHarness.create(
+        trickleModes: [false],
+        sinkFactory: (file) {
+          openError = FileSystemException('controlled open failure', file.path);
+          throw openError!;
+        },
+      );
+      final existingTarget = File(
+        '${harness.root.path}/downloads/$_accountId/$_trackId.mp3',
+      );
+      await existingTarget.parent.create(recursive: true);
+      await existingTarget.writeAsBytes([6, 5, 4]);
+
+      try {
+        final saving = harness.store.save(
+          _accountId,
+          _trackId,
+          Uri.parse('http://download.example/audio'),
+          const {},
+          'mp3',
+          timeout: const Duration(seconds: 2),
+        );
+        final outcome = saving.then<Object>(
+          (uri) => uri,
+          onError: (Object error, StackTrace _) => error,
+        );
+        final client = await harness.clientAt(0);
+        await client.headersSent.future.timeout(const Duration(seconds: 1));
+        final result = await outcome.timeout(
+          const Duration(seconds: 1),
+          onTimeout: () => TimeoutException('Sink open did not reject.'),
+        );
+        await client.responseSettled.future.timeout(const Duration(seconds: 1));
+        return _OpenFailureObservation(
+          result,
+          client.closed,
+          await existingTarget.readAsBytes(),
+          await harness.partialFiles(),
+        );
+      } finally {
+        await harness.close();
+      }
+    }, (error, _) => uncaughtErrors.add(error));
+    final observation = await scenario!.timeout(const Duration(seconds: 3));
+
+    expect(observation.outcome, same(openError));
+    expect(observation.clientClosed, isTrue);
+    expect(observation.existingTargetBytes, [6, 5, 4]);
+    expect(observation.partialFiles, isEmpty);
+    expect(uncaughtErrors, isEmpty);
+  });
+
+  test('concurrent replacements cancel each predecessor in order', () async {
+    final harness = await _DownloadHarness.create(
+      trickleModes: [true, true, false],
+      completionBodies: [
+        null,
+        null,
+        [4, 5, 6],
+      ],
+    );
+    addTearDown(harness.close);
+
+    final firstSave = harness.store.save(
+      _accountId,
+      _trackId,
+      Uri.parse('http://download.example/first'),
+      const {},
+      'mp3',
+      timeout: const Duration(seconds: 3),
+    );
+    final firstOutcome = firstSave.then<Object>(
+      (uri) => uri,
+      onError: (Object error, StackTrace _) => error,
+    );
+    final firstClient = await harness.clientAt(0);
+    await firstClient.headersSent.future.timeout(const Duration(seconds: 1));
+
+    final secondSave = harness.store.save(
+      _accountId,
+      _trackId,
+      Uri.parse('http://download.example/second'),
+      const {},
+      'mp3',
+      timeout: const Duration(seconds: 3),
+    );
+    final secondOutcome = secondSave.then<Object>(
+      (uri) => uri,
+      onError: (Object error, StackTrace _) => error,
+    );
+    final replacementSave = harness.store.save(
+      _accountId,
+      _trackId,
+      Uri.parse('http://download.example/replacement'),
+      const {},
+      'mp3',
+      timeout: const Duration(seconds: 3),
+    );
+
+    final replacementUri = Uri.parse(
+      await replacementSave.timeout(const Duration(seconds: 2)),
+    );
+    final secondClient = await harness.clientAt(1);
+    final firstResult = await firstOutcome.timeout(const Duration(seconds: 1));
+    final secondResult = await secondOutcome.timeout(
+      const Duration(seconds: 1),
+    );
+
+    expect(firstResult, isA<DownloadStoreException>());
+    expect(secondResult, isA<DownloadStoreException>());
+    expect(secondClient.closed, isTrue);
+    expect(await File.fromUri(replacementUri).readAsBytes(), [4, 5, 6]);
+    expect(await harness.partialFiles(), isEmpty);
+  });
+
   test('repeated cancellation cannot remove a replacement transfer', () async {
     final harness = await _DownloadHarness.create(
       trickleModes: [true, false],
@@ -191,6 +378,7 @@ class _DownloadHarness {
   static Future<_DownloadHarness> create({
     required List<bool> trickleModes,
     List<List<int>?> completionBodies = const [],
+    IOSink Function(File file)? sinkFactory,
   }) async {
     final root = await Directory.systemTemp.createTemp('spotifin-download-');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -203,6 +391,7 @@ class _DownloadHarness {
     final clients = <_StreamingClient>[];
     final clientWaiters = <Completer<_StreamingClient>>[];
     final store = DownloadStore(
+      sinkFactory: sinkFactory,
       clientFactory: () {
         final index = clients.length;
         final client = _StreamingClient(
@@ -239,7 +428,9 @@ class _DownloadHarness {
   }
 
   Future<void> close() async {
-    await store.cancelAll();
+    try {
+      await store.cancelAll().timeout(const Duration(seconds: 1));
+    } catch (_) {}
     store.dispose();
     for (final client in clients) {
       client.close();
@@ -264,7 +455,10 @@ class _StreamingClient extends http.BaseClient {
           scheduleMicrotask(() => finishBody(completionBody!));
         }
       },
-      onCancel: _markResponseSettled,
+      onCancel: () {
+        responseSubscriptionCancelled = true;
+        _markResponseSettled();
+      },
     );
   }
 
@@ -275,6 +469,7 @@ class _StreamingClient extends http.BaseClient {
   late final StreamController<List<int>> _body;
   Timer? _ticker;
   var closed = false;
+  var responseSubscriptionCancelled = false;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -316,4 +511,52 @@ class _StreamingClient extends http.BaseClient {
     _ticker?.cancel();
     if (!responseSettled.isCompleted) responseSettled.complete();
   }
+}
+
+class _FailingWriteTarget implements StreamConsumer<List<int>> {
+  _FailingWriteTarget(this.error, this.writeFailed);
+
+  final FileSystemException error;
+  final Completer<void> writeFailed;
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) async {
+    await for (final _ in stream) {
+      if (!writeFailed.isCompleted) writeFailed.complete();
+      throw error;
+    }
+  }
+
+  @override
+  Future<void> close() async {}
+}
+
+class _WriteFailureObservation {
+  const _WriteFailureObservation(
+    this.outcome,
+    this.clientClosed,
+    this.responseSubscriptionCancelled,
+    this.existingTargetBytes,
+    this.partialFiles,
+  );
+
+  final Object outcome;
+  final bool clientClosed;
+  final bool responseSubscriptionCancelled;
+  final List<int> existingTargetBytes;
+  final List<FileSystemEntity> partialFiles;
+}
+
+class _OpenFailureObservation {
+  const _OpenFailureObservation(
+    this.outcome,
+    this.clientClosed,
+    this.existingTargetBytes,
+    this.partialFiles,
+  );
+
+  final Object outcome;
+  final bool clientClosed;
+  final List<int> existingTargetBytes;
+  final List<FileSystemEntity> partialFiles;
 }
