@@ -284,7 +284,7 @@ class _LoginCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (glass) {
-      return GlassCard(
+      return GlassContainer.card(
         useOwnLayer: true,
         quality: GlassQuality.premium,
         settings: SpotifinGlass.settings(glassOpacity),
