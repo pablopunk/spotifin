@@ -22,7 +22,12 @@ import '../player/remote_devices.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
+import 'dismiss_sheets_on_split.dart';
+import 'duo_split_body.dart';
+import 'fold_panes.dart';
 import 'sidebar_playlists.dart';
+import 'strip_navigation.dart';
+import 'vertical_bar_content.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
   const ShellScreen({required this.controller, super.key});
@@ -131,15 +136,19 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     }
     return ListenableBuilder(
       listenable: widget.controller,
-      builder: (context, _) => _buildShell(context),
+      builder: (context, _) =>
+          GlassNavigationShell(child: Builder(builder: _buildShell)),
     );
   }
 
   Widget _buildShell(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final screen = MediaQuery.sizeOf(context);
     final landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
-    final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
+    final compactLandscape =
+        landscape &&
+        SpotifinBreakpoints.isHandset(screen) &&
+        !SpotifinBreakpoints.showsRail(screen);
     final dismissed = ref.watch(mobileCoverflowDismissedProvider);
     // Rotation always opens the playback queue. Only an explicit Cover Flow
     // button request carries a view collection; otherwise collection stays
@@ -201,7 +210,12 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final wide = width >= SpotifinBreakpoints.rail;
+    final ios = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    final iosGlass = ref.watch(glassEffectsProvider) && ios;
+    final verticalBar = ios ? GlassVerticalBar.maybeOf(context) : null;
+    final wide =
+        verticalBar == null &&
+        SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
     final playerPanels = ref.watch(playerPanelProvider);
     final hasTrack = _active.state.track != null;
     final showPlayerPanel =
@@ -216,7 +230,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final glassOpacity = ref.watch(glassOpacityProvider);
     _visitedDestinations.add(selectedIndex);
     final content = SpotifinChromeInsets(
-      bottom: !wide && glassEffects
+      bottom: verticalBar != null && glassEffects
+          ? SpotifinChromeInsets.stripBottom
+          : !wide && glassEffects
           ? SpotifinChromeInsets.glassMobileBottom
           : SpotifinChromeInsets.fallbackBottom,
       child: Stack(
@@ -301,51 +317,74 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         ),
       );
     }
-    if (glassEffects &&
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS) {
+    if (iosGlass) {
       final showAccessory = hasTrack || _remoteSessions.sessions.isNotEmpty;
-      return GlassScaffold(
-        backgroundColor: SpotifinColors.background,
-        settings: SpotifinGlass.settings(glassOpacity),
-        topEdgeFade: false,
-        bottomBar: GlassTabBar.bottom(
-          settings: SpotifinGlass.settings(glassOpacity),
-          indicatorSettings: SpotifinGlass.settings(glassOpacity),
-          selectedIndex: selectedIndex,
-          onTabSelected: widget.controller.selectDestination,
-          selectedIconColor: SpotifinColors.text,
-          unselectedIconColor: SpotifinColors.textMuted,
-          selectedLabelColor: SpotifinColors.text,
-          unselectedLabelColor: SpotifinColors.textMuted,
-          interactionGlowColor: SpotifinColors.accent,
-          bottomAccessorySpacing: 0,
-          bottomAccessory: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: hasTrack
-                ? const PlayerBar()
-                : const GlassContainer(
-                    useOwnLayer: true,
-                    quality: GlassQuality.premium,
-                    shape: LiquidRoundedSuperellipse(borderRadius: 16),
-                    clipBehavior: Clip.antiAlias,
-                    child: RemoteNowPlayingBar(),
-                  ),
-          ),
-          bottomAccessoryEnabled: showAccessory,
-          bottomAccessoryHeight: 74,
-          verticalPadding: 12,
-          tabs: _destinations
-              .map(
-                (item) => GlassTab(
-                  icon: Icon(item.icon),
-                  activeIcon: Icon(item.selectedIcon),
-                  label: item.label,
+      final accessory = hasTrack
+          ? const PlayerBar()
+          : const GlassContainer(
+              useOwnLayer: true,
+              quality: GlassQuality.premium,
+              shape: LiquidRoundedSuperellipse(borderRadius: 16),
+              clipBehavior: Clip.antiAlias,
+              child: RemoteNowPlayingBar(),
+            );
+      final plainBody = verticalBar == null
+          ? content
+          : VerticalBarContent(
+              content: content,
+              playerBar: showAccessory ? accessory : null,
+            );
+      return Builder(
+        builder: (context) {
+          final halfFolded = ios && hasHalfOpenFold(context);
+          final duoSplit = halfFolded && hasTrack;
+          return DismissSheetsOnSplit(
+            split: duoSplit,
+            child: GlassScaffold(
+              backgroundColor: SpotifinColors.background,
+              settings: SpotifinGlass.settings(glassOpacity),
+              topEdgeFade: false,
+              bottomBar: GlassTabBar.bottom(
+                settings: SpotifinGlass.settings(glassOpacity),
+                indicatorSettings: SpotifinGlass.settings(glassOpacity),
+                selectedIndex: selectedIndex,
+                onTabSelected: widget.controller.selectDestination,
+                selectedIconColor: SpotifinColors.text,
+                unselectedIconColor: SpotifinColors.textMuted,
+                selectedLabelColor: SpotifinColors.text,
+                unselectedLabelColor: SpotifinColors.textMuted,
+                interactionGlowColor: SpotifinColors.accent,
+                bottomAccessorySpacing: 0,
+                bottomAccessory: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: accessory,
                 ),
-              )
-              .toList(),
-        ),
-        body: content,
+                bottomAccessoryEnabled: showAccessory && !duoSplit,
+                bottomAccessoryHeight: 74,
+                verticalPadding: 12,
+                tabs: _destinations
+                    .map(
+                      (item) => GlassTab(
+                        icon: Icon(item.icon),
+                        activeIcon: Icon(item.selectedIcon),
+                        label: item.label,
+                      ),
+                    )
+                    .toList(),
+              ),
+              body: duoSplit
+                  ? DuoSplitBody(
+                      panelOpen: !playerPanels.withoutPlayer.isEmpty,
+                      browsingBuilder: (_, inset) => SpotifinChromeInsets(
+                        bottom: inset,
+                        child: _buildDestinationStack(selectedIndex),
+                      ),
+                      fallbackBuilder: (_) => plainBody,
+                    )
+                  : plainBody,
+            ),
+          );
+        },
       );
     }
     if (glassEffects) {
@@ -395,27 +434,79 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         body: content,
       );
     }
-    return Scaffold(
-      body: content,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!hasTrack) const RemoteNowPlayingBar(),
-          NavigationBar(
+    final strip = verticalBar;
+    return Builder(
+      builder: (context) {
+        final halfFolded = ios && hasHalfOpenFold(context);
+        final duoSplit = halfFolded && hasTrack;
+        return DismissSheetsOnSplit(
+          split: duoSplit,
+          child: _buildPlainScaffold(
             selectedIndex: selectedIndex,
-            onDestinationSelected: widget.controller.selectDestination,
-            destinations: _destinations
-                .map(
-                  (item) => NavigationDestination(
+            hasTrack: hasTrack,
+            strip: strip,
+            body: duoSplit
+                ? DuoSplitBody(
+                    panelOpen: !playerPanels.withoutPlayer.isEmpty,
+                    portraitBottomClearance: SpotifinSpacing.xs,
+                    browsingBuilder: (_, inset) => SpotifinChromeInsets(
+                      bottom: inset,
+                      child: _buildDestinationStack(selectedIndex),
+                    ),
+                    fallbackBuilder: (_) => content,
+                  )
+                : content,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlainScaffold({
+    required int selectedIndex,
+    required bool hasTrack,
+    required GlassVerticalBarData? strip,
+    required Widget body,
+  }) {
+    return Scaffold(
+      body: strip == null
+          ? body
+          : StripNavigation(
+              strip: strip,
+              selectedIndex: selectedIndex,
+              onSelected: widget.controller.selectDestination,
+              destinations: [
+                for (final item in _destinations)
+                  NavigationRailDestination(
                     icon: Icon(item.icon),
                     selectedIcon: Icon(item.selectedIcon),
-                    label: item.label,
+                    label: Text(item.label),
                   ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
+              ],
+              child: body,
+            ),
+      bottomNavigationBar: strip != null && hasTrack
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hasTrack) const RemoteNowPlayingBar(),
+                if (strip == null)
+                  NavigationBar(
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: widget.controller.selectDestination,
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: item.label,
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
     );
   }
 

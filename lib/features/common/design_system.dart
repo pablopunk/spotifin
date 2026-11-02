@@ -12,11 +12,28 @@ abstract final class SpotifinSpacing {
   static const xxl = 32.0;
 }
 
+abstract final class SpotifinStrip {
+  static const minimumWidth = 80.0;
+
+  static ({bool left, bool right}) sidesOf(EdgeInsets padding) => (
+    left: padding.left >= minimumWidth && padding.right == 0,
+    right: padding.right >= minimumWidth && padding.left == 0,
+  );
+}
+
 abstract final class SpotifinBreakpoints {
   static const mobile = 576.0;
   static const rail = 896.0;
+  static const largeScreenRail = 840.0;
   static const extendedRail = 1150.0;
   static const playerPanel = 1400.0;
+
+  static bool isHandset(Size screen) => screen.shortestSide < mobile;
+
+  static double railWidthFor(Size screen) =>
+      isHandset(screen) ? rail : largeScreenRail;
+
+  static bool showsRail(Size screen) => screen.width >= railWidthFor(screen);
 }
 
 class SpotifinChromeInsets extends InheritedWidget {
@@ -28,6 +45,7 @@ class SpotifinChromeInsets extends InheritedWidget {
 
   static const fallbackBottom = 120.0;
   static const glassMobileBottom = 178.0;
+  static const stripBottom = 96.0;
 
   final double bottom;
 

@@ -14,35 +14,39 @@ import '../common/design_system.dart';
 import 'history_list.dart';
 import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
-import 'remote_devices.dart';
 
 class PlayerSidePanel extends ConsumerWidget {
-  const PlayerSidePanel({super.key});
+  const PlayerSidePanel({this.pinnedPlayer = false, super.key});
 
   static const _narrowWidth = 560.0;
+  static const _pinnedPlayerMaxOpen = 1;
+
+  final bool pinnedPlayer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(activePlaybackProvider);
-    final panels = ref.watch(playerPanelProvider);
+    final allPanels = ref.watch(playerPanelProvider);
+    final panels = pinnedPlayer ? allPanels.withoutPlayer : allPanels;
     final panelController = ref.read(playerPanelProvider.notifier);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxOpen = constraints.maxWidth < _narrowWidth ? 2 : 4;
+        final maxOpen = pinnedPlayer
+            ? _pinnedPlayerMaxOpen
+            : constraints.maxWidth < _narrowWidth
+            ? 2
+            : 4;
         if (panels.openPanels.length > maxOpen) {
           WidgetsBinding.instance.addPostFrameCallback(
-            (_) => panelController.constrainTo(maxOpen),
+            (_) => pinnedPlayer
+                ? panelController.constrainOthersTo(maxOpen)
+                : panelController.constrainTo(maxOpen),
           );
         }
         return Material(
           color: SpotifinColors.background,
           child: Column(
             children: [
-              _PanelHeader(
-                panels: panels,
-                maxOpen: maxOpen,
-                compact: constraints.maxWidth < 480,
-              ),
               Expanded(
                 child: ListenableBuilder(
                   listenable: active,
@@ -200,65 +204,6 @@ class _PanelCard extends StatelessWidget {
   );
 }
 
-class _PanelHeader extends ConsumerWidget {
-  const _PanelHeader({
-    required this.panels,
-    required this.maxOpen,
-    required this.compact,
-  });
-
-  final PlayerPanelState panels;
-  final int maxOpen;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
-    child: Row(
-      children: [
-        _PanelTab(
-          label: 'Player',
-          icon: Icons.album_rounded,
-          selected: panels.player,
-          compact: compact,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .togglePlayer(maxOpen: maxOpen),
-        ),
-        _PanelTab(
-          label: 'Lyrics',
-          icon: Icons.lyrics_outlined,
-          selected: panels.lyrics,
-          compact: compact,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .toggleLyrics(maxOpen: maxOpen),
-        ),
-        _PanelTab(
-          label: 'Queue',
-          icon: Icons.queue_music_rounded,
-          selected: panels.queue,
-          compact: compact,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .toggleQueue(maxOpen: maxOpen),
-        ),
-        _PanelTab(
-          label: 'History',
-          icon: Icons.history_rounded,
-          selected: panels.history,
-          compact: compact,
-          onPressed: () => ref
-              .read(playerPanelProvider.notifier)
-              .toggleHistory(maxOpen: maxOpen),
-        ),
-        const Spacer(),
-        const RemoteDeviceButton(),
-      ],
-    ),
-  );
-}
-
 class _PanelSection extends StatelessWidget {
   const _PanelSection({
     required this.title,
@@ -299,137 +244,110 @@ class _PanelSection extends StatelessWidget {
   );
 }
 
-class _PanelTab extends StatelessWidget {
-  const _PanelTab({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.compact,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final bool compact;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? SpotifinColors.accent : SpotifinColors.textMuted;
-    if (compact) {
-      return IconButton(
-        tooltip: label,
-        onPressed: onPressed,
-        color: color,
-        icon: Icon(icon, size: 19),
-        visualDensity: VisualDensity.compact,
-      );
-    }
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: TextButton.styleFrom(
-        foregroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: const Size(0, 36),
-        visualDensity: VisualDensity.compact,
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
 class _PlayerPanel extends StatelessWidget {
   const _PlayerPanel({required this.track, required this.active});
+
+  static const _compactHeight = 380.0;
 
   final Track track;
   final ActivePlayback active;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final details = _details(context);
+      const padding = EdgeInsets.fromLTRB(24, 8, 24, 8);
+      if (constraints.maxHeight < _compactHeight) {
+        return SingleChildScrollView(
+          padding: padding,
+          child: Column(children: details),
+        );
+      }
+      return Padding(
+        padding: padding,
+        child: Column(
+          children: [
+            Expanded(child: _artwork()),
+            const SizedBox(height: SpotifinSpacing.sm),
+            ...details,
+          ],
+        ),
+      );
+    },
+  );
+
+  Widget _artwork() => LayoutBuilder(
+    builder: (context, constraints) => Align(
+      alignment: Alignment.bottomCenter,
+      child: Artwork(
+        itemId: track.albumId ?? track.id,
+        size: constraints.biggest.shortestSide,
+        borderRadius: SpotifinRadii.card,
+      ),
+    ),
+  );
+
+  List<Widget> _details(BuildContext context) {
     final state = active.state;
     final canShuffle = state.capabilities.contains(PlaybackCapability.shuffle);
     final canRepeat = state.capabilities.contains(PlaybackCapability.repeat);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-      child: Column(
+    return [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          track.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ),
+      const SizedBox(height: SpotifinSpacing.xxs),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: PlayerCollectionLinks(
+          track: track,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ),
+      const SizedBox(height: SpotifinSpacing.xs),
+      _PanelProgress(active: active),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final size = constraints.biggest.shortestSide;
-                return Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Artwork(
-                    itemId: track.albumId ?? track.id,
-                    size: size,
-                    borderRadius: SpotifinRadii.card,
-                  ),
-                );
-              },
-            ),
+          _ActiveControl(
+            tooltip: 'Shuffle',
+            active: state.shuffle,
+            onPressed: canShuffle ? active.toggleShuffle : null,
+            icon: Icons.shuffle_rounded,
           ),
-          const SizedBox(height: SpotifinSpacing.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              track.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+          IconButton(
+            tooltip: 'Previous',
+            iconSize: 32,
+            onPressed: active.previous,
+            icon: const Icon(Icons.skip_previous_rounded),
           ),
-          const SizedBox(height: SpotifinSpacing.xxs),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: PlayerCollectionLinks(
-              track: track,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+          SpotifinPlayButton(
+            onPressed: active.toggle,
+            playing: state.playing,
+            large: true,
           ),
-          const SizedBox(height: SpotifinSpacing.xs),
-          _PanelProgress(active: active),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _ActiveControl(
-                tooltip: 'Shuffle',
-                active: state.shuffle,
-                onPressed: canShuffle ? active.toggleShuffle : null,
-                icon: Icons.shuffle_rounded,
-              ),
-              IconButton(
-                tooltip: 'Previous',
-                iconSize: 32,
-                onPressed: active.previous,
-                icon: const Icon(Icons.skip_previous_rounded),
-              ),
-              SpotifinPlayButton(
-                onPressed: active.toggle,
-                playing: state.playing,
-                large: true,
-              ),
-              IconButton(
-                tooltip: 'Next',
-                iconSize: 32,
-                onPressed: active.next,
-                icon: const Icon(Icons.skip_next_rounded),
-              ),
-              _ActiveControl(
-                tooltip: 'Repeat',
-                active: state.repeatMode != LoopMode.off,
-                onPressed: canRepeat ? active.cycleRepeat : null,
-                icon: state.repeatMode == LoopMode.one
-                    ? Icons.repeat_one_rounded
-                    : Icons.repeat_rounded,
-              ),
-            ],
+          IconButton(
+            tooltip: 'Next',
+            iconSize: 32,
+            onPressed: active.next,
+            icon: const Icon(Icons.skip_next_rounded),
+          ),
+          _ActiveControl(
+            tooltip: 'Repeat',
+            active: state.repeatMode != LoopMode.off,
+            onPressed: canRepeat ? active.cycleRepeat : null,
+            icon: state.repeatMode == LoopMode.one
+                ? Icons.repeat_one_rounded
+                : Icons.repeat_rounded,
           ),
         ],
       ),
-    );
+    ];
   }
 }
 

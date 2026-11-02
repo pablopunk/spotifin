@@ -5,7 +5,9 @@ import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/state/app_controller.dart';
+import 'package:spotifin/features/common/artwork.dart';
 import 'package:spotifin/features/player/player_bar.dart';
+import 'package:spotifin/features/player/player_card.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_sender.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
@@ -128,6 +130,7 @@ void main() {
     FakeActivePlayback active, {
     LyricsService? lyrics,
     Size size = const Size(390, 844),
+    Widget child = const PlayerBar(),
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -154,7 +157,7 @@ void main() {
           castControllerProvider.overrideWithValue(cast),
           if (lyrics != null) lyricsProvider.overrideWithValue(lyrics),
         ],
-        child: const MaterialApp(home: Scaffold(body: PlayerBar())),
+        child: MaterialApp(home: Scaffold(body: child)),
       ),
     );
     await tester.pump();
@@ -270,6 +273,97 @@ void main() {
       expect(slider.onChanged, isNull);
     }
     semantics.dispose();
+  });
+
+  testWidgets('player card shows the track, controls and three panel tabs', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(
+      tester,
+      active,
+      size: const Size(372, 560),
+      child: const PlayerCard(),
+    );
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Local Song'), findsOneWidget);
+    expect(find.byTooltip('Previous'), findsOneWidget);
+    expect(find.byTooltip('Lyrics'), findsOneWidget);
+    expect(find.byTooltip('Queue'), findsOneWidget);
+    expect(find.byTooltip('History'), findsOneWidget);
+    expect(find.byTooltip('Now playing'), findsNothing);
+    expect(find.byType(Slider), findsOneWidget);
+  });
+
+  testWidgets('player card gives spare height to the artwork', (tester) async {
+    final active = FakeActivePlayback();
+    await pumpBar(
+      tester,
+      active,
+      size: const Size(330, 356),
+      child: const SizedBox(height: 356, child: PlayerCard()),
+    );
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Artwork).evaluate().length, 1);
+    expect(tester.getSize(find.byType(Artwork)).width, greaterThan(64));
+  });
+
+  testWidgets('wide player card puts the artwork beside the details', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(
+      tester,
+      active,
+      size: const Size(653, 356),
+      child: const SizedBox(height: 356, child: PlayerCard()),
+    );
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final artwork = tester.getRect(find.byType(Artwork));
+    final title = tester.getTopLeft(find.text('Local Song'));
+    expect(artwork.right, lessThanOrEqualTo(title.dx));
+    expect(find.byType(Slider), findsOneWidget);
+    final slider = tester.getRect(find.byType(Slider));
+    expect(slider.top, greaterThan(artwork.bottom - 1));
+    expect(slider.width, greaterThan(400));
+  });
+
+  testWidgets('player card stays usable in a short half screen', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(
+      tester,
+      active,
+      size: const Size(330, 300),
+      child: const SizedBox(height: 300, child: PlayerCard()),
+    );
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Local Song'), findsOneWidget);
+  });
+
+  testWidgets('desktop bar fits an unfolded iPhone Duo in landscape', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(tester, active, size: const Size(951, 669));
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byTooltip('Queue'), findsOneWidget);
   });
 
   testWidgets('receiver loss retains the recovery display', (tester) async {

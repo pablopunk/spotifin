@@ -12,6 +12,7 @@ import '../common/glass.dart';
 import 'cast_button.dart';
 import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
+import 'player_panel_tabs.dart';
 import 'remote_devices.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
@@ -23,6 +24,7 @@ class DesktopPlayerBar extends StatelessWidget {
     required this.onOpenLyrics,
     required this.glass,
     required this.glassOpacity,
+    this.usesSidePanel = false,
     super.key,
   });
 
@@ -33,6 +35,7 @@ class DesktopPlayerBar extends StatelessWidget {
   final VoidCallback onOpenLyrics;
   final bool glass;
   final double glassOpacity;
+  final bool usesSidePanel;
 
   @override
   Widget build(BuildContext context) {
@@ -42,36 +45,66 @@ class DesktopPlayerBar extends StatelessWidget {
         height: 88,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _TrackSummary(track: track, onTap: onOpenPlayer),
-                ),
-              ),
-              Expanded(flex: 2, child: _DesktopTransport(active: active)),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _DesktopUtilities(
-                    active: active,
-                    onOpenQueue: onOpenQueue,
-                    onOpenLyrics: onOpenLyrics,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _TrackSummary(track: track, onTap: onOpenPlayer),
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  flex: constraints.maxWidth >= SpotifinBreakpoints.extendedRail
+                      ? 2
+                      : 1,
+                  child: DesktopTransport(active: active),
+                ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _DesktopUtilities(
+                      active: active,
+                      usesSidePanel: usesSidePanel,
+                      onOpenQueue: onOpenQueue,
+                      onOpenLyrics: onOpenLyrics,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+    return PlayerBarSurface(
+      glass: glass,
+      glassOpacity: glassOpacity,
+      child: content,
+    );
+  }
+}
+
+class PlayerBarSurface extends StatelessWidget {
+  const PlayerBarSurface({
+    required this.glass,
+    required this.glassOpacity,
+    required this.child,
+    super.key,
+  });
+
+  final bool glass;
+  final double glassOpacity;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     final surface = !glass
         ? Material(
             color: Colors.black,
             elevation: 20,
             shadowColor: Colors.black,
-            child: content,
+            child: child,
           )
         : GlassContainer(
             useOwnLayer: true,
@@ -79,7 +112,7 @@ class DesktopPlayerBar extends StatelessWidget {
             settings: SpotifinGlass.settings(glassOpacity),
             shape: const LiquidRoundedSuperellipse(borderRadius: 16),
             clipBehavior: Clip.antiAlias,
-            child: content,
+            child: child,
           );
     return Listener(
       behavior: HitTestBehavior.opaque,
@@ -261,10 +294,19 @@ class _TrackSummary extends StatelessWidget {
   );
 }
 
-class _DesktopTransport extends StatelessWidget {
-  const _DesktopTransport({required this.active});
+class DesktopTransport extends StatelessWidget {
+  const DesktopTransport({
+    required this.active,
+    this.showControls = true,
+    this.showProgress = true,
+    this.large = false,
+    super.key,
+  });
 
   final ActivePlayback active;
+  final bool showControls;
+  final bool showProgress;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -282,44 +324,49 @@ class _DesktopTransport extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              height: 40,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _ToggleButton(
-                    tooltip: casting && !canShuffle
-                        ? 'Stop casting to change shuffle'
-                        : 'Shuffle',
-                    active: state.shuffle,
-                    onPressed: canShuffle ? active.toggleShuffle : () {},
-                    icon: Icons.shuffle_rounded,
-                  ),
-                  IconButton(
-                    tooltip: 'Previous',
-                    onPressed: active.previous,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  _OwnerPlayButton(active: active),
-                  IconButton(
-                    tooltip: 'Next',
-                    onPressed: active.next,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                  _ToggleButton(
-                    tooltip: casting && !canRepeat
-                        ? 'Stop casting to change repeat'
-                        : 'Repeat',
-                    active: state.repeatMode != LoopMode.off,
-                    onPressed: canRepeat ? active.cycleRepeat : () {},
-                    icon: state.repeatMode == LoopMode.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                  ),
-                ],
+            if (showControls)
+              SizedBox(
+                height: large ? 68 : 40,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _ToggleButton(
+                      tooltip: casting && !canShuffle
+                          ? 'Stop casting to change shuffle'
+                          : 'Shuffle',
+                      active: state.shuffle,
+                      onPressed: canShuffle ? active.toggleShuffle : () {},
+                      icon: Icons.shuffle_rounded,
+                      iconSize: large ? 30 : 20,
+                    ),
+                    IconButton(
+                      tooltip: 'Previous',
+                      iconSize: large ? 40 : 24,
+                      onPressed: active.previous,
+                      icon: const Icon(Icons.skip_previous_rounded),
+                    ),
+                    _OwnerPlayButton(active: active, size: large ? 56 : 32),
+                    IconButton(
+                      tooltip: 'Next',
+                      iconSize: large ? 40 : 24,
+                      onPressed: active.next,
+                      icon: const Icon(Icons.skip_next_rounded),
+                    ),
+                    _ToggleButton(
+                      tooltip: casting && !canRepeat
+                          ? 'Stop casting to change repeat'
+                          : 'Repeat',
+                      active: state.repeatMode != LoopMode.off,
+                      onPressed: canRepeat ? active.cycleRepeat : () {},
+                      icon: state.repeatMode == LoopMode.one
+                          ? Icons.repeat_one_rounded
+                          : Icons.repeat_rounded,
+                      iconSize: large ? 30 : 20,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            _ProgressSlider(active: active),
+            if (showProgress) _ProgressSlider(active: active),
           ],
         );
       },
@@ -328,9 +375,10 @@ class _DesktopTransport extends StatelessWidget {
 }
 
 class _OwnerPlayButton extends StatelessWidget {
-  const _OwnerPlayButton({required this.active});
+  const _OwnerPlayButton({required this.active, required this.size});
 
   final ActivePlayback active;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -343,14 +391,14 @@ class _OwnerPlayButton extends StatelessWidget {
           style: IconButton.styleFrom(
             backgroundColor: SpotifinColors.text,
             foregroundColor: Colors.black,
-            minimumSize: const Size.square(32),
-            maximumSize: const Size.square(32),
+            minimumSize: Size.square(size),
+            maximumSize: Size.square(size),
             padding: EdgeInsets.zero,
           ),
           onPressed: active.toggle,
           icon: Icon(
             playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            size: 22,
+            size: size * 0.7,
           ),
         );
       },
@@ -364,19 +412,21 @@ class _ToggleButton extends StatelessWidget {
     required this.active,
     required this.onPressed,
     required this.icon,
+    required this.iconSize,
   });
 
   final String tooltip;
   final bool active;
   final VoidCallback onPressed;
   final IconData icon;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
     color: active ? SpotifinColors.accent : SpotifinColors.textMuted,
     onPressed: onPressed,
-    icon: Icon(icon, size: 20),
+    icon: Icon(icon, size: iconSize),
   );
 }
 
@@ -438,11 +488,13 @@ class _TimeLabel extends StatelessWidget {
 class _DesktopUtilities extends StatelessWidget {
   const _DesktopUtilities({
     required this.active,
+    required this.usesSidePanel,
     required this.onOpenQueue,
     required this.onOpenLyrics,
   });
 
   final ActivePlayback active;
+  final bool usesSidePanel;
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
 
@@ -451,32 +503,65 @@ class _DesktopUtilities extends StatelessWidget {
     return ListenableBuilder(
       listenable: active,
       builder: (context, _) {
-        final state = active.state;
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CastButton(),
             const RemoteDeviceButton(),
-            IconButton(
-              tooltip: 'Lyrics',
-              onPressed: onOpenLyrics,
-              icon: const Icon(Icons.lyrics_outlined, size: 19),
-            ),
-            IconButton(
-              tooltip: 'Queue',
-              onPressed: onOpenQueue,
-              icon: const Icon(Icons.queue_music_rounded, size: 20),
-            ),
+            if (usesSidePanel)
+              const PlayerPanelTabs()
+            else ...[
+              IconButton(
+                tooltip: 'Lyrics',
+                onPressed: onOpenLyrics,
+                icon: const Icon(Icons.lyrics_outlined, size: 19),
+              ),
+              IconButton(
+                tooltip: 'Queue',
+                onPressed: onOpenQueue,
+                icon: const Icon(Icons.queue_music_rounded, size: 20),
+              ),
+            ],
             const SizedBox(width: SpotifinSpacing.sm),
             if (AirPlayControl.isSupported) const AirPlayControl(),
+            Flexible(child: _DesktopVolume(active: active)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DesktopVolume extends StatelessWidget {
+  const _DesktopVolume({required this.active});
+
+  static const _iconWidth = 20.0;
+  static const _sliderWidth = 144.0;
+  static const _minimumSliderWidth = 96.0;
+
+  final ActivePlayback active;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = active.state;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sliderWidth = (constraints.maxWidth - _iconWidth).clamp(
+          0.0,
+          _sliderWidth,
+        );
+        if (sliderWidth < _minimumSliderWidth) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Icon(
               state.volumeSlider == 0
                   ? Icons.volume_off_rounded
                   : Icons.volume_up_rounded,
-              size: 20,
+              size: _iconWidth,
             ),
             SizedBox(
-              width: 144,
+              width: sliderWidth,
               child: MergeSemantics(
                 child: Semantics(
                   label: 'Volume',

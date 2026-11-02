@@ -11,53 +11,71 @@ class PlayerCollectionLinks extends ConsumerWidget {
   const PlayerCollectionLinks({
     required this.track,
     required this.style,
+    this.stacked = false,
     super.key,
   });
 
   final Track track;
   final TextStyle? style;
+  final bool stacked;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final artist = _artist(context, ref);
+    final album = _album(context, ref);
+    if (stacked) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          artist,
+          if (album != null) ...[const SizedBox(height: 4), album],
+        ],
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: artist),
+        if (album != null) ...[
+          const SizedBox(width: 12),
+          Flexible(child: album),
+        ],
+      ],
+    );
+  }
+
+  Widget _artist(BuildContext context, WidgetRef ref) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Flexible(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.person_rounded,
-              size: (style?.fontSize ?? 14) + 1,
-              color: SpotifinColors.text,
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: ArtistLinks(
-                  artists: track.artistCredits,
-                  style: style?.copyWith(color: SpotifinColors.text),
-                  onTap: (artist) => openArtistCollection(context, ref, artist),
-                ),
-              ),
-            ),
-          ],
-        ),
+      Icon(
+        Icons.person_rounded,
+        size: (style?.fontSize ?? 14) + 1,
+        color: SpotifinColors.text,
       ),
-      if (track.album.isNotEmpty) ...[
-        const SizedBox(width: 12),
-        Flexible(
-          child: _CollectionLink(
-            icon: Icons.album_rounded,
-            label: track.album,
-            color: SpotifinColors.textMuted,
-            style: style?.copyWith(color: SpotifinColors.textMuted),
-            onTap: () => openAlbumCollection(context, ref, track),
+      const SizedBox(width: 4),
+      Flexible(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: ArtistLinks(
+            artists: track.artistCredits,
+            style: style?.copyWith(color: SpotifinColors.text),
+            onTap: (artist) => openArtistCollection(context, ref, artist),
           ),
         ),
-      ],
+      ),
     ],
   );
+
+  Widget? _album(BuildContext context, WidgetRef ref) => track.album.isEmpty
+      ? null
+      : _CollectionLink(
+          icon: Icons.album_rounded,
+          label: track.album,
+          color: SpotifinColors.textMuted,
+          style: style?.copyWith(color: SpotifinColors.textMuted),
+          onTap: () => openAlbumCollection(context, ref, track),
+        );
 }
 
 class _CollectionLink extends StatelessWidget {

@@ -18,6 +18,38 @@ void main() {
     expect(theme.sliderTheme.overlayColor, const Color(0x3339F4D1));
   });
 
+  test('only a wide one-sided inset counts as a vertical bar strip', () {
+    expect(SpotifinStrip.sidesOf(const EdgeInsets.only(right: 84)), (
+      left: false,
+      right: true,
+    ));
+    expect(SpotifinStrip.sidesOf(const EdgeInsets.only(left: 84)), (
+      left: true,
+      right: false,
+    ));
+    expect(SpotifinStrip.sidesOf(const EdgeInsets.symmetric(horizontal: 59)), (
+      left: false,
+      right: false,
+    ));
+    expect(SpotifinStrip.sidesOf(const EdgeInsets.only(right: 24)), (
+      left: false,
+      right: false,
+    ));
+  });
+
+  test('handsets keep the rail breakpoint while foldables open the rail', () {
+    const phoneLandscape = Size(874, 402);
+    const duoInnerPortrait = Size(626, 890);
+    const duoInnerLandscape = Size(890, 626);
+
+    expect(SpotifinBreakpoints.isHandset(phoneLandscape), isTrue);
+    expect(SpotifinBreakpoints.showsRail(phoneLandscape), isFalse);
+    expect(SpotifinBreakpoints.isHandset(duoInnerPortrait), isFalse);
+    expect(SpotifinBreakpoints.showsRail(duoInnerPortrait), isFalse);
+    expect(SpotifinBreakpoints.isHandset(duoInnerLandscape), isFalse);
+    expect(SpotifinBreakpoints.showsRail(duoInnerLandscape), isTrue);
+  });
+
   testWidgets('shared components fit a narrow mobile viewport', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
