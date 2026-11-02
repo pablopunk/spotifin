@@ -299,12 +299,14 @@ class DesktopTransport extends StatelessWidget {
     required this.active,
     this.showControls = true,
     this.showProgress = true,
+    this.large = false,
     super.key,
   });
 
   final ActivePlayback active;
   final bool showControls;
   final bool showProgress;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +326,7 @@ class DesktopTransport extends StatelessWidget {
           children: [
             if (showControls)
               SizedBox(
-                height: 40,
+                height: large ? 68 : 40,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -335,15 +337,18 @@ class DesktopTransport extends StatelessWidget {
                       active: state.shuffle,
                       onPressed: canShuffle ? active.toggleShuffle : () {},
                       icon: Icons.shuffle_rounded,
+                      iconSize: large ? 30 : 20,
                     ),
                     IconButton(
                       tooltip: 'Previous',
+                      iconSize: large ? 40 : 24,
                       onPressed: active.previous,
                       icon: const Icon(Icons.skip_previous_rounded),
                     ),
-                    _OwnerPlayButton(active: active),
+                    _OwnerPlayButton(active: active, size: large ? 56 : 32),
                     IconButton(
                       tooltip: 'Next',
+                      iconSize: large ? 40 : 24,
                       onPressed: active.next,
                       icon: const Icon(Icons.skip_next_rounded),
                     ),
@@ -356,6 +361,7 @@ class DesktopTransport extends StatelessWidget {
                       icon: state.repeatMode == LoopMode.one
                           ? Icons.repeat_one_rounded
                           : Icons.repeat_rounded,
+                      iconSize: large ? 30 : 20,
                     ),
                   ],
                 ),
@@ -369,9 +375,10 @@ class DesktopTransport extends StatelessWidget {
 }
 
 class _OwnerPlayButton extends StatelessWidget {
-  const _OwnerPlayButton({required this.active});
+  const _OwnerPlayButton({required this.active, required this.size});
 
   final ActivePlayback active;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -384,14 +391,14 @@ class _OwnerPlayButton extends StatelessWidget {
           style: IconButton.styleFrom(
             backgroundColor: SpotifinColors.text,
             foregroundColor: Colors.black,
-            minimumSize: const Size.square(32),
-            maximumSize: const Size.square(32),
+            minimumSize: Size.square(size),
+            maximumSize: Size.square(size),
             padding: EdgeInsets.zero,
           ),
           onPressed: active.toggle,
           icon: Icon(
             playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            size: 22,
+            size: size * 0.7,
           ),
         );
       },
@@ -405,19 +412,21 @@ class _ToggleButton extends StatelessWidget {
     required this.active,
     required this.onPressed,
     required this.icon,
+    required this.iconSize,
   });
 
   final String tooltip;
   final bool active;
   final VoidCallback onPressed;
   final IconData icon;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
     color: active ? SpotifinColors.accent : SpotifinColors.textMuted,
     onPressed: onPressed,
-    icon: Icon(icon, size: 20),
+    icon: Icon(icon, size: iconSize),
   );
 }
 

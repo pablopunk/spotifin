@@ -18,15 +18,18 @@ class DuoDisplayHost extends StatelessWidget {
 class DuoSplitScope extends StatelessWidget {
   const DuoSplitScope({required this.builder, super.key});
 
-  final Widget Function(BuildContext context, bool onInnerScreen) builder;
+  final Widget Function(BuildContext context, bool halfFolded) builder;
 
   @override
   Widget build(BuildContext context) => !Platform.isIOS
       ? builder(context, false)
       : StreamBuilder<DuoGeometry>(
           stream: DuoDisplay.geometry,
-          builder: (context, snapshot) =>
-              builder(context, snapshot.data?.screen == DuoScreen.inner),
+          builder: (context, snapshot) => builder(
+            context,
+            snapshot.data?.screen == DuoScreen.inner &&
+                snapshot.data?.posture == DuoPosture.book,
+          ),
         );
 }
 
@@ -37,7 +40,6 @@ class DuoPanesBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DuoLayoutBuilder(
-    splitWhenFlat: true,
     builder: (context, layout) => builder(context, _DuoLayoutPanes(layout)),
   );
 }

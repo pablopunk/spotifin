@@ -23,6 +23,7 @@ import '../player/remote_devices.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
+import 'dismiss_sheets_on_split.dart';
 import 'duo_split_body.dart';
 import 'sidebar_playlists.dart';
 import 'vertical_bar_content.dart';
@@ -333,50 +334,53 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               playerBar: showAccessory ? accessory : null,
             );
       return DuoSplitScope(
-        builder: (context, onInnerScreen) {
-          final duoSplit = onInnerScreen && hasTrack;
-          return GlassScaffold(
-            backgroundColor: SpotifinColors.background,
-            settings: SpotifinGlass.settings(glassOpacity),
-            topEdgeFade: false,
-            bottomBar: GlassTabBar.bottom(
+        builder: (context, halfFolded) {
+          final duoSplit = halfFolded && hasTrack;
+          return DismissSheetsOnSplit(
+            split: duoSplit,
+            child: GlassScaffold(
+              backgroundColor: SpotifinColors.background,
               settings: SpotifinGlass.settings(glassOpacity),
-              indicatorSettings: SpotifinGlass.settings(glassOpacity),
-              selectedIndex: selectedIndex,
-              onTabSelected: widget.controller.selectDestination,
-              selectedIconColor: SpotifinColors.text,
-              unselectedIconColor: SpotifinColors.textMuted,
-              selectedLabelColor: SpotifinColors.text,
-              unselectedLabelColor: SpotifinColors.textMuted,
-              interactionGlowColor: SpotifinColors.accent,
-              bottomAccessorySpacing: 0,
-              bottomAccessory: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: accessory,
+              topEdgeFade: false,
+              bottomBar: GlassTabBar.bottom(
+                settings: SpotifinGlass.settings(glassOpacity),
+                indicatorSettings: SpotifinGlass.settings(glassOpacity),
+                selectedIndex: selectedIndex,
+                onTabSelected: widget.controller.selectDestination,
+                selectedIconColor: SpotifinColors.text,
+                unselectedIconColor: SpotifinColors.textMuted,
+                selectedLabelColor: SpotifinColors.text,
+                unselectedLabelColor: SpotifinColors.textMuted,
+                interactionGlowColor: SpotifinColors.accent,
+                bottomAccessorySpacing: 0,
+                bottomAccessory: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: accessory,
+                ),
+                bottomAccessoryEnabled: showAccessory && !duoSplit,
+                bottomAccessoryHeight: 74,
+                verticalPadding: 12,
+                tabs: _destinations
+                    .map(
+                      (item) => GlassTab(
+                        icon: Icon(item.icon),
+                        activeIcon: Icon(item.selectedIcon),
+                        label: item.label,
+                      ),
+                    )
+                    .toList(),
               ),
-              bottomAccessoryEnabled: showAccessory && !duoSplit,
-              bottomAccessoryHeight: 74,
-              verticalPadding: 12,
-              tabs: _destinations
-                  .map(
-                    (item) => GlassTab(
-                      icon: Icon(item.icon),
-                      activeIcon: Icon(item.selectedIcon),
-                      label: item.label,
-                    ),
-                  )
-                  .toList(),
+              body: duoSplit
+                  ? DuoSplitBody(
+                      panelOpen: !playerPanels.withoutPlayer.isEmpty,
+                      browsingBuilder: (_, inset) => SpotifinChromeInsets(
+                        bottom: inset,
+                        child: _buildDestinationStack(selectedIndex),
+                      ),
+                      fallbackBuilder: (_) => plainBody,
+                    )
+                  : plainBody,
             ),
-            body: duoSplit
-                ? DuoSplitBody(
-                    panelOpen: !playerPanels.withoutPlayer.isEmpty,
-                    browsingBuilder: (_, inset) => SpotifinChromeInsets(
-                      bottom: inset,
-                      child: _buildDestinationStack(selectedIndex),
-                    ),
-                    fallbackBuilder: (_) => plainBody,
-                  )
-                : plainBody,
           );
         },
       );

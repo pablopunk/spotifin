@@ -62,10 +62,12 @@ class PlayerCard extends ConsumerWidget {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    _Details(track: track),
+                                    _Details(track: track, wide: true),
+                                    const SizedBox(height: SpotifinSpacing.xl),
                                     DesktopTransport(
                                       active: active,
                                       showProgress: false,
+                                      large: true,
                                     ),
                                   ],
                                 ),
@@ -73,6 +75,7 @@ class PlayerCard extends ConsumerWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(height: SpotifinSpacing.md),
                         DesktopTransport(active: active, showControls: false),
                         const _CardToolbar(),
                       ],
@@ -164,9 +167,10 @@ class _FillArtwork extends StatelessWidget {
 }
 
 class _Details extends StatelessWidget {
-  const _Details({required this.track});
+  const _Details({required this.track, this.wide = false});
 
   final Track track;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -177,12 +181,17 @@ class _Details extends StatelessWidget {
         track.name,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.titleLarge,
+        style: wide
+            ? Theme.of(context).textTheme.headlineMedium
+            : Theme.of(context).textTheme.titleLarge,
       ),
-      const SizedBox(height: SpotifinSpacing.xxs),
+      SizedBox(height: wide ? SpotifinSpacing.xs : SpotifinSpacing.xxs),
       PlayerCollectionLinks(
         track: track,
-        style: Theme.of(context).textTheme.bodySmall,
+        stacked: wide,
+        style: wide
+            ? Theme.of(context).textTheme.bodyMedium
+            : Theme.of(context).textTheme.bodySmall,
       ),
     ],
   );

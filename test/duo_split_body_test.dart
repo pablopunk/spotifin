@@ -94,6 +94,23 @@ void main() {
     expect(card.left, lessThan(panel.left));
   });
 
+  testWidgets('a flat fold does not split the screen', (tester) async {
+    await _pump(
+      tester,
+      size: const Size(669, 951),
+      features: [
+        const DisplayFeature(
+          bounds: Rect.fromLTRB(0, 455.5, 669, 495.5),
+          type: DisplayFeatureType.fold,
+          state: DisplayFeatureState.postureFlat,
+        ),
+      ],
+    );
+
+    expect(find.byKey(_fallback), findsOneWidget);
+    expect(find.byKey(_card), findsNothing);
+  });
+
   testWidgets('without a fold the fallback layout is shown', (tester) async {
     await _pump(tester, size: const Size(669, 951));
 

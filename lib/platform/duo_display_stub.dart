@@ -14,7 +14,7 @@ class DuoDisplayHost extends StatelessWidget {
 class DuoSplitScope extends StatelessWidget {
   const DuoSplitScope({required this.builder, super.key});
 
-  final Widget Function(BuildContext context, bool onInnerScreen) builder;
+  final Widget Function(BuildContext context, bool halfFolded) builder;
 
   @override
   Widget build(BuildContext context) => builder(context, false);
