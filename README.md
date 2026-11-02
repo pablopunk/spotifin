@@ -39,6 +39,11 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 | ![ios app player](assets/screenshots/ios1.jpg) | ![ios app library](assets/screenshots/ios2.jpg) |
 
 
+| iPhone Duo (folded) | iPhone Duo (landscape) | iPhone Duo (closed) |
+| -------- | -------- | -------- |
+| ![iPhone Duo folded](assets/screenshots/duo-folded.png) | ![iPhone Duo landscape](assets/screenshots/duo-landscape.png) | ![iPhone Duo closed](assets/screenshots/duo-closed.png) |
+
+
 | Remote play! |
 | -------- |
 | ![Web screenshot](assets/screenshots/remote%20play.png) |
