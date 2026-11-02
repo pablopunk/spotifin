@@ -138,9 +138,12 @@ class _OverlayShellState extends State<_OverlayShell> {
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
+    final strip = SpotifinStrip.sidesOf(MediaQuery.paddingOf(context));
     return Material(
       color: Colors.black,
       child: SafeArea(
+        left: !strip.left,
+        right: !strip.right,
         child: LayoutBuilder(
           builder: (context, constraints) => CustomScrollView(
             slivers: [

@@ -149,6 +149,38 @@ void main() {
     await tester.runAsync(database.close);
   });
 
+  testWidgets('overlay covers a vertical bar strip', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(678, 466));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final active = FakeActivePlayback();
+    final queue = [_track('1', 'First'), _track('2', 'Second')];
+    active.emit(_ownerState(queue: queue, index: 0, track: queue.first));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          activePlaybackProvider.overrideWithValue(active),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(678, 466),
+              padding: EdgeInsets.only(right: 84, bottom: 34),
+            ),
+            child: Scaffold(body: CoverflowOverlay(onDismiss: () {})),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dismiss = tester.getRect(find.byTooltip('Dismiss'));
+    expect(dismiss.right, greaterThan(678 - 24));
+  });
+
   testWidgets('overlay falls back to library when queue is empty', (
     tester,
   ) async {

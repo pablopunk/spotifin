@@ -26,6 +26,7 @@ import 'sidebar.dart';
 import 'dismiss_sheets_on_split.dart';
 import 'duo_split_body.dart';
 import 'sidebar_playlists.dart';
+import 'strip_navigation.dart';
 import 'vertical_bar_content.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
@@ -432,27 +433,46 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         body: content,
       );
     }
+    final strip = GlassVerticalBar.maybeOf(context);
     return Scaffold(
-      body: content,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!hasTrack) const RemoteNowPlayingBar(),
-          NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: widget.controller.selectDestination,
-            destinations: _destinations
-                .map(
-                  (item) => NavigationDestination(
+      body: strip == null
+          ? content
+          : StripNavigation(
+              strip: strip,
+              selectedIndex: selectedIndex,
+              onSelected: widget.controller.selectDestination,
+              destinations: [
+                for (final item in _destinations)
+                  NavigationRailDestination(
                     icon: Icon(item.icon),
                     selectedIcon: Icon(item.selectedIcon),
-                    label: item.label,
+                    label: Text(item.label),
                   ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
+              ],
+              child: content,
+            ),
+      bottomNavigationBar: strip != null && hasTrack
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hasTrack) const RemoteNowPlayingBar(),
+                if (strip == null)
+                  NavigationBar(
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: widget.controller.selectDestination,
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.selectedIcon),
+                            label: item.label,
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
     );
   }
 

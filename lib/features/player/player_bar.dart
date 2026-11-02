@@ -98,15 +98,22 @@ void _showNowPlaying(
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
     constraints: const BoxConstraints(maxWidth: 720),
     backgroundColor: glass ? Colors.transparent : SpotifinColors.surface,
-    builder: (_) => _NowPlaying(
-      active: active,
-      glass: glass,
-      glassOpacity: glassOpacity,
-      initialDetailsTab: initialDetailsTab,
-    ),
+    builder: (sheetContext) {
+      final strip = SpotifinStrip.sidesOf(MediaQuery.paddingOf(sheetContext));
+      return SafeArea(
+        bottom: false,
+        left: !strip.left,
+        right: !strip.right,
+        child: _NowPlaying(
+          active: active,
+          glass: glass,
+          glassOpacity: glassOpacity,
+          initialDetailsTab: initialDetailsTab,
+        ),
+      );
+    },
   );
 }
 

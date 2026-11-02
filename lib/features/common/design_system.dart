@@ -12,6 +12,15 @@ abstract final class SpotifinSpacing {
   static const xxl = 32.0;
 }
 
+abstract final class SpotifinStrip {
+  static const minimumWidth = 80.0;
+
+  static ({bool left, bool right}) sidesOf(EdgeInsets padding) => (
+    left: padding.left >= minimumWidth && padding.right == 0,
+    right: padding.right >= minimumWidth && padding.left == 0,
+  );
+}
+
 abstract final class SpotifinBreakpoints {
   static const mobile = 576.0;
   static const rail = 896.0;
