@@ -31,6 +31,7 @@ Future<void> _pump(
           browsingBuilder: (_, _) => const SizedBox.expand(key: _browsing),
           fallbackBuilder: (_) => const SizedBox.expand(key: _fallback),
           panel: const SizedBox.expand(key: _panel),
+          topPanel: const SizedBox.expand(key: _panel),
           bar: const SizedBox(key: _bar, height: 80),
         ),
       ),

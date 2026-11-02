@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
+import 'package:spotifin/app/state/player_panel_controller.dart';
 import 'package:spotifin/features/player/player_side_panel.dart';
 import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/services/playback/remote_session_service.dart';
@@ -52,10 +53,11 @@ ActivePlaybackState _queueState() {
   );
 }
 
-Future<FakeActivePlayback> _pumpPanel(
+Future<(FakeActivePlayback, ProviderContainer)> _pumpPanel(
   WidgetTester tester, {
   required Size size,
   bool showPlayer = false,
+  bool sideBySide = false,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -77,18 +79,20 @@ Future<FakeActivePlayback> _pumpPanel(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: Scaffold(body: PlayerSidePanel())),
+      child: MaterialApp(
+        home: Scaffold(body: PlayerSidePanel(sideBySide: sideBySide)),
+      ),
     ),
   );
   await tester.pump();
-  return active;
+  return (active, container);
 }
 
 void main() {
   testWidgets('desktop queue hides played tracks and maps queue actions', (
     tester,
   ) async {
-    final active = await _pumpPanel(tester, size: const Size(900, 700));
+    final (active, _) = await _pumpPanel(tester, size: const Size(900, 700));
 
     expect(find.text('Played'), findsNothing);
     expect(find.text('Current'), findsOneWidget);
@@ -109,5 +113,31 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(SingleChildScrollView), findsWidgets);
+  });
+
+  testWidgets('side by side panels sit in one row and cap at two', (
+    tester,
+  ) async {
+    final (_, container) = await _pumpPanel(
+      tester,
+      size: const Size(669, 455),
+      showPlayer: true,
+      sideBySide: true,
+    );
+
+    container.read(playerPanelProvider.notifier).toggleHistory();
+    await tester.pump();
+    await tester.pump();
+
+    final open = container.read(playerPanelProvider).openPanels;
+    expect(open, hasLength(2));
+    expect(open, contains(PlayerPanel.history));
+    final queue = tester.getTopLeft(find.text('Queue'));
+    final history = tester.getTopLeft(find.text('History'));
+    expect(queue.dy, history.dy);
+    expect(queue.dx, lessThan(history.dx));
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 }

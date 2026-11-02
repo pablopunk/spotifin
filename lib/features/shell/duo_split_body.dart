@@ -12,6 +12,7 @@ class DuoSplitBody extends StatelessWidget {
     required this.browsingBuilder,
     required this.fallbackBuilder,
     this.panel = const PlayerSidePanel(),
+    this.topPanel = const PlayerSidePanel(sideBySide: true),
     this.bar = const StackedPlayerBar(),
     super.key,
   });
@@ -23,6 +24,7 @@ class DuoSplitBody extends StatelessWidget {
   browsingBuilder;
   final WidgetBuilder fallbackBuilder;
   final Widget panel;
+  final Widget topPanel;
   final Widget bar;
 
   @override
@@ -40,7 +42,7 @@ class DuoSplitBody extends StatelessWidget {
                   second: _PanelPage(panel: panel, bar: bar),
                 )
               : panes.place(
-                  first: _PanelTop(panel: panel),
+                  first: _PanelTop(panel: topPanel),
                   second: _BarAndBrowsing(
                     bar: bar,
                     browsing: MediaQuery.removePadding(

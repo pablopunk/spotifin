@@ -16,9 +16,12 @@ import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
 
 class PlayerSidePanel extends ConsumerWidget {
-  const PlayerSidePanel({super.key});
+  const PlayerSidePanel({this.sideBySide = false, super.key});
 
   static const _narrowWidth = 560.0;
+  static const _sideBySideMaxOpen = 2;
+
+  final bool sideBySide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,7 +30,11 @@ class PlayerSidePanel extends ConsumerWidget {
     final panelController = ref.read(playerPanelProvider.notifier);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxOpen = constraints.maxWidth < _narrowWidth ? 2 : 4;
+        final maxOpen = sideBySide
+            ? _sideBySideMaxOpen
+            : constraints.maxWidth < _narrowWidth
+            ? 2
+            : 4;
         if (panels.openPanels.length > maxOpen) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => panelController.constrainTo(maxOpen),
@@ -53,7 +60,8 @@ class PlayerSidePanel extends ConsumerWidget {
                       controller: panelController,
                       track: track,
                       active: active,
-                      useQuadrants: maxOpen == 4,
+                      useQuadrants: !sideBySide && maxOpen == 4,
+                      sideBySide: sideBySide,
                     );
                   },
                 ),
@@ -73,6 +81,7 @@ class _ResponsivePanelSections extends StatelessWidget {
     required this.track,
     required this.active,
     required this.useQuadrants,
+    required this.sideBySide,
   });
 
   final PlayerPanelState panels;
@@ -80,10 +89,12 @@ class _ResponsivePanelSections extends StatelessWidget {
   final Track track;
   final ActivePlayback active;
   final bool useQuadrants;
+  final bool sideBySide;
 
   @override
   Widget build(BuildContext context) {
     final sections = _activeSections(panels.displayPanels);
+    if (sideBySide) return _QuadrantRow(sections: sections);
     return useQuadrants
         ? _QuadrantPanelSections(sections: sections)
         : _VerticalPanelSections(sections: sections);
