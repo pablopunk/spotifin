@@ -23,6 +23,7 @@ import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
 import 'sidebar_playlists.dart';
+import 'vertical_bar_content.dart';
 
 class ShellScreen extends ConsumerStatefulWidget {
   const ShellScreen({required this.controller, super.key});
@@ -131,7 +132,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     }
     return ListenableBuilder(
       listenable: widget.controller,
-      builder: (context, _) => _buildShell(context),
+      builder: (context, _) =>
+          GlassNavigationShell(child: Builder(builder: _buildShell)),
     );
   }
 
@@ -204,7 +206,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final wide = SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
+    final iosGlass =
+        ref.watch(glassEffectsProvider) &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS;
+    final verticalBar = iosGlass ? GlassVerticalBar.maybeOf(context) : null;
+    final wide =
+        verticalBar == null &&
+        SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
     final playerPanels = ref.watch(playerPanelProvider);
     final hasTrack = _active.state.track != null;
     final showPlayerPanel =
@@ -304,10 +313,17 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         ),
       );
     }
-    if (glassEffects &&
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS) {
+    if (iosGlass) {
       final showAccessory = hasTrack || _remoteSessions.sessions.isNotEmpty;
+      final accessory = hasTrack
+          ? const PlayerBar()
+          : const GlassContainer(
+              useOwnLayer: true,
+              quality: GlassQuality.premium,
+              shape: LiquidRoundedSuperellipse(borderRadius: 16),
+              clipBehavior: Clip.antiAlias,
+              child: RemoteNowPlayingBar(),
+            );
       return GlassScaffold(
         backgroundColor: SpotifinColors.background,
         settings: SpotifinGlass.settings(glassOpacity),
@@ -325,15 +341,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           bottomAccessorySpacing: 0,
           bottomAccessory: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: hasTrack
-                ? const PlayerBar()
-                : const GlassContainer(
-                    useOwnLayer: true,
-                    quality: GlassQuality.premium,
-                    shape: LiquidRoundedSuperellipse(borderRadius: 16),
-                    clipBehavior: Clip.antiAlias,
-                    child: RemoteNowPlayingBar(),
-                  ),
+            child: accessory,
           ),
           bottomAccessoryEnabled: showAccessory,
           bottomAccessoryHeight: 74,
@@ -348,7 +356,12 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               )
               .toList(),
         ),
-        body: content,
+        body: verticalBar == null
+            ? content
+            : VerticalBarContent(
+                content: content,
+                playerBar: showAccessory ? accessory : null,
+              ),
       );
     }
     if (glassEffects) {
