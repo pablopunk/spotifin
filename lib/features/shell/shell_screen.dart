@@ -6,6 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
+import '../../platform/duo_display.dart';
 import '../../services/playback/active_playback.dart';
 import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
@@ -22,6 +23,7 @@ import '../player/remote_devices.dart';
 import '../settings/settings_screen.dart';
 import 'shell_controller.dart';
 import 'sidebar.dart';
+import 'duo_split_body.dart';
 import 'sidebar_playlists.dart';
 import 'vertical_bar_content.dart';
 
@@ -324,44 +326,58 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               clipBehavior: Clip.antiAlias,
               child: RemoteNowPlayingBar(),
             );
-      return GlassScaffold(
-        backgroundColor: SpotifinColors.background,
-        settings: SpotifinGlass.settings(glassOpacity),
-        topEdgeFade: false,
-        bottomBar: GlassTabBar.bottom(
-          settings: SpotifinGlass.settings(glassOpacity),
-          indicatorSettings: SpotifinGlass.settings(glassOpacity),
-          selectedIndex: selectedIndex,
-          onTabSelected: widget.controller.selectDestination,
-          selectedIconColor: SpotifinColors.text,
-          unselectedIconColor: SpotifinColors.textMuted,
-          selectedLabelColor: SpotifinColors.text,
-          unselectedLabelColor: SpotifinColors.textMuted,
-          interactionGlowColor: SpotifinColors.accent,
-          bottomAccessorySpacing: 0,
-          bottomAccessory: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: accessory,
-          ),
-          bottomAccessoryEnabled: showAccessory,
-          bottomAccessoryHeight: 74,
-          verticalPadding: 12,
-          tabs: _destinations
-              .map(
-                (item) => GlassTab(
-                  icon: Icon(item.icon),
-                  activeIcon: Icon(item.selectedIcon),
-                  label: item.label,
-                ),
-              )
-              .toList(),
-        ),
-        body: verticalBar == null
-            ? content
-            : VerticalBarContent(
-                content: content,
-                playerBar: showAccessory ? accessory : null,
+      final plainBody = verticalBar == null
+          ? content
+          : VerticalBarContent(
+              content: content,
+              playerBar: showAccessory ? accessory : null,
+            );
+      return DuoSplitScope(
+        builder: (context, onInnerScreen) {
+          final duoSplit = onInnerScreen && hasTrack;
+          return GlassScaffold(
+            backgroundColor: SpotifinColors.background,
+            settings: SpotifinGlass.settings(glassOpacity),
+            topEdgeFade: false,
+            bottomBar: GlassTabBar.bottom(
+              settings: SpotifinGlass.settings(glassOpacity),
+              indicatorSettings: SpotifinGlass.settings(glassOpacity),
+              selectedIndex: selectedIndex,
+              onTabSelected: widget.controller.selectDestination,
+              selectedIconColor: SpotifinColors.text,
+              unselectedIconColor: SpotifinColors.textMuted,
+              selectedLabelColor: SpotifinColors.text,
+              unselectedLabelColor: SpotifinColors.textMuted,
+              interactionGlowColor: SpotifinColors.accent,
+              bottomAccessorySpacing: 0,
+              bottomAccessory: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: accessory,
               ),
+              bottomAccessoryEnabled: showAccessory && !duoSplit,
+              bottomAccessoryHeight: 74,
+              verticalPadding: 12,
+              tabs: _destinations
+                  .map(
+                    (item) => GlassTab(
+                      icon: Icon(item.icon),
+                      activeIcon: Icon(item.selectedIcon),
+                      label: item.label,
+                    ),
+                  )
+                  .toList(),
+            ),
+            body: duoSplit
+                ? DuoSplitBody(
+                    browsingBuilder: (_, inset) => SpotifinChromeInsets(
+                      bottom: inset,
+                      child: _buildDestinationStack(selectedIndex),
+                    ),
+                    fallbackBuilder: (_) => plainBody,
+                  )
+                : plainBody,
+          );
+        },
       );
     }
     if (glassEffects) {
