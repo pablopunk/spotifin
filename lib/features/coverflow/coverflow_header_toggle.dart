@@ -33,8 +33,10 @@ class CoverflowToggleButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final width = MediaQuery.sizeOf(context).width;
-    final mobile = width < SpotifinBreakpoints.rail;
+    final screen = MediaQuery.sizeOf(context);
+    final mobile =
+        SpotifinBreakpoints.isHandset(screen) &&
+        !SpotifinBreakpoints.showsRail(screen);
     final compactLandscape =
         mobile && MediaQuery.orientationOf(context) == Orientation.landscape;
     final active = ref.watch(coverflowModeProvider(viewId));

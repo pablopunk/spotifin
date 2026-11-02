@@ -29,8 +29,7 @@ class LibraryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final desktop =
-        MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
+    final desktop = SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
     return DefaultTabController(
       length: 4,
       initialIndex: initialTabIndex.clamp(0, 3),

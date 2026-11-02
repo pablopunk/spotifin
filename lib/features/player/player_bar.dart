@@ -62,7 +62,8 @@ class PlayerBar extends ConsumerWidget {
               );
         return LayoutBuilder(
           builder: (context, constraints) =>
-              constraints.maxWidth >= SpotifinBreakpoints.rail
+              constraints.maxWidth >=
+                  SpotifinBreakpoints.railWidthFor(MediaQuery.sizeOf(context))
               ? DesktopPlayerBar(
                   track: track,
                   active: active,

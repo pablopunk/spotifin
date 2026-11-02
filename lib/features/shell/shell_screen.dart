@@ -136,10 +136,13 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
   }
 
   Widget _buildShell(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final screen = MediaQuery.sizeOf(context);
     final landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
-    final compactLandscape = width < SpotifinBreakpoints.rail && landscape;
+    final compactLandscape =
+        landscape &&
+        SpotifinBreakpoints.isHandset(screen) &&
+        !SpotifinBreakpoints.showsRail(screen);
     final dismissed = ref.watch(mobileCoverflowDismissedProvider);
     // Rotation always opens the playback queue. Only an explicit Cover Flow
     // button request carries a view collection; otherwise collection stays
@@ -201,7 +204,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final wide = width >= SpotifinBreakpoints.rail;
+    final wide = SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
     final playerPanels = ref.watch(playerPanelProvider);
     final hasTrack = _active.state.track != null;
     final showPlayerPanel =

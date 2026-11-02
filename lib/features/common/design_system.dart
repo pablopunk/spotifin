@@ -15,8 +15,16 @@ abstract final class SpotifinSpacing {
 abstract final class SpotifinBreakpoints {
   static const mobile = 576.0;
   static const rail = 896.0;
+  static const largeScreenRail = 840.0;
   static const extendedRail = 1150.0;
   static const playerPanel = 1400.0;
+
+  static bool isHandset(Size screen) => screen.shortestSide < mobile;
+
+  static double railWidthFor(Size screen) =>
+      isHandset(screen) ? rail : largeScreenRail;
+
+  static bool showsRail(Size screen) => screen.width >= railWidthFor(screen);
 }
 
 class SpotifinChromeInsets extends InheritedWidget {

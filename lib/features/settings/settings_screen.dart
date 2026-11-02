@@ -24,8 +24,7 @@ class SettingsScreen extends ConsumerWidget {
     final glassOpacity = ref.watch(glassOpacityProvider);
     final packageInfo = ref.watch(packageInfoProvider).value;
     final updateState = ref.watch(updateControllerProvider);
-    final desktop =
-        MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.rail;
+    final desktop = SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
     return Scaffold(
       appBar: desktop ? null : AppBar(title: const Text('Settings')),
       body: ListView(
