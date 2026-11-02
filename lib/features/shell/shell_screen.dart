@@ -6,7 +6,6 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../../app/providers.dart';
 import '../../app/features.dart';
 import '../../app/theme.dart';
-import '../../platform/duo_display.dart';
 import '../../services/playback/active_playback.dart';
 import '../../services/playback/remote_session_service.dart';
 import '../../storage/database.dart';
@@ -25,6 +24,7 @@ import 'shell_controller.dart';
 import 'sidebar.dart';
 import 'dismiss_sheets_on_split.dart';
 import 'duo_split_body.dart';
+import 'fold_panes.dart';
 import 'sidebar_playlists.dart';
 import 'strip_navigation.dart';
 import 'vertical_bar_content.dart';
@@ -334,8 +334,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               content: content,
               playerBar: showAccessory ? accessory : null,
             );
-      return DuoSplitScope(
-        builder: (context, halfFolded) {
+      return Builder(
+        builder: (context) {
+          final halfFolded = ios && hasHalfOpenFold(context);
           final duoSplit = halfFolded && hasTrack;
           return DismissSheetsOnSplit(
             split: duoSplit,
@@ -434,8 +435,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
       );
     }
     final strip = verticalBar;
-    return DuoSplitScope(
-      builder: (context, halfFolded) {
+    return Builder(
+      builder: (context) {
+        final halfFolded = ios && hasHalfOpenFold(context);
         final duoSplit = halfFolded && hasTrack;
         return DismissSheetsOnSplit(
           split: duoSplit,

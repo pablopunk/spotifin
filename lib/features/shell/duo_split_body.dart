@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../platform/duo_display.dart';
 import '../common/design_system.dart';
 import '../player/player_card.dart';
 import '../player/player_side_panel.dart';
+import 'fold_panes.dart';
 
 class DuoSplitBody extends StatelessWidget {
   const DuoSplitBody({
@@ -31,7 +31,7 @@ class DuoSplitBody extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     bottom: false,
-    child: DuoPanesBuilder(
+    child: FoldPanesBuilder(
       builder: (context, panes) {
         if (!panes.isSplit) return fallbackBuilder(context);
         return panes.sideBySide

@@ -11,7 +11,6 @@ import '../features/common/brand_logo.dart';
 import '../features/shell/shell_controller.dart';
 import '../features/shell/shell_screen.dart';
 import '../features/updates/update_prompt.dart';
-import '../platform/duo_display.dart';
 import '../services/shortcuts/play_library_handler.dart';
 import '../services/updates/release_info.dart';
 import 'app_shortcuts.dart';
@@ -87,9 +86,8 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
       title: 'Spotifin',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      builder: (context, child) => DuoDisplayHost(
-        child: Material(type: MaterialType.transparency, child: child!),
-      ),
+      builder: (context, child) =>
+          Material(type: MaterialType.transparency, child: child!),
       shortcuts: buildAppShortcuts(enabled: status == AppStatus.ready),
       actions: buildAppActions(
         onTogglePlayback: _togglePlayback,
