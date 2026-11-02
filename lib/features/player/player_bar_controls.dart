@@ -42,26 +42,33 @@ class DesktopPlayerBar extends StatelessWidget {
         height: 88,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _TrackSummary(track: track, onTap: onOpenPlayer),
-                ),
-              ),
-              Expanded(flex: 2, child: _DesktopTransport(active: active)),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _DesktopUtilities(
-                    active: active,
-                    onOpenQueue: onOpenQueue,
-                    onOpenLyrics: onOpenLyrics,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _TrackSummary(track: track, onTap: onOpenPlayer),
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  flex: constraints.maxWidth >= SpotifinBreakpoints.extendedRail
+                      ? 2
+                      : 1,
+                  child: _DesktopTransport(active: active),
+                ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _DesktopUtilities(
+                      active: active,
+                      onOpenQueue: onOpenQueue,
+                      onOpenLyrics: onOpenLyrics,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -451,7 +458,6 @@ class _DesktopUtilities extends StatelessWidget {
     return ListenableBuilder(
       listenable: active,
       builder: (context, _) {
-        final state = active.state;
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -469,14 +475,44 @@ class _DesktopUtilities extends StatelessWidget {
             ),
             const SizedBox(width: SpotifinSpacing.sm),
             if (AirPlayControl.isSupported) const AirPlayControl(),
+            Flexible(child: _DesktopVolume(active: active)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DesktopVolume extends StatelessWidget {
+  const _DesktopVolume({required this.active});
+
+  static const _iconWidth = 20.0;
+  static const _sliderWidth = 144.0;
+  static const _minimumSliderWidth = 96.0;
+
+  final ActivePlayback active;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = active.state;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sliderWidth = (constraints.maxWidth - _iconWidth).clamp(
+          0.0,
+          _sliderWidth,
+        );
+        if (sliderWidth < _minimumSliderWidth) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Icon(
               state.volumeSlider == 0
                   ? Icons.volume_off_rounded
                   : Icons.volume_up_rounded,
-              size: 20,
+              size: _iconWidth,
             ),
             SizedBox(
-              width: 144,
+              width: sliderWidth,
               child: MergeSemantics(
                 child: Semantics(
                   label: 'Volume',

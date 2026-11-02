@@ -272,6 +272,18 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('desktop bar fits an unfolded iPhone Duo in landscape', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(tester, active, size: const Size(951, 669));
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byTooltip('Queue'), findsOneWidget);
+  });
+
   testWidgets('receiver loss retains the recovery display', (tester) async {
     final active = FakeActivePlayback();
     await pumpBar(tester, active);
