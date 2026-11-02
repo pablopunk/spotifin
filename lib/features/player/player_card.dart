@@ -18,6 +18,8 @@ class PlayerCard extends ConsumerWidget {
 
   static const _controlsHeight = 252.0;
   static const _minimumArtwork = 96.0;
+  static const _wideWidth = 520.0;
+  static const _wideMinHeight = 240.0;
   static const _thumbnailSize = 64.0;
   static const _padding = EdgeInsets.fromLTRB(16, 16, 16, 8);
 
@@ -40,6 +42,43 @@ class PlayerCard extends ConsumerWidget {
                   DesktopTransport(active: active),
                   const _CardToolbar(),
                 ];
+                if (bounded &&
+                    constraints.maxWidth >= _wideWidth &&
+                    constraints.maxHeight >= _wideMinHeight) {
+                  return Padding(
+                    padding: _padding,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              _FillArtwork(
+                                track: track,
+                                alignment: Alignment.centerLeft,
+                                square: true,
+                              ),
+                              const SizedBox(width: SpotifinSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _Details(track: track),
+                                    DesktopTransport(
+                                      active: active,
+                                      showProgress: false,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        DesktopTransport(active: active, showControls: false),
+                        const _CardToolbar(),
+                      ],
+                    ),
+                  );
+                }
                 if (bounded &&
                     constraints.maxHeight >=
                         _controlsHeight + _minimumArtwork) {
@@ -98,21 +137,30 @@ class PlayerCard extends ConsumerWidget {
 }
 
 class _FillArtwork extends StatelessWidget {
-  const _FillArtwork({required this.track});
+  const _FillArtwork({
+    required this.track,
+    this.alignment = Alignment.bottomCenter,
+    this.square = false,
+  });
 
   final Track track;
+  final Alignment alignment;
+  final bool square;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Align(
-      alignment: Alignment.bottomCenter,
-      child: Artwork(
-        itemId: track.albumId ?? track.id,
-        size: constraints.biggest.shortestSide,
-        borderRadius: SpotifinRadii.card,
+  Widget build(BuildContext context) {
+    final artwork = LayoutBuilder(
+      builder: (context, constraints) => Align(
+        alignment: alignment,
+        child: Artwork(
+          itemId: track.albumId ?? track.id,
+          size: constraints.biggest.shortestSide,
+          borderRadius: SpotifinRadii.card,
+        ),
       ),
-    ),
-  );
+    );
+    return square ? AspectRatio(aspectRatio: 1, child: artwork) : artwork;
+  }
 }
 
 class _Details extends StatelessWidget {

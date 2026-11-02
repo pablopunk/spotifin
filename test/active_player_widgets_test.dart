@@ -314,6 +314,29 @@ void main() {
     expect(tester.getSize(find.byType(Artwork)).width, greaterThan(64));
   });
 
+  testWidgets('wide player card puts the artwork beside the details', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    await pumpBar(
+      tester,
+      active,
+      size: const Size(653, 356),
+      child: const SizedBox(height: 356, child: PlayerCard()),
+    );
+    active.emit(_localState(_track('local', 'Local Song')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final artwork = tester.getRect(find.byType(Artwork));
+    final title = tester.getTopLeft(find.text('Local Song'));
+    expect(artwork.right, lessThanOrEqualTo(title.dx));
+    expect(find.byType(Slider), findsOneWidget);
+    final slider = tester.getRect(find.byType(Slider));
+    expect(slider.top, greaterThan(artwork.bottom - 1));
+    expect(slider.width, greaterThan(400));
+  });
+
   testWidgets('player card stays usable in a short half screen', (
     tester,
   ) async {

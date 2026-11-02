@@ -295,9 +295,16 @@ class _TrackSummary extends StatelessWidget {
 }
 
 class DesktopTransport extends StatelessWidget {
-  const DesktopTransport({required this.active, super.key});
+  const DesktopTransport({
+    required this.active,
+    this.showControls = true,
+    this.showProgress = true,
+    super.key,
+  });
 
   final ActivePlayback active;
+  final bool showControls;
+  final bool showProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -315,44 +322,45 @@ class DesktopTransport extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              height: 40,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _ToggleButton(
-                    tooltip: casting && !canShuffle
-                        ? 'Stop casting to change shuffle'
-                        : 'Shuffle',
-                    active: state.shuffle,
-                    onPressed: canShuffle ? active.toggleShuffle : () {},
-                    icon: Icons.shuffle_rounded,
-                  ),
-                  IconButton(
-                    tooltip: 'Previous',
-                    onPressed: active.previous,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  _OwnerPlayButton(active: active),
-                  IconButton(
-                    tooltip: 'Next',
-                    onPressed: active.next,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                  _ToggleButton(
-                    tooltip: casting && !canRepeat
-                        ? 'Stop casting to change repeat'
-                        : 'Repeat',
-                    active: state.repeatMode != LoopMode.off,
-                    onPressed: canRepeat ? active.cycleRepeat : () {},
-                    icon: state.repeatMode == LoopMode.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                  ),
-                ],
+            if (showControls)
+              SizedBox(
+                height: 40,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _ToggleButton(
+                      tooltip: casting && !canShuffle
+                          ? 'Stop casting to change shuffle'
+                          : 'Shuffle',
+                      active: state.shuffle,
+                      onPressed: canShuffle ? active.toggleShuffle : () {},
+                      icon: Icons.shuffle_rounded,
+                    ),
+                    IconButton(
+                      tooltip: 'Previous',
+                      onPressed: active.previous,
+                      icon: const Icon(Icons.skip_previous_rounded),
+                    ),
+                    _OwnerPlayButton(active: active),
+                    IconButton(
+                      tooltip: 'Next',
+                      onPressed: active.next,
+                      icon: const Icon(Icons.skip_next_rounded),
+                    ),
+                    _ToggleButton(
+                      tooltip: casting && !canRepeat
+                          ? 'Stop casting to change repeat'
+                          : 'Repeat',
+                      active: state.repeatMode != LoopMode.off,
+                      onPressed: canRepeat ? active.cycleRepeat : () {},
+                      icon: state.repeatMode == LoopMode.one
+                          ? Icons.repeat_one_rounded
+                          : Icons.repeat_rounded,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            _ProgressSlider(active: active),
+            if (showProgress) _ProgressSlider(active: active),
           ],
         );
       },
