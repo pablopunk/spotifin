@@ -57,7 +57,7 @@ Future<(FakeActivePlayback, ProviderContainer)> _pumpPanel(
   WidgetTester tester, {
   required Size size,
   bool showPlayer = false,
-  bool sideBySide = false,
+  bool pinnedPlayer = false,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -80,7 +80,7 @@ Future<(FakeActivePlayback, ProviderContainer)> _pumpPanel(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
-        home: Scaffold(body: PlayerSidePanel(sideBySide: sideBySide)),
+        home: Scaffold(body: PlayerSidePanel(pinnedPlayer: pinnedPlayer)),
       ),
     ),
   );
@@ -115,27 +115,27 @@ void main() {
     expect(find.byType(SingleChildScrollView), findsWidgets);
   });
 
-  testWidgets('side by side panels sit in one row and cap at two', (
+  testWidgets('pinned player mode hides Now playing and keeps one panel', (
     tester,
   ) async {
     final (_, container) = await _pumpPanel(
       tester,
-      size: const Size(669, 455),
+      size: const Size(372, 560),
       showPlayer: true,
-      sideBySide: true,
+      pinnedPlayer: true,
     );
+
+    expect(find.text('Now playing'), findsNothing);
+    expect(find.text('Queue'), findsOneWidget);
 
     container.read(playerPanelProvider.notifier).toggleHistory();
     await tester.pump();
     await tester.pump();
 
     final open = container.read(playerPanelProvider).openPanels;
-    expect(open, hasLength(2));
-    expect(open, contains(PlayerPanel.history));
-    final queue = tester.getTopLeft(find.text('Queue'));
-    final history = tester.getTopLeft(find.text('History'));
-    expect(queue.dy, history.dy);
-    expect(queue.dx, lessThan(history.dx));
+    expect(open, [PlayerPanel.player, PlayerPanel.history]);
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Queue'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));

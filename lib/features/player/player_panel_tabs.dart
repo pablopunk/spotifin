@@ -5,7 +5,9 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 
 class PlayerPanelTabs extends ConsumerWidget {
-  const PlayerPanelTabs({super.key});
+  const PlayerPanelTabs({this.includePlayer = true, super.key});
+
+  final bool includePlayer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -14,12 +16,13 @@ class PlayerPanelTabs extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _PanelTab(
-          tooltip: 'Now playing',
-          icon: Icons.album_rounded,
-          selected: panels.player,
-          onPressed: controller.togglePlayer,
-        ),
+        if (includePlayer)
+          _PanelTab(
+            tooltip: 'Now playing',
+            icon: Icons.album_rounded,
+            selected: panels.player,
+            onPressed: controller.togglePlayer,
+          ),
         _PanelTab(
           tooltip: 'Lyrics',
           icon: Icons.lyrics_outlined,

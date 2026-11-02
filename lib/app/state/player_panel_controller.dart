@@ -14,6 +14,12 @@ class PlayerPanelState {
   bool get queue => openPanels.contains(PlayerPanel.queue);
   bool get history => openPanels.contains(PlayerPanel.history);
   bool get isEmpty => openPanels.isEmpty;
+  PlayerPanelState get withoutPlayer => PlayerPanelState(
+    openPanels: [
+      for (final panel in openPanels)
+        if (panel != PlayerPanel.player) panel,
+    ],
+  );
   List<PlayerPanel> get displayPanels =>
       PlayerPanel.values.where(openPanels.contains).toList(growable: false);
 
@@ -37,6 +43,18 @@ class PlayerPanelController extends Notifier<PlayerPanelState> {
     if (state.openPanels.length <= maxOpen) return;
     state = state.copyWith(
       openPanels: state.openPanels.sublist(state.openPanels.length - maxOpen),
+    );
+  }
+
+  void constrainOthersTo(int maxOpen) {
+    final others = state.withoutPlayer.openPanels;
+    if (others.length <= maxOpen) return;
+    final dropped = others.sublist(0, others.length - maxOpen);
+    state = state.copyWith(
+      openPanels: [
+        for (final panel in state.openPanels)
+          if (!dropped.contains(panel)) panel,
+      ],
     );
   }
 

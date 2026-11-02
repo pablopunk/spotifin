@@ -19,7 +19,6 @@ import 'playback_position_slider.dart';
 import 'player_bar_controls.dart';
 import 'player_artwork_carousel.dart';
 import 'player_collection_links.dart';
-import 'side_panel_scope.dart';
 import 'remote_devices.dart';
 
 class PlayerBar extends ConsumerWidget {
@@ -35,7 +34,8 @@ class PlayerBar extends ConsumerWidget {
       builder: (context, _) {
         final track = active.state.track;
         if (track == null) return const SizedBox.shrink();
-        final useSidePanel = SidePanelScope.of(context);
+        final useSidePanel =
+            MediaQuery.sizeOf(context).width >= SpotifinBreakpoints.playerPanel;
         final glassEffects = ref.watch(glassEffectsProvider);
         final glassOpacity = ref.watch(glassOpacityProvider);
         void showPlayer() => useSidePanel

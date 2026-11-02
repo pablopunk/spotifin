@@ -6,7 +6,7 @@ import 'package:spotifin/features/shell/duo_split_body.dart';
 
 const _browsing = Key('browsing');
 const _panel = Key('panel');
-const _bar = Key('bar');
+const _card = Key('card');
 const _fallback = Key('fallback');
 
 DisplayFeature _fold(Rect bounds) => DisplayFeature(
@@ -19,6 +19,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required Size size,
   List<DisplayFeature> features = const [],
+  bool panelOpen = true,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -28,11 +29,11 @@ Future<void> _pump(
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: DuoSplitBody(
+          panelOpen: panelOpen,
           browsingBuilder: (_, _) => const SizedBox.expand(key: _browsing),
           fallbackBuilder: (_) => const SizedBox.expand(key: _fallback),
           panel: const SizedBox.expand(key: _panel),
-          topPanel: const SizedBox.expand(key: _panel),
-          bar: const SizedBox(key: _bar, height: 80),
+          card: const SizedBox(key: _card, height: 80),
         ),
       ),
     ),
@@ -40,7 +41,7 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('landscape fold puts browsing left and panel with bar right', (
+  testWidgets('landscape: browsing left, panel above the card on the right', (
     tester,
   ) async {
     await _pump(
@@ -51,38 +52,53 @@ void main() {
 
     final browsing = tester.getRect(find.byKey(_browsing));
     final panel = tester.getRect(find.byKey(_panel));
-    final bar = tester.getRect(find.byKey(_bar));
+    final card = tester.getRect(find.byKey(_card));
     expect(find.byKey(_fallback), findsNothing);
     expect(browsing.right, lessThanOrEqualTo(455.5));
     expect(panel.left, greaterThanOrEqualTo(495.5));
-    expect(bar.left, greaterThanOrEqualTo(495.5));
-    expect(bar.top, greaterThan(panel.bottom - 1));
+    expect(card.left, greaterThanOrEqualTo(495.5));
+    expect(card.top, greaterThanOrEqualTo(panel.bottom));
+    expect(card.bottom, greaterThan(600));
   });
 
-  testWidgets(
-    'portrait fold puts the panel above and bar then browsing below',
-    (tester) async {
-      await _pump(
-        tester,
-        size: const Size(669, 951),
-        features: [_fold(const Rect.fromLTRB(0, 455.5, 669, 495.5))],
-      );
+  testWidgets('landscape: without a panel the card fills the right page', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      size: const Size(951, 669),
+      features: [_fold(const Rect.fromLTRB(455.5, 0, 495.5, 669))],
+      panelOpen: false,
+    );
 
-      final panel = tester.getRect(find.byKey(_panel));
-      final bar = tester.getRect(find.byKey(_bar));
-      final browsing = tester.getRect(find.byKey(_browsing));
-      expect(find.byKey(_fallback), findsNothing);
-      expect(panel.bottom, lessThanOrEqualTo(455.5));
-      expect(bar.top, greaterThanOrEqualTo(495.5));
-      expect(browsing.top, greaterThanOrEqualTo(bar.bottom));
-    },
-  );
+    expect(find.byKey(_panel), findsNothing);
+    expect(tester.getRect(find.byKey(_card)).height, greaterThan(500));
+  });
+
+  testWidgets('portrait: browsing on top, card beside the panel below', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      size: const Size(669, 951),
+      features: [_fold(const Rect.fromLTRB(0, 455.5, 669, 495.5))],
+    );
+
+    final browsing = tester.getRect(find.byKey(_browsing));
+    final panel = tester.getRect(find.byKey(_panel));
+    final card = tester.getRect(find.byKey(_card));
+    expect(find.byKey(_fallback), findsNothing);
+    expect(browsing.bottom, lessThanOrEqualTo(455.5));
+    expect(card.top, greaterThanOrEqualTo(495.5));
+    expect(panel.top, greaterThanOrEqualTo(495.5));
+    expect(card.left, lessThan(panel.left));
+  });
 
   testWidgets('without a fold the fallback layout is shown', (tester) async {
     await _pump(tester, size: const Size(669, 951));
 
     expect(find.byKey(_fallback), findsOneWidget);
     expect(find.byKey(_panel), findsNothing);
-    expect(find.byKey(_bar), findsNothing);
+    expect(find.byKey(_card), findsNothing);
   });
 }

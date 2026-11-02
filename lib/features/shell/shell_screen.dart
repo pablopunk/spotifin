@@ -369,6 +369,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
             ),
             body: duoSplit
                 ? DuoSplitBody(
+                    panelOpen: !playerPanels.withoutPlayer.isEmpty,
                     browsingBuilder: (_, inset) => SpotifinChromeInsets(
                       bottom: inset,
                       child: _buildDestinationStack(selectedIndex),

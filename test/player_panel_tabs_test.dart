@@ -39,6 +39,21 @@ void main() {
     await tester.pump();
     expect(container.read(playerPanelProvider).history, isTrue);
   });
+
+  testWidgets('the player tab can be left out', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(body: PlayerPanelTabs(includePlayer: false)),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Now playing'), findsNothing);
+    expect(find.byTooltip('Lyrics'), findsOneWidget);
+    expect(find.byTooltip('Queue'), findsOneWidget);
+    expect(find.byTooltip('History'), findsOneWidget);
+  });
 }
 
 IconData _icon(String tooltip) => switch (tooltip) {

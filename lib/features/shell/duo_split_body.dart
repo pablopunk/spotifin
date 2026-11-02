@@ -1,31 +1,29 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme.dart';
 import '../../platform/duo_display.dart';
 import '../common/design_system.dart';
+import '../player/player_card.dart';
 import '../player/player_side_panel.dart';
-import '../player/side_panel_scope.dart';
-import '../player/stacked_player_bar.dart';
 
 class DuoSplitBody extends StatelessWidget {
   const DuoSplitBody({
     required this.browsingBuilder,
     required this.fallbackBuilder,
-    this.panel = const PlayerSidePanel(),
-    this.topPanel = const PlayerSidePanel(sideBySide: true),
-    this.bar = const StackedPlayerBar(),
+    required this.panelOpen,
+    this.panel = const PlayerSidePanel(pinnedPlayer: true),
+    this.card = const PlayerCard(),
     super.key,
   });
 
-  static const _landscapeBrowsingBottom = SpotifinSpacing.md;
-  static const _portraitBrowsingBottom = 100.0;
+  static const _browsingBottom = SpotifinSpacing.md;
+  static const _tabBarClearance = 100.0;
 
   final Widget Function(BuildContext context, double bottomInset)
   browsingBuilder;
   final WidgetBuilder fallbackBuilder;
+  final bool panelOpen;
   final Widget panel;
-  final Widget topPanel;
-  final Widget bar;
+  final Widget card;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -34,114 +32,94 @@ class DuoSplitBody extends StatelessWidget {
     child: DuoPanesBuilder(
       builder: (context, panes) {
         if (!panes.isSplit) return fallbackBuilder(context);
-        return SidePanelScope(
-          available: true,
-          child: panes.sideBySide
-              ? panes.place(
-                  first: browsingBuilder(context, _landscapeBrowsingBottom),
-                  second: _PanelPage(panel: panel, bar: bar),
-                )
-              : panes.place(
-                  first: _PanelTop(panel: topPanel),
-                  second: _BarAndBrowsing(
-                    bar: bar,
-                    browsing: MediaQuery.removePadding(
-                      context: context,
-                      removeTop: true,
-                      child: browsingBuilder(context, _portraitBrowsingBottom),
-                    ),
-                  ),
+        return panes.sideBySide
+            ? panes.place(
+                first: browsingBuilder(context, _browsingBottom),
+                second: _PlayerPage(
+                  panelOpen: panelOpen,
+                  panel: panel,
+                  card: card,
                 ),
-        );
+              )
+            : panes.place(
+                first: MediaQuery.removePadding(
+                  context: context,
+                  removeBottom: true,
+                  child: browsingBuilder(context, _browsingBottom),
+                ),
+                second: _PlayerRow(
+                  panelOpen: panelOpen,
+                  panel: panel,
+                  card: card,
+                  bottomClearance: _tabBarClearance,
+                ),
+              );
       },
     ),
   );
 }
 
-class _PanelCard extends StatelessWidget {
-  const _PanelCard({required this.panel});
+class _PlayerPage extends StatelessWidget {
+  const _PlayerPage({
+    required this.panelOpen,
+    required this.panel,
+    required this.card,
+  });
 
+  final bool panelOpen;
   final Widget panel;
+  final Widget card;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: const BorderRadius.all(Radius.circular(SpotifinRadii.card)),
-    child: panel,
-  );
-}
-
-class _PanelPage extends StatelessWidget {
-  const _PanelPage({required this.panel, required this.bar});
-
-  final Widget panel;
-  final Widget bar;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Expanded(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            SpotifinSpacing.xxs,
-            SpotifinSpacing.xs,
-            SpotifinSpacing.xs,
-            SpotifinSpacing.xxs,
-          ),
-          child: _PanelCard(panel: panel),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(
-          SpotifinSpacing.xxs,
-          0,
-          SpotifinSpacing.xs,
-          SpotifinSpacing.xs,
-        ),
-        child: bar,
-      ),
-    ],
-  );
-}
-
-class _PanelTop extends StatelessWidget {
-  const _PanelTop({required this.panel});
-
-  final Widget panel;
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    bottom: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(
-        SpotifinSpacing.xs,
-        SpotifinSpacing.xs,
-        SpotifinSpacing.xs,
-        SpotifinSpacing.xxs,
-      ),
-      child: _PanelCard(panel: panel),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      SpotifinSpacing.xxs,
+      SpotifinSpacing.xs,
+      SpotifinSpacing.xs,
+      SpotifinSpacing.xs,
     ),
+    child: panelOpen
+        ? Column(
+            children: [
+              Expanded(child: panel),
+              const SizedBox(height: SpotifinSpacing.xs),
+              card,
+            ],
+          )
+        : card,
   );
 }
 
-class _BarAndBrowsing extends StatelessWidget {
-  const _BarAndBrowsing({required this.bar, required this.browsing});
+class _PlayerRow extends StatelessWidget {
+  const _PlayerRow({
+    required this.panelOpen,
+    required this.panel,
+    required this.card,
+    required this.bottomClearance,
+  });
 
-  final Widget bar;
-  final Widget browsing;
+  final bool panelOpen;
+  final Widget panel;
+  final Widget card;
+  final double bottomClearance;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(
-          SpotifinSpacing.xs,
-          SpotifinSpacing.xxs,
-          SpotifinSpacing.xs,
-          0,
-        ),
-        child: bar,
-      ),
-      Expanded(child: browsing),
-    ],
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      SpotifinSpacing.xs,
+      SpotifinSpacing.xxs,
+      SpotifinSpacing.xs,
+      bottomClearance,
+    ),
+    child: panelOpen
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: card),
+              const SizedBox(width: SpotifinSpacing.xs),
+              Expanded(child: panel),
+            ],
+          )
+        : card,
   );
 }
