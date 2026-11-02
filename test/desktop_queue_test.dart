@@ -52,34 +52,43 @@ ActivePlaybackState _queueState() {
   );
 }
 
+Future<FakeActivePlayback> _pumpPanel(
+  WidgetTester tester, {
+  required Size size,
+  bool showPlayer = false,
+}) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  final active = FakeActivePlayback()..emit(_queueState());
+  final remote = _RemoteSessions();
+  when(() => remote.addListener(any())).thenReturn(null);
+  when(() => remote.removeListener(any())).thenReturn(null);
+  when(() => remote.sessions).thenReturn([]);
+
+  final container = ProviderContainer(
+    overrides: [
+      activePlaybackProvider.overrideWithValue(active),
+      remoteSessionProvider.overrideWithValue(remote),
+    ],
+  );
+  addTearDown(container.dispose);
+  if (!showPlayer) container.read(playerPanelProvider.notifier).togglePlayer();
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: Scaffold(body: PlayerSidePanel())),
+    ),
+  );
+  await tester.pump();
+  return active;
+}
+
 void main() {
   testWidgets('desktop queue hides played tracks and maps queue actions', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(900, 700));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final active = FakeActivePlayback()..emit(_queueState());
-    final remote = _RemoteSessions();
-    when(() => remote.addListener(any())).thenReturn(null);
-    when(() => remote.removeListener(any())).thenReturn(null);
-    when(() => remote.sessions).thenReturn([]);
-
-    final container = ProviderContainer(
-      overrides: [
-        activePlaybackProvider.overrideWithValue(active),
-        remoteSessionProvider.overrideWithValue(remote),
-      ],
-    );
-    addTearDown(container.dispose);
-    container.read(playerPanelProvider.notifier).togglePlayer();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Scaffold(body: PlayerSidePanel())),
-      ),
-    );
-    await tester.pump();
+    final active = await _pumpPanel(tester, size: const Size(900, 700));
 
     expect(find.text('Played'), findsNothing);
     expect(find.text('Current'), findsOneWidget);
@@ -91,5 +100,14 @@ void main() {
     await tester.tap(find.byTooltip('Remove from queue').last);
     expect(active.actions, contains('removeUpcomingAt'));
     expect(active.actionArguments['removeUpcomingAt'], [1]);
+  });
+
+  testWidgets('now playing panel scrolls instead of overflowing when short', (
+    tester,
+  ) async {
+    await _pumpPanel(tester, size: const Size(669, 300), showPlayer: true);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(SingleChildScrollView), findsWidgets);
   });
 }

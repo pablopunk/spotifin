@@ -12,6 +12,7 @@ import '../common/glass.dart';
 import 'cast_button.dart';
 import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
+import 'player_panel_tabs.dart';
 import 'remote_devices.dart';
 
 class DesktopPlayerBar extends StatelessWidget {
@@ -23,6 +24,7 @@ class DesktopPlayerBar extends StatelessWidget {
     required this.onOpenLyrics,
     required this.glass,
     required this.glassOpacity,
+    this.usesSidePanel = false,
     super.key,
   });
 
@@ -33,6 +35,7 @@ class DesktopPlayerBar extends StatelessWidget {
   final VoidCallback onOpenLyrics;
   final bool glass;
   final double glassOpacity;
+  final bool usesSidePanel;
 
   @override
   Widget build(BuildContext context) {
@@ -55,13 +58,14 @@ class DesktopPlayerBar extends StatelessWidget {
                   flex: constraints.maxWidth >= SpotifinBreakpoints.extendedRail
                       ? 2
                       : 1,
-                  child: _DesktopTransport(active: active),
+                  child: DesktopTransport(active: active),
                 ),
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: _DesktopUtilities(
                       active: active,
+                      usesSidePanel: usesSidePanel,
                       onOpenQueue: onOpenQueue,
                       onOpenLyrics: onOpenLyrics,
                     ),
@@ -73,12 +77,34 @@ class DesktopPlayerBar extends StatelessWidget {
         ),
       ),
     );
+    return PlayerBarSurface(
+      glass: glass,
+      glassOpacity: glassOpacity,
+      child: content,
+    );
+  }
+}
+
+class PlayerBarSurface extends StatelessWidget {
+  const PlayerBarSurface({
+    required this.glass,
+    required this.glassOpacity,
+    required this.child,
+    super.key,
+  });
+
+  final bool glass;
+  final double glassOpacity;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     final surface = !glass
         ? Material(
             color: Colors.black,
             elevation: 20,
             shadowColor: Colors.black,
-            child: content,
+            child: child,
           )
         : GlassContainer(
             useOwnLayer: true,
@@ -86,7 +112,7 @@ class DesktopPlayerBar extends StatelessWidget {
             settings: SpotifinGlass.settings(glassOpacity),
             shape: const LiquidRoundedSuperellipse(borderRadius: 16),
             clipBehavior: Clip.antiAlias,
-            child: content,
+            child: child,
           );
     return Listener(
       behavior: HitTestBehavior.opaque,
@@ -268,8 +294,8 @@ class _TrackSummary extends StatelessWidget {
   );
 }
 
-class _DesktopTransport extends StatelessWidget {
-  const _DesktopTransport({required this.active});
+class DesktopTransport extends StatelessWidget {
+  const DesktopTransport({required this.active, super.key});
 
   final ActivePlayback active;
 
@@ -445,11 +471,13 @@ class _TimeLabel extends StatelessWidget {
 class _DesktopUtilities extends StatelessWidget {
   const _DesktopUtilities({
     required this.active,
+    required this.usesSidePanel,
     required this.onOpenQueue,
     required this.onOpenLyrics,
   });
 
   final ActivePlayback active;
+  final bool usesSidePanel;
   final VoidCallback onOpenQueue;
   final VoidCallback onOpenLyrics;
 
@@ -463,16 +491,20 @@ class _DesktopUtilities extends StatelessWidget {
           children: [
             const CastButton(),
             const RemoteDeviceButton(),
-            IconButton(
-              tooltip: 'Lyrics',
-              onPressed: onOpenLyrics,
-              icon: const Icon(Icons.lyrics_outlined, size: 19),
-            ),
-            IconButton(
-              tooltip: 'Queue',
-              onPressed: onOpenQueue,
-              icon: const Icon(Icons.queue_music_rounded, size: 20),
-            ),
+            if (usesSidePanel)
+              const PlayerPanelTabs()
+            else ...[
+              IconButton(
+                tooltip: 'Lyrics',
+                onPressed: onOpenLyrics,
+                icon: const Icon(Icons.lyrics_outlined, size: 19),
+              ),
+              IconButton(
+                tooltip: 'Queue',
+                onPressed: onOpenQueue,
+                icon: const Icon(Icons.queue_music_rounded, size: 20),
+              ),
+            ],
             const SizedBox(width: SpotifinSpacing.sm),
             if (AirPlayControl.isSupported) const AirPlayControl(),
             Flexible(child: _DesktopVolume(active: active)),
