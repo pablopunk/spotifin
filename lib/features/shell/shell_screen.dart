@@ -210,11 +210,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final iosGlass =
-        ref.watch(glassEffectsProvider) &&
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS;
-    final verticalBar = iosGlass ? GlassVerticalBar.maybeOf(context) : null;
+    final ios = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    final iosGlass = ref.watch(glassEffectsProvider) && ios;
+    final verticalBar = ios ? GlassVerticalBar.maybeOf(context) : null;
     final wide =
         verticalBar == null &&
         SpotifinBreakpoints.showsRail(MediaQuery.sizeOf(context));
@@ -232,7 +230,9 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
     final glassOpacity = ref.watch(glassOpacityProvider);
     _visitedDestinations.add(selectedIndex);
     final content = SpotifinChromeInsets(
-      bottom: !wide && glassEffects
+      bottom: verticalBar != null && glassEffects
+          ? SpotifinChromeInsets.stripBottom
+          : !wide && glassEffects
           ? SpotifinChromeInsets.glassMobileBottom
           : SpotifinChromeInsets.fallbackBottom,
       child: Stack(
@@ -433,10 +433,42 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
         body: content,
       );
     }
-    final strip = GlassVerticalBar.maybeOf(context);
+    final strip = verticalBar;
+    return DuoSplitScope(
+      builder: (context, halfFolded) {
+        final duoSplit = halfFolded && hasTrack;
+        return DismissSheetsOnSplit(
+          split: duoSplit,
+          child: _buildPlainScaffold(
+            selectedIndex: selectedIndex,
+            hasTrack: hasTrack,
+            strip: strip,
+            body: duoSplit
+                ? DuoSplitBody(
+                    panelOpen: !playerPanels.withoutPlayer.isEmpty,
+                    portraitBottomClearance: SpotifinSpacing.xs,
+                    browsingBuilder: (_, inset) => SpotifinChromeInsets(
+                      bottom: inset,
+                      child: _buildDestinationStack(selectedIndex),
+                    ),
+                    fallbackBuilder: (_) => content,
+                  )
+                : content,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlainScaffold({
+    required int selectedIndex,
+    required bool hasTrack,
+    required GlassVerticalBarData? strip,
+    required Widget body,
+  }) {
     return Scaffold(
       body: strip == null
-          ? content
+          ? body
           : StripNavigation(
               strip: strip,
               selectedIndex: selectedIndex,
@@ -449,7 +481,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                     label: Text(item.label),
                   ),
               ],
-              child: content,
+              child: body,
             ),
       bottomNavigationBar: strip != null && hasTrack
           ? null

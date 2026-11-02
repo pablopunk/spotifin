@@ -48,6 +48,8 @@ void main() {
     final rail = tester.getRect(find.byType(NavigationRail));
     expect(rail.left, greaterThanOrEqualTo(size.width - 84));
     expect(rail.right, size.width);
+    final tab = tester.getRect(find.byIcon(Icons.library_music));
+    expect(tab.center.dy, greaterThan(size.height / 2));
     await tester.tap(find.byIcon(Icons.library_music));
     expect(selected, 1);
   });

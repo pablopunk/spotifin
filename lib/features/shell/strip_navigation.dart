@@ -38,6 +38,7 @@ class StripNavigation extends StatelessWidget {
               child: NavigationRail(
                 backgroundColor: Colors.transparent,
                 minWidth: strip.width,
+                groupAlignment: 1,
                 labelType: NavigationRailLabelType.none,
                 selectedIndex: selectedIndex,
                 onDestinationSelected: onSelected,

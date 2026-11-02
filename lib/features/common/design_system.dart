@@ -45,6 +45,7 @@ class SpotifinChromeInsets extends InheritedWidget {
 
   static const fallbackBottom = 120.0;
   static const glassMobileBottom = 178.0;
+  static const stripBottom = 96.0;
 
   final double bottom;
 

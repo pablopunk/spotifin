@@ -10,18 +10,20 @@ class DuoSplitBody extends StatelessWidget {
     required this.browsingBuilder,
     required this.fallbackBuilder,
     required this.panelOpen,
+    this.portraitBottomClearance = floatingTabBarClearance,
     this.panel = const PlayerSidePanel(pinnedPlayer: true),
     this.card = const PlayerCard(),
     super.key,
   });
 
   static const _browsingBottom = SpotifinSpacing.md;
-  static const _tabBarClearance = 100.0;
+  static const floatingTabBarClearance = 100.0;
 
   final Widget Function(BuildContext context, double bottomInset)
   browsingBuilder;
   final WidgetBuilder fallbackBuilder;
   final bool panelOpen;
+  final double portraitBottomClearance;
   final Widget panel;
   final Widget card;
 
@@ -51,7 +53,7 @@ class DuoSplitBody extends StatelessWidget {
                   panelOpen: panelOpen,
                   panel: panel,
                   card: card,
-                  bottomClearance: _tabBarClearance,
+                  bottomClearance: portraitBottomClearance,
                 ),
               );
       },

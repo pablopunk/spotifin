@@ -106,11 +106,18 @@ void _showNowPlaying(
         bottom: false,
         left: !strip.left,
         right: !strip.right,
-        child: _NowPlaying(
-          active: active,
-          glass: glass,
-          glassOpacity: glassOpacity,
-          initialDetailsTab: initialDetailsTab,
+        child: Builder(
+          builder: (innerContext) => MediaQuery.removePadding(
+            context: innerContext,
+            removeLeft: strip.left,
+            removeRight: strip.right,
+            child: _NowPlaying(
+              active: active,
+              glass: glass,
+              glassOpacity: glassOpacity,
+              initialDetailsTab: initialDetailsTab,
+            ),
+          ),
         ),
       );
     },

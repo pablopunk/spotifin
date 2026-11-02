@@ -14,7 +14,6 @@ class VerticalBarContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return SafeArea(
       top: false,
       bottom: false,
@@ -25,7 +24,7 @@ class VerticalBarContent extends StatelessWidget {
             Positioned(
               left: SpotifinSpacing.xs,
               right: SpotifinSpacing.xs,
-              bottom: bottomInset + SpotifinSpacing.xs,
+              bottom: SpotifinSpacing.xs,
               child: playerBar,
             ),
         ],

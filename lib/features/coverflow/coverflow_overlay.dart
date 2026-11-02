@@ -144,80 +144,87 @@ class _OverlayShellState extends State<_OverlayShell> {
       child: SafeArea(
         left: !strip.left,
         right: !strip.right,
-        child: LayoutBuilder(
-          builder: (context, constraints) => CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: constraints.maxHeight,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragEnd: (details) {
-                      if ((details.primaryVelocity ?? 0) > 320) {
-                        widget.onDismiss();
-                      }
-                    },
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: CoverflowStage(
-                            items: widget.items,
-                            initialIndex: _focused,
-                            showCaption: false,
-                            showReflection: false,
-                            fillHeight: true,
-                            currentTrackId: widget.currentTrackId,
-                            playing: widget.playing,
-                            onFocus: _focus,
-                            onCenterTap: (item) => _activate(_indexOf(item)),
-                            onTrackTap: widget.onTrackTap,
-                          ),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 8,
-                          child: IconButton(
-                            tooltip: 'Dismiss',
-                            onPressed: widget.onDismiss,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                            color: SpotifinColors.textMuted,
-                          ),
-                        ),
-                        Positioned(
-                          left: 88,
-                          right: 88,
-                          bottom: 0,
-                          child: _TrackLine(item: widget.items[_focused]),
-                        ),
-                        Positioned(
-                          right: 14,
-                          bottom: 10,
-                          child: Opacity(
-                            opacity: 0.78,
-                            child: SpotifinPlayButton(
-                              onPressed:
-                                  widget.onToggle ??
-                                  () => widget.onSelect(_focused),
+        child: MediaQuery.removePadding(
+          context: context,
+          removeLeft: strip.left,
+          removeRight: strip.right,
+          child: LayoutBuilder(
+            builder: (context, constraints) => CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragEnd: (details) {
+                        if ((details.primaryVelocity ?? 0) > 320) {
+                          widget.onDismiss();
+                        }
+                      },
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: CoverflowStage(
+                              items: widget.items,
+                              initialIndex: _focused,
+                              showCaption: false,
+                              showReflection: false,
+                              fillHeight: true,
+                              currentTrackId: widget.currentTrackId,
                               playing: widget.playing,
+                              onFocus: _focus,
+                              onCenterTap: (item) => _activate(_indexOf(item)),
+                              onTrackTap: widget.onTrackTap,
                             ),
                           ),
-                        ),
-                      ],
+                          Positioned(
+                            top: 4,
+                            right: 8,
+                            child: IconButton(
+                              tooltip: 'Dismiss',
+                              onPressed: widget.onDismiss,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                              ),
+                              color: SpotifinColors.textMuted,
+                            ),
+                          ),
+                          Positioned(
+                            left: 88,
+                            right: 88,
+                            bottom: 0,
+                            child: _TrackLine(item: widget.items[_focused]),
+                          ),
+                          Positioned(
+                            right: 14,
+                            bottom: 10,
+                            child: Opacity(
+                              opacity: 0.78,
+                              child: SpotifinPlayButton(
+                                onPressed:
+                                    widget.onToggle ??
+                                    () => widget.onSelect(_focused),
+                                playing: widget.playing,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: Divider(height: 1)),
-              SliverList.builder(
-                itemCount: widget.items.length,
-                itemBuilder: (context, index) => _QueueRow(
-                  item: widget.items[index],
-                  selected: index == _focused,
-                  onTap: () => widget.onSelect(index),
+                const SliverToBoxAdapter(child: Divider(height: 1)),
+                SliverList.builder(
+                  itemCount: widget.items.length,
+                  itemBuilder: (context, index) => _QueueRow(
+                    item: widget.items[index],
+                    selected: index == _focused,
+                    onTap: () => widget.onSelect(index),
+                  ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ],
+            ),
           ),
         ),
       ),
