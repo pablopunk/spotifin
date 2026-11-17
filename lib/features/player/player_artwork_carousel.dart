@@ -136,8 +136,8 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   void _beginSwipe() {
     final current = _pageController.hasClients ? _pageController.page : null;
     final page = current ?? _lastSyncedIndex.toDouble();
-    _swipeAnchor.startPage = page;
     _dragStartIndex = page.round();
+    _swipeAnchor.startPage = _dragStartIndex!.toDouble();
   }
 
   void _commitSettledSwipe() {
@@ -322,10 +322,9 @@ class _SingleStepPageScrollPhysics extends PageScrollPhysics {
     final anchorPixels = start * pageWidth + _initialOffset(metrics);
     final minAllowed = anchorPixels - pageWidth;
     final maxAllowed = anchorPixels + pageWidth;
-    final target = position.pixels + result;
-    if (target < minAllowed) return minAllowed - position.pixels;
-    if (target > maxAllowed) return maxAllowed - position.pixels;
-    return result;
+    final pixelsAfterDrag = position.pixels - result;
+    final clampedPixels = pixelsAfterDrag.clamp(minAllowed, maxAllowed);
+    return position.pixels - clampedPixels;
   }
 
   @override

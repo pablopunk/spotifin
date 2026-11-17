@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
@@ -9,246 +10,288 @@ import 'package:spotifin/features/player/player_artwork_carousel.dart';
 import 'package:spotifin/storage/database.dart';
 
 void main() {
-  testWidgets('swiping past a page threshold changes the playing track', (
-    tester,
-  ) async {
-    final tracks = [_track('one'), _track('two'), _track('three')];
-    final changedIndexes = <int>[];
+  testWidgets(
+    'swiping past a page threshold changes the playing track',
+    (tester) async {
+      final tracks = [_track('one'), _track('two'), _track('three')];
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: tracks,
-                currentIndex: 1,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(Artwork), findsAtLeastNWidgets(2));
+      expect(find.byType(Artwork), findsAtLeastNWidgets(2));
 
-    await tester.drag(find.byType(PageView), const Offset(-220, 0));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-220, 0));
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, [2]);
-  });
+      expect(changedIndexes, [2]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('a short swipe settles back without changing tracks', (
-    tester,
-  ) async {
-    final changedIndexes = <int>[];
+  testWidgets(
+    'a short swipe settles back without changing tracks',
+    (tester) async {
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: [_track('one'), _track('two')],
-                currentIndex: 0,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two')],
+                  currentIndex: 0,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(PageView), const Offset(-40, 0));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-40, 0));
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, isEmpty);
-  });
+      expect(changedIndexes, isEmpty);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('dragging with the mouse changes the playing track', (
-    tester,
-  ) async {
-    final changedIndexes = <int>[];
+  testWidgets(
+    'dragging with the mouse changes the playing track',
+    (tester) async {
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: [_track('one'), _track('two'), _track('three')],
-                currentIndex: 1,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two'), _track('three')],
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final center = tester.getCenter(find.byType(PageView));
-    final gesture = await tester.startGesture(
-      center,
-      kind: PointerDeviceKind.mouse,
-    );
-    await gesture.moveBy(const Offset(-220, 0));
-    await gesture.up();
-    await tester.pumpAndSettle();
+      final center = tester.getCenter(find.byType(PageView));
+      final gesture = await tester.startGesture(
+        center,
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(-220, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, [2]);
-  });
+      expect(changedIndexes, [2]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('shows complete previous and next artwork around current', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 700,
-              height: 400,
-              child: PlayerArtworkCarousel(
-                tracks: [_track('one'), _track('two'), _track('three')],
-                currentIndex: 1,
-                onTrackChanged: (_) async {},
+  testWidgets(
+    'shows complete previous and next artwork around current',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 700,
+                height: 400,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two'), _track('three')],
+                  currentIndex: 1,
+                  onTrackChanged: (_) async {},
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final viewport = tester.getRect(find.byType(PageView));
-    final previous = tester.getRect(find.byKey(const ValueKey('one')));
-    final current = tester.getRect(find.byKey(const ValueKey('two')));
-    final next = tester.getRect(find.byKey(const ValueKey('three')));
+      final viewport = tester.getRect(find.byType(PageView));
+      final previous = tester.getRect(find.byKey(const ValueKey('one')));
+      final current = tester.getRect(find.byKey(const ValueKey('two')));
+      final next = tester.getRect(find.byKey(const ValueKey('three')));
 
-    expect(viewport.contains(previous.topLeft), isTrue);
-    expect(viewport.contains(previous.bottomRight), isTrue);
-    expect(viewport.contains(next.topLeft), isTrue);
-    expect(viewport.contains(next.bottomRight), isTrue);
-    expect(current.width, greaterThan(previous.width));
-    expect(current.width, greaterThan(next.width));
-  });
+      expect(viewport.contains(previous.topLeft), isTrue);
+      expect(viewport.contains(previous.bottomRight), isTrue);
+      expect(viewport.contains(next.topLeft), isTrue);
+      expect(viewport.contains(next.bottomRight), isTrue);
+      expect(current.width, greaterThan(previous.width));
+      expect(current.width, greaterThan(next.width));
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('the current artwork paints above its neighbors', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 700,
-              height: 400,
-              child: PlayerArtworkCarousel(
-                tracks: [_track('one'), _track('two'), _track('three')],
-                currentIndex: 1,
-                onTrackChanged: (_) async {},
+  testWidgets(
+    'the current artwork paints above its neighbors',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 700,
+                height: 400,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two'), _track('three')],
+                  currentIndex: 1,
+                  onTrackChanged: (_) async {},
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final covers = tester.widget<Stack>(
-      find.byKey(const Key('player-artwork-covers')),
-    );
-    final keys = [
-      for (final child in covers.children) (child.key! as ValueKey).value,
-    ];
-    expect(keys.last, 'two');
-    expect(keys.toSet(), {'one', 'two', 'three'});
-  });
+      final covers = tester.widget<Stack>(
+        find.byKey(const Key('player-artwork-covers')),
+      );
+      final keys = [
+        for (final child in covers.children) (child.key! as ValueKey).value,
+      ];
+      expect(keys.last, 'two');
+      expect(keys.toSet(), {'one', 'two', 'three'});
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('a swipe does not replace artwork with a fixed foreground', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: [_track('one'), _track('two'), _track('three')],
-                currentIndex: 1,
-                onTrackChanged: (_) async {},
+  testWidgets(
+    'a swipe does not replace artwork with a fixed foreground',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two'), _track('three')],
+                  currentIndex: 1,
+                  onTrackChanged: (_) async {},
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final currentArt = tester.element(find.byKey(const ValueKey('two')));
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(PageView)),
-    );
-    await gesture.moveBy(const Offset(-60, 0));
-    await tester.pump();
+      final currentArt = tester.element(find.byKey(const ValueKey('two')));
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(PageView)),
+      );
+      await gesture.moveBy(const Offset(-60, 0));
+      await tester.pump();
 
-    expect(tester.element(find.byKey(const ValueKey('two'))), same(currentArt));
-    expect(find.byKey(const ValueKey('foreground-two')), findsNothing);
-    await gesture.up();
-    await tester.pumpAndSettle();
-  });
+      expect(
+        tester.element(find.byKey(const ValueKey('two'))),
+        same(currentArt),
+      );
+      expect(find.byKey(const ValueKey('foreground-two')), findsNothing);
+      await gesture.up();
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('a long drag advances only one track', (tester) async {
-    final tracks = [
-      _track('zero'),
-      _track('one'),
-      _track('two'),
-      _track('three'),
-      _track('four'),
-    ];
-    final changedIndexes = <int>[];
+  testWidgets(
+    'a long drag advances only one track',
+    (tester) async {
+      final tracks = [
+        _track('zero'),
+        _track('one'),
+        _track('two'),
+        _track('three'),
+        _track('four'),
+      ];
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: tracks,
-                currentIndex: 1,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(PageView), const Offset(-500, 0));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, [2]);
-  });
+      expect(changedIndexes, [2]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets(
     'a high-velocity fling advances only one track without chaining',
@@ -287,83 +330,99 @@ void main() {
 
       expect(changedIndexes, [2]);
     },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
   );
 
-  testWidgets('a high-velocity fling back goes back only one track', (
-    tester,
-  ) async {
-    final tracks = [
-      _track('zero'),
-      _track('one'),
-      _track('two'),
-      _track('three'),
-      _track('four'),
-    ];
-    final changedIndexes = <int>[];
+  testWidgets(
+    'a high-velocity fling back goes back only one track',
+    (tester) async {
+      final tracks = [
+        _track('zero'),
+        _track('one'),
+        _track('two'),
+        _track('three'),
+        _track('four'),
+      ];
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: tracks,
-                currentIndex: 2,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 2,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.fling(find.byType(PageView), const Offset(400, 0), 3000);
-    await tester.pumpAndSettle();
+      await tester.fling(find.byType(PageView), const Offset(400, 0), 3000);
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, [1]);
-  });
+      expect(changedIndexes, [1]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
-  testWidgets('two successive swipes each move one track', (tester) async {
-    final tracks = [
-      _track('zero'),
-      _track('one'),
-      _track('two'),
-      _track('three'),
-      _track('four'),
-    ];
-    final changedIndexes = <int>[];
+  testWidgets(
+    'two successive swipes each move one track',
+    (tester) async {
+      final tracks = [
+        _track('zero'),
+        _track('one'),
+        _track('two'),
+        _track('three'),
+        _track('four'),
+      ];
+      final changedIndexes = <int>[];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: Scaffold(
-            body: SizedBox(
-              width: 390,
-              height: 390,
-              child: PlayerArtworkCarousel(
-                tracks: tracks,
-                currentIndex: 0,
-                onTrackChanged: (index) async => changedIndexes.add(index),
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 0,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(PageView), const Offset(-220, 0));
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(PageView), const Offset(-220, 0));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-220, 0));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(PageView), const Offset(-220, 0));
+      await tester.pumpAndSettle();
 
-    expect(changedIndexes, [1, 2]);
-  });
+      expect(changedIndexes, [1, 2]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets(
     'crossing halfway and springing back keeps the track and artwork in sync',
@@ -409,6 +468,61 @@ void main() {
       expect(changedIndexes, isEmpty);
       expect(page.page, 1);
     },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
+  testWidgets(
+    'a slow drag held across many songs stops one song away',
+    (tester) async {
+      final tracks = [for (var i = 0; i < 10; i++) _track('t$i')];
+      final changedIndexes = <int>[];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: tracks,
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(PageView)),
+      );
+      var furthestPage = 0.0;
+      for (var step = 0; step < 120; step++) {
+        await gesture.moveBy(const Offset(-8, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+        furthestPage = math.max(furthestPage, controller.page!);
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(furthestPage, lessThanOrEqualTo(2));
+      expect(controller.page, 2);
+      expect(changedIndexes, [2]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
   );
 }
 
