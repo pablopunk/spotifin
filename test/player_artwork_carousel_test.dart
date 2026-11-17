@@ -364,6 +364,52 @@ void main() {
 
     expect(changedIndexes, [1, 2]);
   });
+
+  testWidgets(
+    'crossing halfway and springing back keeps the track and artwork in sync',
+    (tester) async {
+      final changedIndexes = <int>[];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: PlayerArtworkCarousel(
+                  tracks: [_track('one'), _track('two'), _track('three')],
+                  currentIndex: 1,
+                  onTrackChanged: (index) async => changedIndexes.add(index),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(PageView)),
+      );
+      for (var step = 0; step < 10; step++) {
+        await gesture.moveBy(const Offset(-10, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(changedIndexes, isEmpty);
+      for (var step = 0; step < 10; step++) {
+        await gesture.moveBy(const Offset(8, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final page = tester.widget<PageView>(find.byType(PageView)).controller!;
+      expect(changedIndexes, isEmpty);
+      expect(page.page, 1);
+    },
+  );
 }
 
 Track _track(String id) => Track(

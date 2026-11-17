@@ -35,7 +35,6 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   late int _lastSyncedIndex;
   int? _dragStartIndex;
   bool _syncingToPlayback = false;
-  bool _correctingOvershoot = false;
 
   @override
   void initState() {
@@ -103,7 +102,6 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
                       itemCount: widget.tracks.length,
                       pageSnapping: true,
                       padEnds: true,
-                      onPageChanged: _handlePageChanged,
                       itemBuilder: (context, index) => const SizedBox.shrink(),
                     ),
                   ),
@@ -117,50 +115,50 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollStartNotification &&
-        notification.dragDetails != null &&
-        notification.metrics is PageMetrics) {
-      final current = _pageController.hasClients ? _pageController.page : null;
-      final page = current ?? _lastSyncedIndex.toDouble();
-      _swipeAnchor.startPage = page;
-      _dragStartIndex = page.round();
+    if (notification.metrics is! PageMetrics) return false;
+    if (_dragStartIndex == null && _isUserDrag(notification)) {
+      _beginSwipe();
+    } else if (notification is ScrollEndNotification &&
+        _dragStartIndex != null) {
+      _commitSettledSwipe();
     }
     return false;
   }
 
-  void _handlePageChanged(int index) {
-    if (_syncingToPlayback || _correctingOvershoot) return;
-    final start = _dragStartIndex ?? _lastSyncedIndex;
-    var clamped = (index - start).clamp(-1, 1) + start;
-    clamped = _validIndex(clamped);
-    if (clamped != index) {
-      if (clamped == _lastSyncedIndex) {
-        _snapBackTo(clamped);
-        return;
-      }
-      setState(() => _lastSyncedIndex = clamped);
-      widget.onTrackChanged(clamped);
-      _snapBackTo(clamped);
-      return;
-    }
-    if (index == _lastSyncedIndex) return;
-    setState(() => _lastSyncedIndex = index);
-    widget.onTrackChanged(index);
+  bool _isUserDrag(ScrollNotification notification) {
+    return switch (notification) {
+      ScrollStartNotification(:final dragDetails) => dragDetails != null,
+      ScrollUpdateNotification(:final dragDetails) => dragDetails != null,
+      _ => false,
+    };
+  }
+
+  void _beginSwipe() {
+    final current = _pageController.hasClients ? _pageController.page : null;
+    final page = current ?? _lastSyncedIndex.toDouble();
+    _swipeAnchor.startPage = page;
+    _dragStartIndex = page.round();
+  }
+
+  void _commitSettledSwipe() {
+    final start = _dragStartIndex!;
+    _dragStartIndex = null;
+    _swipeAnchor.startPage = null;
+    if (_syncingToPlayback || !_pageController.hasClients) return;
+    final settled = _pageController.page?.round() ?? start;
+    final target = _validIndex(settled.clamp(start - 1, start + 1));
+    if (settled != target) _snapBackTo(target);
+    if (target == _lastSyncedIndex) return;
+    setState(() => _lastSyncedIndex = target);
+    widget.onTrackChanged(target);
   }
 
   void _snapBackTo(int index) {
-    if (!_pageController.hasClients) return;
-    if (_pageController.page?.round() == index) return;
-    _correctingOvershoot = true;
-    _pageController
-        .animateToPage(
-          index,
-          duration: _pageAnimationDuration,
-          curve: Curves.easeOut,
-        )
-        .whenComplete(() {
-          if (mounted) _correctingOvershoot = false;
-        });
+    _pageController.animateToPage(
+      index,
+      duration: _pageAnimationDuration,
+      curve: Curves.easeOut,
+    );
   }
 
   void _animateToPlaybackIndex(int index) {
