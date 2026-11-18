@@ -22,6 +22,7 @@ import '../coverflow/coverflow_section.dart';
 import '../coverflow/coverflow_stage.dart';
 import '../coverflow/mobile_coverflow_scope.dart';
 import '../downtify/downtify_collection_tab.dart';
+import '../downtify/downtify_tab.dart';
 import 'collection_sort.dart';
 import 'collection_tabs.dart';
 
@@ -735,7 +736,7 @@ class CollectionScreen extends ConsumerWidget {
     final CollectionTab? downtifyTab = downtifySearch == null
         ? null
         : (
-            label: 'Downtify',
+            label: downtifyTabLabel,
             child: DowntifyCollectionTab(
               search: downtifySearch,
               libraryTracks: tracks,

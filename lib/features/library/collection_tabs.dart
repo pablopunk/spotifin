@@ -10,6 +10,7 @@ import '../coverflow/coverflow_controller.dart';
 import '../coverflow/coverflow_model.dart';
 import '../coverflow/coverflow_section.dart';
 import '../coverflow/mobile_coverflow_scope.dart';
+import '../downtify/downtify_tab.dart';
 
 typedef CollectionTab = ({String label, Widget child});
 
@@ -36,7 +37,10 @@ class CollectionTabs extends StatelessWidget {
           SliverPersistentHeader(
             pinned: true,
             delegate: PinnedTabBar(
-              SpotifinTabBar(labels: [for (final tab in tabs) tab.label]),
+              SpotifinTabBar(
+                labels: [for (final tab in tabs) tab.label],
+                icons: const {downtifyTabLabel: downtifyTabIcon},
+              ),
             ),
           ),
         ],

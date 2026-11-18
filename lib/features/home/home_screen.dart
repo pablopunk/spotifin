@@ -21,6 +21,7 @@ import '../common/design_system.dart';
 import '../common/go_shuffle_button.dart';
 import '../common/track_tile.dart';
 import '../downtify/downtify_song_results.dart';
+import '../downtify/downtify_tab.dart';
 import '../library/library_screen.dart';
 import 'playlists_section.dart';
 
@@ -518,6 +519,7 @@ class _SearchFilters extends StatelessWidget {
       initialIndex: filters.indexOf(selected),
       child: SpotifinTabBar(
         labels: filters.map(_filterLabel).toList(),
+        icons: const {downtifyTabLabel: downtifyTabIcon},
         onTap: (index) => onSelected(filters[index]),
       ),
     ),
@@ -638,7 +640,7 @@ String _filterLabel(_SearchFilter filter) => switch (filter) {
   _SearchFilter.songs => 'Songs',
   _SearchFilter.artists => 'Artists',
   _SearchFilter.albums => 'Albums',
-  _SearchFilter.downtify => 'Downtify',
+  _SearchFilter.downtify => downtifyTabLabel,
 };
 
 class _HomeCatalog {
