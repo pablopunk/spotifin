@@ -20,7 +20,8 @@ import '../common/album_context_menu.dart';
 import '../common/design_system.dart';
 import '../common/go_shuffle_button.dart';
 import '../common/track_tile.dart';
-import '../downtify/external_track_tile.dart';
+import '../downtify/downtify_song_results.dart';
+import '../downtify/downtify_tab.dart';
 import '../library/library_screen.dart';
 import 'playlists_section.dart';
 
@@ -452,7 +453,7 @@ class _SearchResults extends StatelessWidget {
       return SliverMainAxisGroup(
         slivers: filter == _SearchFilter.downtify
             ? [
-                _ExternalSongResults(
+                DowntifySongResults(
                   songs: visibleExternal,
                   libraryTracks: libraryTracks,
                 ),
@@ -482,7 +483,7 @@ class _SearchResults extends StatelessWidget {
                     const SliverToBoxAdapter(
                       child: SpotifinPageTitle('Add to library'),
                     ),
-                    _ExternalSongResults(songs: visibleExternal),
+                    DowntifySongResults(songs: visibleExternal),
                   ],
                 ],
                 _SearchFilter.songs => [
@@ -518,6 +519,7 @@ class _SearchFilters extends StatelessWidget {
       initialIndex: filters.indexOf(selected),
       child: SpotifinTabBar(
         labels: filters.map(_filterLabel).toList(),
+        icons: const {downtifyTabLabel: downtifyTabIcon},
         onTap: (index) => onSelected(filters[index]),
       ),
     ),
@@ -535,35 +537,6 @@ class _SongResults extends StatelessWidget {
     itemBuilder: (context, index) =>
         TrackTile(track: tracks[index], contextTracks: tracks),
   );
-}
-
-class _ExternalSongResults extends StatelessWidget {
-  const _ExternalSongResults({
-    required this.songs,
-    this.libraryTracks = const [],
-  });
-
-  final List<DowntifySong> songs;
-  final List<Track> libraryTracks;
-
-  @override
-  Widget build(BuildContext context) {
-    const matcher = DowntifyMatcher();
-    final matches = {
-      for (final song in songs) song.id: matcher.findMatch(song, libraryTracks),
-    };
-    final matchedTracks = matches.values.whereType<Track>().toList();
-    return SliverList.builder(
-      itemCount: songs.length,
-      itemBuilder: (context, index) {
-        final song = songs[index];
-        final match = matches[song.id];
-        return match == null
-            ? ExternalTrackTile(song: song)
-            : TrackTile(track: match, contextTracks: matchedTracks);
-      },
-    );
-  }
 }
 
 class _CollectionResults extends ConsumerWidget {
@@ -667,7 +640,7 @@ String _filterLabel(_SearchFilter filter) => switch (filter) {
   _SearchFilter.songs => 'Songs',
   _SearchFilter.artists => 'Artists',
   _SearchFilter.albums => 'Albums',
-  _SearchFilter.downtify => 'Downtify',
+  _SearchFilter.downtify => downtifyTabLabel,
 };
 
 class _HomeCatalog {

@@ -21,7 +21,10 @@ import '../coverflow/coverflow_model.dart';
 import '../coverflow/coverflow_section.dart';
 import '../coverflow/coverflow_stage.dart';
 import '../coverflow/mobile_coverflow_scope.dart';
+import '../downtify/downtify_collection_tab.dart';
+import '../downtify/downtify_tab.dart';
 import 'collection_sort.dart';
+import 'collection_tabs.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key, this.initialTabIndex = 0});
@@ -67,7 +70,7 @@ class LibraryScreen extends ConsumerWidget {
                 ),
                 const SliverPersistentHeader(
                   pinned: true,
-                  delegate: _PinnedTabBar(
+                  delegate: PinnedTabBar(
                     SpotifinTabBar(
                       labels: ['Songs', 'Albums', 'Artists', 'Playlists'],
                     ),
@@ -727,6 +730,38 @@ class CollectionScreen extends ConsumerWidget {
               ],
             ),
     );
+    final downtifySearch = watchDowntifyAvailable(ref)
+        ? _downtifySearch()
+        : null;
+    final CollectionTab? downtifyTab = downtifySearch == null
+        ? null
+        : (
+            label: downtifyTabLabel,
+            child: DowntifyCollectionTab(
+              search: downtifySearch,
+              libraryTracks: tracks,
+            ),
+          );
+    if (kind == CollectionKind.album && downtifyTab != null) {
+      return CollectionTabs(
+        title: title,
+        header: header,
+        tabs: [
+          (
+            label: 'Songs',
+            child: CollectionSongsTab(
+              viewId: collectionCoverflowViewId(
+                kind.name,
+                title,
+                albumStableId,
+              ),
+              tracks: sortedTracks,
+            ),
+          ),
+          downtifyTab,
+        ],
+      );
+    }
     if (!kind.hasArtistTabs) {
       final viewId = collectionCoverflowViewId(kind.name, title, albumStableId);
       final coverflow = ref.watch(coverflowModeProvider(viewId));
@@ -796,93 +831,42 @@ class CollectionScreen extends ConsumerWidget {
         ),
       );
     }
-    return Scaffold(
-      appBar: AppBar(title: Text(title), backgroundColor: Colors.transparent),
-      body: DefaultTabController(
-        length: 2,
-        child: NestedScrollView(
-          headerSliverBuilder: (context, _) => [
-            SliverToBoxAdapter(child: header),
-            const SliverPersistentHeader(
-              pinned: true,
-              delegate: _PinnedTabBar(
-                SpotifinTabBar(labels: ['Songs', 'Albums']),
-              ),
-            ),
-          ],
-          body: TabBarView(
-            children: [
-              MobileCoverflowScope(
-                viewId: collectionCoverflowViewId('artist-songs', title, null),
-                tabIndex: 0,
-                collection: MobileCoverflowCollection(
-                  items: trackCoverflowItems(sortedTracks),
-                  contextTracks: sortedTracks,
-                  playback: MobileCoverflowPlayback.tracks,
-                ),
-                child: CoverflowSection(
-                  viewId: collectionCoverflowViewId(
-                    'artist-songs',
-                    title,
-                    null,
-                  ),
-                  items: trackCoverflowItems(sortedTracks),
-                  onCenterTap: (item) => ref
-                      .read(activePlaybackProvider)
-                      .playTrack(item.tracks.single, sortedTracks),
-                  list: Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          key: const PageStorageKey('artist-songs'),
-                          padding: EdgeInsets.only(
-                            bottom: SpotifinChromeInsets.bottomOf(context),
-                          ),
-                          itemCount: sortedTracks.length,
-                          itemBuilder: (context, index) => TrackTile(
-                            track: sortedTracks[index],
-                            contextTracks: sortedTracks,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              _ArtistAlbumsTab(
-                key: const PageStorageKey('artist-albums'),
-                tracks: tracks,
-                viewId: collectionCoverflowViewId('artist-albums', title, null),
-              ),
-            ],
+    return CollectionTabs(
+      title: title,
+      header: header,
+      tabs: [
+        (
+          label: 'Songs',
+          child: CollectionSongsTab(
+            viewId: collectionCoverflowViewId('artist-songs', title, null),
+            tracks: sortedTracks,
           ),
         ),
-      ),
+        (
+          label: 'Albums',
+          child: _ArtistAlbumsTab(
+            key: const PageStorageKey('artist-albums'),
+            tracks: tracks,
+            viewId: collectionCoverflowViewId('artist-albums', title, null),
+          ),
+        ),
+        ?downtifyTab,
+      ],
     );
   }
-}
 
-class _PinnedTabBar extends SliverPersistentHeaderDelegate {
-  const _PinnedTabBar(this.tabBar);
-
-  final SpotifinTabBar tabBar;
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) => ColoredBox(color: SpotifinColors.background, child: tabBar);
-
-  @override
-  bool shouldRebuild(_PinnedTabBar oldDelegate) =>
-      oldDelegate.tabBar.labels != tabBar.labels;
+  DowntifyCollectionSearch? _downtifySearch() {
+    if (tracks.isEmpty) return null;
+    return switch (kind) {
+      CollectionKind.artist => DowntifyCollectionSearch.artist(title),
+      CollectionKind.album => DowntifyCollectionSearch.album(
+        album: title,
+        artist:
+            tracks.first.artistCredits.firstOrNull?.name ?? tracks.first.artist,
+      ),
+      _ => null,
+    };
+  }
 }
 
 class _CollectionHeader extends ConsumerWidget {

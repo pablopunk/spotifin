@@ -86,9 +86,15 @@ class SpotifinPageTitle extends StatelessWidget {
 }
 
 class SpotifinTabBar extends StatelessWidget implements PreferredSizeWidget {
-  const SpotifinTabBar({required this.labels, this.onTap, super.key});
+  const SpotifinTabBar({
+    required this.labels,
+    this.icons = const {},
+    this.onTap,
+    super.key,
+  });
 
   final List<String> labels;
+  final Map<String, IconData> icons;
   final ValueChanged<int>? onTap;
 
   @override
@@ -99,8 +105,20 @@ class SpotifinTabBar extends StatelessWidget implements PreferredSizeWidget {
     isScrollable: true,
     tabAlignment: TabAlignment.start,
     onTap: onTap,
-    tabs: labels.map((label) => Tab(text: label)).toList(),
+    tabs: labels.map(_tab).toList(),
   );
+
+  Tab _tab(String label) {
+    final icon = icons[label];
+    if (icon == null) return Tab(text: label);
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: SpotifinSpacing.xs,
+        children: [Icon(icon, size: 18), Text(label)],
+      ),
+    );
+  }
 }
 
 class SpotifinEmptyState extends StatelessWidget {
