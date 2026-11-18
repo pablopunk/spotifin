@@ -155,6 +155,9 @@ void main() {
           activePlaybackProvider.overrideWithValue(active),
           appControllerProvider.overrideWith(_AuthenticatedAppController.new),
           remoteSessionProvider.overrideWithValue(remote),
+          downloadStatusesProvider.overrideWith(
+            (ref) => Stream.value(const {}),
+          ),
           castControllerProvider.overrideWithValue(cast),
           if (lyrics != null) lyricsProvider.overrideWithValue(lyrics),
         ],

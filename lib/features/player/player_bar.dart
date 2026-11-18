@@ -13,6 +13,7 @@ import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
 import '../common/glass.dart';
+import '../common/track_tile.dart';
 import 'cast_button.dart';
 import 'history_list.dart';
 import 'playback_position_slider.dart';
@@ -241,16 +242,36 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                 ),
                               ),
                               const SizedBox(height: 28),
-                              Text(
-                                track.name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineLarge,
-                              ),
-                              PlayerCollectionLinks(
-                                track: track,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(color: SpotifinColors.textMuted),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          track.name,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headlineLarge,
+                                        ),
+                                        PlayerCollectionLinks(
+                                          track: track,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                color: SpotifinColors.textMuted,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TrackMenuButtonWithDownloadStatus(
+                                    track: track,
+                                    contextTracks: fullQueue,
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 18),
                               _PositionSlider(active: active),
@@ -412,18 +433,29 @@ class _NowPlayingState extends ConsumerState<_NowPlaying> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    trailing: IconButton(
-                                      tooltip: 'Remove from queue',
-                                      padding: EdgeInsets.zero,
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 40,
-                                            height: 40,
-                                          ),
-                                      onPressed: canEdit
-                                          ? () => active.removeUpcomingAt(index)
-                                          : null,
-                                      icon: const Icon(Icons.close_rounded),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TrackMenuButtonWithDownloadStatus(
+                                          track: item,
+                                          contextTracks: queue,
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Remove from queue',
+                                          padding: EdgeInsets.zero,
+                                          constraints:
+                                              const BoxConstraints.tightFor(
+                                                width: 40,
+                                                height: 40,
+                                              ),
+                                          onPressed: canEdit
+                                              ? () => active.removeUpcomingAt(
+                                                  index,
+                                                )
+                                              : null,
+                                          icon: const Icon(Icons.close_rounded),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 );

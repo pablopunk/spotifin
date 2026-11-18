@@ -7,6 +7,7 @@ import '../../services/playback/recently_played.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/track_tile.dart';
 
 /// History list backed by Jellyfin Recently Played.
 ///
@@ -233,10 +234,9 @@ class _HistoryRowState extends ConsumerState<_HistoryRow> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: const Icon(
-        Icons.history_rounded,
-        size: 18,
-        color: SpotifinColors.textMuted,
+      trailing: TrackMenuButtonWithDownloadStatus(
+        track: widget.track,
+        contextTracks: [widget.track],
       ),
     ),
   );

@@ -7,6 +7,7 @@ import '../../platform/airplay_control.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/track_tile.dart';
 import 'cast_button.dart';
 import 'player_bar_controls.dart';
 import 'player_collection_links.dart';
@@ -173,7 +174,14 @@ class _Details extends StatelessWidget {
   final bool wide;
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(child: _titleAndLinks(context)),
+      TrackMenuButtonWithDownloadStatus(track: track, contextTracks: [track]),
+    ],
+  );
+
+  Widget _titleAndLinks(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [

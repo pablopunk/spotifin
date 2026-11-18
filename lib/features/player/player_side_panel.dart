@@ -11,6 +11,7 @@ import '../../services/playback/active_playback.dart';
 import '../../storage/database.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import '../common/track_tile.dart';
 import 'history_list.dart';
 import 'playback_position_slider.dart';
 import 'player_collection_links.dart';
@@ -292,14 +293,21 @@ class _PlayerPanel extends StatelessWidget {
     final canShuffle = state.capabilities.contains(PlaybackCapability.shuffle);
     final canRepeat = state.capabilities.contains(PlaybackCapability.repeat);
     return [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          track.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              track.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          TrackMenuButtonWithDownloadStatus(
+            track: track,
+            contextTracks: state.queue,
+          ),
+        ],
       ),
       const SizedBox(height: SpotifinSpacing.xxs),
       Align(
@@ -515,12 +523,21 @@ class _QueueItemState extends State<_QueueItem> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: IconButton(
-        tooltip: 'Remove from queue',
-        onPressed: widget.canRemove
-            ? () => widget.active.removeUpcomingAt(widget.index)
-            : null,
-        icon: const Icon(Icons.close_rounded),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TrackMenuButtonWithDownloadStatus(
+            track: widget.track,
+            contextTracks: widget.active.state.upcoming,
+          ),
+          IconButton(
+            tooltip: 'Remove from queue',
+            onPressed: widget.canRemove
+                ? () => widget.active.removeUpcomingAt(widget.index)
+                : null,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
       ),
     ),
   );
