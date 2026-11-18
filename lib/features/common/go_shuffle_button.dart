@@ -13,11 +13,12 @@ class GoShuffleButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return TextButton.icon(
-      style: TextButton.styleFrom(
+    return FilledButton.tonalIcon(
+      style: FilledButton.styleFrom(
         foregroundColor: SpotifinColors.accent,
+        backgroundColor: SpotifinColors.accent.withValues(alpha: .16),
         visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.sm),
+        padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
       ),
       onPressed: tracks.isEmpty
           ? null
