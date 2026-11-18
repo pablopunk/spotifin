@@ -359,6 +359,40 @@ class PlaybackService extends ChangeNotifier implements RemotePlayback {
     notifyListeners();
   }
 
+  Future<void> replaceUpcoming(List<Track> tracks) =>
+      _enqueue((generation) => _replaceUpcomingNow(tracks, generation));
+
+  Future<void> _replaceUpcomingNow(List<Track> tracks, int generation) async {
+    final session = _session;
+    if (session == null) return;
+    final base = _state;
+    final candidate = base.replaceUpcoming(tracks, newId: _newPlaylistItemId);
+    final keep = (base.currentIndex ?? -1) + 1;
+    final loadedLength = base.loadedEntries.length;
+    final added = candidate.loadedEntries.sublist(keep);
+    final prior = _capturePriorAudio(session);
+    try {
+      await _guardedAudio(() async {
+        if (loadedLength > keep) {
+          await _player.removeAudioSourceRange(keep, loadedLength);
+        }
+        await _player.insertAudioSources(
+          keep,
+          await _sources(session, added, prior.revision),
+        );
+      });
+    } catch (error) {
+      await _recoverPriorAudio(prior);
+      rethrow;
+    }
+    if (generation != _accountGeneration) return;
+    _commitState(candidate, generation: generation);
+    _rememberTracks(tracks);
+    await _persistCommittedState(generation);
+    unawaited(_reportProgress(force: true));
+    notifyListeners();
+  }
+
   Future<void> removeAt(int index) =>
       _enqueue((generation) => _removeAtNow(index, generation));
 

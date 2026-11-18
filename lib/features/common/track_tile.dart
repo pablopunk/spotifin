@@ -439,7 +439,7 @@ Future<void> _startRadio(
       .read(radioServiceProvider)
       .queueFor(track, ref.read(appControllerProvider).session);
   if (owner.state.track?.id == track.id) {
-    await owner.addNextToQueue(
+    await owner.replaceUpcoming(
       radio.where((item) => item.id != track.id).toList(),
     );
   } else {

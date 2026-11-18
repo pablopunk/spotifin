@@ -894,6 +894,14 @@ class CastController extends ChangeNotifier {
     _commitCastQueue(snapshot.queue.insertNext(tracks, newId: _newCastId));
   });
 
+  Future<void> replaceUpcoming(List<Track> tracks) => _remoteGuarded((_) async {
+    final snapshot = _castSnapshot;
+    if (snapshot == null) {
+      throw const CastException('Nothing is casting right now.');
+    }
+    _commitCastQueue(snapshot.queue.replaceUpcoming(tracks, newId: _newCastId));
+  });
+
   Future<void> removeAt(int index) =>
       _remoteGuarded((generation) => _removeAtNow(index, generation));
 

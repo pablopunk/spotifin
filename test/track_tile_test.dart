@@ -423,8 +423,8 @@ void main() {
     await tester.tap(find.text('Start radio'));
     await tester.pumpAndSettle();
 
-    expect(active.actions, ['addNextToQueue']);
-    expect(active.actionArguments['addNextToQueue'], [
+    expect(active.actions, ['replaceUpcoming']);
+    expect(active.actionArguments['replaceUpcoming'], [
       [radioTrack],
     ]);
   });
