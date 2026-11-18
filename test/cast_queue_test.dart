@@ -214,6 +214,28 @@ void main() {
     expect(playback.localPlayCalls, 0);
   });
 
+  test('a reorder while paused waits for play to reach the receiver', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
+    final sender = _sender();
+    final cast = await _connected(playback, sender);
+    sender.reportPlaying(
+      position: const Duration(seconds: 8),
+      state: CastPlayerState.paused,
+    );
+    await _pump();
+
+    await cast.reorder(2, 1);
+    await _settle();
+    expect(_playNows(sender), 1);
+
+    await cast.play();
+    await _pump();
+    expect(_playNows(sender), 2);
+    expect(sender.lastOptions('PlayNow')['startPositionTicks'], 80000000);
+    expect(_receiverUpcoming(sender), ['a', 'c', 'b']);
+    expect(cast.remotePlaying, isTrue);
+  });
+
   test('replacing upcoming keeps the current track and position', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
     final sender = _sender();

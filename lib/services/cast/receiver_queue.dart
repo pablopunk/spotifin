@@ -13,15 +13,16 @@ class ReceiverQueue {
 
   /// The slice of [queue] to send with `PlayNow`, starting at its current
   /// entry: a short look-behind for "previous", then the upcoming entries
-  /// up to the message size limit.
-  factory ReceiverQueue.around(QueueState queue) {
+  /// up to the message size limit. [fromStart] sends from the first entry
+  /// when it fits, so the receiver's repeat-all wraps to the queue start.
+  factory ReceiverQueue.around(QueueState queue, {bool fromStart = false}) {
     final loaded = queue.loadedEntries;
     final current = queue.currentIndex ?? 0;
-    final start = math.max(0, current - _lookBehind);
-    final end = math.min(
-      loaded.length,
-      start + JellyfinReceiverProtocol.maxItemsPerMessage,
-    );
+    const limit = JellyfinReceiverProtocol.maxItemsPerMessage;
+    final start = fromStart && loaded.length <= limit
+        ? 0
+        : math.max(0, current - _lookBehind);
+    final end = math.min(loaded.length, start + limit);
     return ReceiverQueue._(
       List.unmodifiable(loaded.sublist(start, end)),
       current - start,

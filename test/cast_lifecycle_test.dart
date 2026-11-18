@@ -126,7 +126,7 @@ CastController _controller({
   playback: playback,
   sender: sender,
   isSupported: () => true,
-  rejoinDelays: const [Duration(seconds: 30)],
+  sessionLossGrace: const Duration(seconds: 30),
   adoptTimeout: const Duration(milliseconds: 10),
 );
 
@@ -222,6 +222,7 @@ void main() {
       expect(cast.error, isNull);
 
       await cast.retry();
+      await cast.play();
       await _pump();
       expect(sender.calls, contains('connect:room'));
       expect(_lastStart(sender), const Duration(seconds: 12));
@@ -244,6 +245,7 @@ void main() {
       expect(cast.ownership, CastOwnership.recovering);
 
       await cast.retry();
+      await cast.play();
       await _pump();
       expect(_lastStart(sender), const Duration(seconds: 12));
     });
@@ -269,8 +271,8 @@ void main() {
 
       await cast.retry();
       await _settle();
-      expect(_lastStart(sender), const Duration(seconds: 30));
-      expect(sender.calls.last, 'pause');
+      expect(cast.remotePlaying, isFalse);
+      expect(cast.remotePosition, const Duration(seconds: 30));
 
       await cast.disconnect();
       await _pump();
@@ -300,9 +302,10 @@ void main() {
       await _pump();
 
       await cast.retry();
+      await cast.play();
       await _settle();
       expect(_lastStart(sender), const Duration(seconds: 40));
-      expect(sender.calls, isNot(contains('pause')));
+      expect(cast.remotePlaying, isTrue);
     });
   });
 

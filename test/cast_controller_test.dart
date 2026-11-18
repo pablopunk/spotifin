@@ -159,16 +159,13 @@ CastController controller({
   required FakeReceiverSender sender,
   JellyfinSession? session = httpsSession,
   bool supported = true,
-  List<Duration> rejoinDelays = const [
-    Duration(milliseconds: 1),
-    Duration(milliseconds: 1),
-  ],
+  Duration sessionLossGrace = const Duration(milliseconds: 5),
 }) {
   final instance = CastController(
     playback: playback,
     sender: sender,
     isSupported: () => supported,
-    rejoinDelays: rejoinDelays,
+    sessionLossGrace: sessionLossGrace,
     resyncDelay: const Duration(milliseconds: 1),
     adoptTimeout: const Duration(milliseconds: 20),
   );
@@ -374,6 +371,33 @@ void main() {
       expect(sender.playingItemId, 'b');
     });
 
+    test('next skips even when the receiver repeats one track', () async {
+      final sender = FakeReceiverSender(devices: const [livingRoom]);
+      final cast = await casting(
+        ['a', 'b'],
+        repeatMode: LoopMode.one,
+        sender: sender,
+      );
+      await cast.next();
+      await pump();
+      expect(cast.remoteTrack?.id, 'b');
+      expect(sender.playingItemId, 'b');
+    });
+
+    test('next at the end wraps under repeat all', () async {
+      final sender = FakeReceiverSender(devices: const [livingRoom]);
+      final cast = await casting(
+        ['a', 'b'],
+        index: 1,
+        repeatMode: LoopMode.all,
+        sender: sender,
+      );
+      await cast.next();
+      await pump();
+      expect(cast.remoteIndex, 0);
+      expect(sender.playingItemId, 'a');
+    });
+
     test('status from the previous item never moves the queue back', () async {
       final sender = FakeReceiverSender(devices: const [livingRoom]);
       final cast = await casting(['a', 'b', 'c'], sender: sender);
@@ -459,7 +483,7 @@ void main() {
       final cast = controller(
         playback: FakePlayback(queue: [track('a'), track('b'), track('c')]),
         sender: sender,
-        rejoinDelays: const [Duration(seconds: 30)],
+        sessionLossGrace: const Duration(seconds: 30),
       );
       await cast.connect(livingRoom);
       final sent = sender.commands.length;
@@ -482,67 +506,93 @@ void main() {
       expect(cast.ownership, CastOwnership.remote);
       expect(cast.remoteTrack?.id, 'b');
       expect(cast.remotePosition, const Duration(seconds: 40));
-      expect(sender.commands, hasLength(sent));
+      expect(sender.commands.skip(sent).map((c) => c['command']), [
+        'SetRepeatMode',
+      ]);
       expect(cast.error, isNull);
     });
 
-    test('rejoins the last device automatically', () async {
+    test('a session ended elsewhere returns to the phone paused', () async {
+      final playback = FakePlayback(queue: [track('a'), track('b')]);
       final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(['a', 'b'], sender: sender);
+      final cast = await casting(const [], playback: playback, sender: sender);
+      sender.finishCurrent();
+      sender.reportPlaying(position: const Duration(seconds: 20));
+      await pump();
       sender.calls.clear();
 
       sender.emitConnection(CastConnectionState.disconnected);
       await settle();
 
-      expect(sender.calls, contains('connect:room'));
-      expect(cast.ownership, CastOwnership.remote);
-      expect(cast.error, isNull);
+      expect(sender.calls, isNot(contains('connect:room')));
+      expect(cast.ownership, CastOwnership.local);
+      expect(cast.error, contains('Casting to Living Room ended'));
+      final restored = playback.restoredSnapshots.single;
+      expect(restored.queue.currentIndex, 1);
+      expect(restored.position, const Duration(seconds: 20));
+      expect(restored.playing, isFalse);
+      expect(playback.castingActive, isFalse);
     });
 
-    test('a receiver that lost the queue resumes where it stopped', () async {
+    test('a receiver that lost the queue never restarts by itself', () async {
       final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(['a', 'b'], sender: sender);
-      sender.reportPlaying(
-        position: const Duration(seconds: 30),
-        state: CastPlayerState.paused,
+      final cast = controller(
+        playback: FakePlayback(queue: [track('a'), track('b')]),
+        sender: sender,
+        sessionLossGrace: const Duration(seconds: 30),
       );
+      await cast.connect(livingRoom);
+      sender.reportPlaying(position: const Duration(seconds: 30));
       await pump();
 
       sender.emitConnection(CastConnectionState.disconnected);
       sender.playlist = [];
       sender.index = -1;
+      sender.emitConnection(CastConnectionState.connected, livingRoom);
       await settle();
 
+      expect(cast.ownership, CastOwnership.remote);
+      expect(sender.commandNames.where((c) => c == 'PlayNow'), hasLength(1));
+      expect(cast.remotePlaying, isFalse);
+      expect(cast.remoteTrack?.id, 'a');
+      expect(cast.remotePosition, const Duration(seconds: 30));
+
+      await cast.play();
+      await pump();
       final options = sender.lastOptions('PlayNow');
       expect(options['startPositionTicks'], 300000000);
-      expect(sender.itemIdsOf(options), ['a', 'b']);
-      expect(sender.calls.last, 'pause');
-      expect(cast.ownership, CastOwnership.remote);
+      expect(sender.playingItemId, 'a');
     });
 
-    test('repeated rejoin failures ask the user', () async {
-      final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(['a'], sender: sender);
-      sender.failConnectCount = 10;
-
-      sender.emitConnection(CastConnectionState.disconnected);
-      await settle();
-
-      expect(cast.ownership, CastOwnership.recovering);
-      expect(cast.error, contains('Lost connection to Living Room'));
-    });
-
-    test('rejoin waits while the app is in the background', () async {
+    test('the loss timer waits while the app is in the background', () async {
       final sender = FakeReceiverSender(devices: const [livingRoom]);
       final cast = await casting(['a'], sender: sender);
       await cast.handleAppBackground();
-      sender.calls.clear();
 
       sender.emitConnection(CastConnectionState.disconnected);
       await settle();
-      expect(sender.calls, isNot(contains('connect:room')));
+      expect(cast.ownership, CastOwnership.recovering);
 
+      sender.emitConnection(CastConnectionState.connected, livingRoom);
+      sender.reportPlaying(position: const Duration(seconds: 3));
       await cast.handleAppForeground();
+      await settle();
+      expect(cast.ownership, CastOwnership.remote);
+      expect(cast.error, isNull);
+    });
+
+    test('retry reconnects to the last device', () async {
+      final sender = FakeReceiverSender(devices: const [livingRoom]);
+      final cast = controller(
+        playback: FakePlayback(queue: [track('a')]),
+        sender: sender,
+        sessionLossGrace: const Duration(seconds: 30),
+      );
+      await cast.connect(livingRoom);
+      sender.emitConnection(CastConnectionState.disconnected);
+      await pump();
+
+      await cast.retry();
       await settle();
       expect(sender.calls, contains('connect:room'));
       expect(cast.ownership, CastOwnership.remote);

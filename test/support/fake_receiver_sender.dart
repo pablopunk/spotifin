@@ -204,7 +204,9 @@ class FakeReceiverSender implements CastSender {
       case 'PlayLast':
         playlist = [...playlist, ...itemIdsOf(options)];
       case 'NextTrack':
-        if (index + 1 < playlist.length) {
+        if (repeatMode == 'RepeatOne') {
+          reportPlaying();
+        } else if (index + 1 < playlist.length) {
           index++;
           reportPlaying();
         }

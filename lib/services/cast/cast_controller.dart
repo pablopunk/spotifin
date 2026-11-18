@@ -19,8 +19,8 @@ import 'receiver_queue.dart';
 /// Who owns playback right now.
 ///
 /// Local is selected until a Cast handoff is pending ([transferring]) or
-/// Cast owns ([remote]) or the Cast connection dropped and is being rejoined
-/// ([recovering]). A disconnected transport alone never selects local: only
+/// Cast owns ([remote]) or the Cast session dropped and the Cast SDK may
+/// still resume it ([recovering]). A disconnected transport alone never selects local: only
 /// a successful restoration or account cleanup does.
 enum CastOwnership { local, transferring, remote, recovering }
 
@@ -36,21 +36,19 @@ enum CastOwnership { local, transferring, remote, recovering }
 /// `PlayLast`, and reloads the receiver at the same position only when an
 /// edit changes the order of what is already there.
 ///
-/// A dropped connection (app backgrounded, Wi-Fi blip) is not an error: the
-/// controller silently rejoins the same device and adopts whatever the
-/// receiver is playing. Only repeated rejoin failures surface to the user.
+/// A dropped session (iOS suspends it in the background, Wi-Fi blips) is not
+/// an error: the Cast SDK resumes it and the controller adopts whatever the
+/// receiver is playing. The controller never relaunches the receiver on its
+/// own, because a session ended from the TV, Google Home or another app must
+/// stay ended: when no resume arrives within [sessionLossGrace] in the
+/// foreground, playback returns to the phone, paused.
 class CastController extends ChangeNotifier {
   CastController({
     required CastPlaybackSource playback,
     required CastSender sender,
     bool Function()? isSupported,
     math.Random? random,
-    this.rejoinDelays = const [
-      Duration(seconds: 2),
-      Duration(seconds: 5),
-      Duration(seconds: 10),
-      Duration(seconds: 20),
-    ],
+    this.sessionLossGrace = const Duration(seconds: 20),
     this.resyncDelay = const Duration(milliseconds: 1200),
     this.adoptTimeout = const Duration(seconds: 4),
     // ignore: prefer_initializing_formals
@@ -66,8 +64,9 @@ class CastController extends ChangeNotifier {
   final bool Function() _isSupported;
   final math.Random _random;
 
-  /// Waits before each automatic rejoin attempt after a dropped connection.
-  final List<Duration> rejoinDelays;
+  /// How long a dropped session may take to resume in the foreground before
+  /// it counts as ended.
+  final Duration sessionLossGrace;
 
   /// Coalesces queue edits that reorder the receiver into one reload.
   final Duration resyncDelay;
@@ -129,8 +128,15 @@ class CastController extends ChangeNotifier {
   bool _leavingRemote = false;
 
   Timer? _resyncTimer;
-  Timer? _rejoinTimer;
-  int _rejoinAttempt = 0;
+  Timer? _sessionLossTimer;
+
+  /// An edit reordered the receiver while paused; it reloads on play rather
+  /// than audibly restarting now.
+  bool _resyncOnPlay = false;
+
+  /// A correction for a stale receiver advance is queued; further statuses
+  /// must not queue another.
+  bool _correcting = false;
 
   String? _error;
 
@@ -316,12 +322,11 @@ class CastController extends ChangeNotifier {
         _connectedDevice = null;
         if (_ownership == CastOwnership.remote && !_leavingRemote) {
           _setOwnership(CastOwnership.recovering);
-          _rejoinAttempt = 0;
-          _scheduleRejoin();
+          _startSessionLossTimer();
         }
       case CastConnectionState.connected:
         if (_ownership == CastOwnership.recovering) {
-          _rejoinTimer?.cancel();
+          _cancelSessionLossTimer();
           _runInBackground(_adoptReceiverNow);
         }
       case CastConnectionState.connecting:
@@ -413,7 +418,9 @@ class CastController extends ChangeNotifier {
     final reached = receiver.entries[at];
     final queue = snapshot.queue.selectEntry(reached.id);
     final stillQueued = queue.currentEntry?.id == reached.id;
-    if (!stillQueued || _resyncTimer != null) {
+    if (!stillQueued || _resyncPending) {
+      if (_correcting) return;
+      _correcting = true;
       _runInBackground(_playDesiredNextNow);
       return;
     }
@@ -421,6 +428,8 @@ class CastController extends ChangeNotifier {
     _castSnapshot = snapshot.copyWith(queue: queue);
     if (_needsMoreQueue()) _runInBackground(_extendReceiverNow);
   }
+
+  bool get _resyncPending => _resyncTimer != null || _resyncOnPlay;
 
   bool _needsMoreQueue() {
     final queue = _castSnapshot?.queue;
@@ -580,7 +589,10 @@ class CastController extends ChangeNotifier {
       throw const CastException('Nothing is casting right now.');
     }
     final selected = queue.selectEntry(target.id);
-    final receiver = ReceiverQueue.around(selected);
+    final receiver = ReceiverQueue.around(
+      selected,
+      fromStart: castRepeatMode == LoopMode.all,
+    );
     await _sendExpecting(
       JellyfinReceiverProtocol.playNow(
         session,
@@ -595,6 +607,7 @@ class CastController extends ChangeNotifier {
     );
     _resyncTimer?.cancel();
     _resyncTimer = null;
+    _resyncOnPlay = false;
     _castSnapshot = snapshot.copyWith(
       queue: selected,
       position: position,
@@ -691,6 +704,12 @@ class CastController extends ChangeNotifier {
 
   void _scheduleResync() {
     _resyncTimer?.cancel();
+    _resyncTimer = null;
+    if (_disposed) return;
+    if (!_recoveryPlaying) {
+      _resyncOnPlay = true;
+      return;
+    }
     _resyncTimer = Timer(resyncDelay, () {
       _resyncTimer = null;
       _runInBackground(_resyncNow);
@@ -726,6 +745,7 @@ class CastController extends ChangeNotifier {
   /// The receiver finished the current entry before a pending edit reached
   /// it, so it advanced in its stale order. Plays the phone's next entry.
   Future<void> _playDesiredNextNow(int generation) async {
+    _correcting = false;
     final queue = _castSnapshot?.queue;
     if (queue == null || _ownership != CastOwnership.remote) return;
     final at = (queue.currentIndex ?? -1) + 1;
@@ -762,7 +782,7 @@ class CastController extends ChangeNotifier {
     final current = snapshot?.queue.currentEntry;
     final idle =
         _remote.playerState == CastPlayerState.idle || _remote.itemId == null;
-    if (idle && snapshot != null && current != null) {
+    if ((idle || _resyncOnPlay) && snapshot != null && current != null) {
       final ended = _remote.finishReason == CastFinishReason.finished;
       await _playOnReceiver(
         snapshot.queue,
@@ -810,13 +830,32 @@ class CastController extends ChangeNotifier {
       snapshot = snapshot.copyWith(queue: queue);
       _castSnapshot = snapshot;
     }
+    if (at >= queue.loadedEntries.length && castRepeatMode == LoopMode.all) {
+      queue = QueueState.restore(
+        queue.collectionTracks,
+        index: 0,
+        shuffle: queue.shuffle,
+        newId: _newCastId,
+      );
+      final first = queue.currentEntry;
+      if (first == null) return;
+      await _playOnReceiver(
+        queue,
+        first,
+        position: Duration.zero,
+        autoplay: true,
+      );
+      return;
+    }
     if (at >= queue.loadedEntries.length) {
       throw const CastException('You’re at the end of the queue.');
     }
     final target = queue.loadedEntries[at];
     final receiver = _receiver;
+    // The receiver's NextTrack replays the current item under repeat one.
     final inSync =
-        _resyncTimer == null &&
+        castRepeatMode != LoopMode.one &&
+        !_resyncPending &&
         receiver != null &&
         receiver.current?.id == queue.currentEntry?.id &&
         receiver.next?.id == target.id;
@@ -1059,30 +1098,34 @@ class CastController extends ChangeNotifier {
 
   /// Reconnects to the last device and continues where Cast left off.
   Future<void> retry() => _enqueue((generation) async {
-    _rejoinTimer?.cancel();
-    _rejoinAttempt = 0;
+    _cancelSessionLossTimer();
     await _rejoinNow(generation);
   });
 
-  void _scheduleRejoin() {
-    _rejoinTimer?.cancel();
-    if (!_foreground || _ownership != CastOwnership.recovering) return;
-    if (_rejoinAttempt >= rejoinDelays.length) {
-      final name = _lastDevice?.friendlyName ?? 'Chromecast';
-      _fail('Lost connection to $name. Reconnect, or resume on this phone.');
-      return;
-    }
-    _rejoinTimer = Timer(rejoinDelays[_rejoinAttempt], () {
-      _rejoinTimer = null;
-      _rejoinAttempt++;
-      _runInBackground((generation) async {
-        try {
-          await _rejoinNow(generation);
-        } catch (_) {
-          _scheduleRejoin();
-        }
-      });
+  void _startSessionLossTimer() {
+    _cancelSessionLossTimer();
+    if (_disposed || !_foreground) return;
+    if (_ownership != CastOwnership.recovering) return;
+    _sessionLossTimer = Timer(sessionLossGrace, () {
+      _sessionLossTimer = null;
+      _runInBackground(_returnToPhoneAfterLossNow);
     });
+  }
+
+  void _cancelSessionLossTimer() {
+    _sessionLossTimer?.cancel();
+    _sessionLossTimer = null;
+  }
+
+  /// The session ended elsewhere (TV, Google Home, another app) or never
+  /// came back: the queue returns to the phone, paused where Cast was.
+  Future<void> _returnToPhoneAfterLossNow(int generation) async {
+    if (_ownership != CastOwnership.recovering) return;
+    if (_sender.connectionState != CastConnectionState.disconnected) return;
+    final name = _lastDevice?.friendlyName ?? 'Chromecast';
+    await _disconnectNow(false, generation);
+    if (generation != _generation) return;
+    _fail('Casting to $name ended. Playback is back on this phone.');
   }
 
   Future<void> _rejoinNow(int generation) async {
@@ -1120,35 +1163,50 @@ class CastController extends ChangeNotifier {
     _awaitingSince = null;
     final receiver = _receiver;
     final at = itemId == null ? null : receiver?.locate(itemId);
+    await _registerAsReceiverSender();
+    if (generation != _generation || _castSnapshot == null) return;
     if (receiver != null && at != null) {
       _setOwnership(CastOwnership.remote);
-      _rejoinAttempt = 0;
       _error = null;
       _followReceiver(_remote);
       _safeNotify();
       return;
     }
-    final current = _castSnapshot!.queue.currentEntry;
-    final session = _session;
-    if (current == null || session == null) {
-      _setOwnership(CastOwnership.remote);
-      _safeNotify();
-      return;
-    }
-    await _sender.sendReceiverCommand(
-      JellyfinReceiverProtocol.setRepeatMode(session, castRepeatMode),
-    );
-    await _playOnReceiver(
-      _castSnapshot!.queue,
-      current,
-      position: _recoveryPosition,
-      autoplay: _recoveryPlaying,
-    );
-    if (generation != _generation) return;
+    _showLostReceiverQueuePaused();
     _setOwnership(CastOwnership.remote);
-    _rejoinAttempt = 0;
     _error = null;
     _safeNotify();
+  }
+
+  /// The receiver sends its errors to the sender of its last command, so a
+  /// rejoined phone announces itself with a harmless command.
+  Future<void> _registerAsReceiverSender() async {
+    final session = _session;
+    if (session == null) return;
+    try {
+      await _sender.sendReceiverCommand(
+        JellyfinReceiverProtocol.setRepeatMode(session, castRepeatMode),
+      );
+    } on CastException {
+      // Only error routing depends on it; playback control still works.
+    }
+  }
+
+  /// The receiver finished the queue or was restarted while the phone was
+  /// away. Never restart audio by surprise: show where Cast stopped, paused;
+  /// play reloads it.
+  void _showLostReceiverQueuePaused() {
+    final current = _castSnapshot?.queue.currentEntry;
+    _receiver = null;
+    _recoveryPlaying = false;
+    _remote = CastRemoteState(
+      playerState: CastPlayerState.idle,
+      position: _recoveryPosition,
+      duration: current == null
+          ? null
+          : Duration(microseconds: current.track.durationTicks ~/ 10),
+      volume: _remote.volume,
+    );
   }
 
   Future<String?> _receiverItemAfterJoin() async {
@@ -1236,10 +1294,7 @@ class CastController extends ChangeNotifier {
       await _sender.startDiscovery();
     } catch (_) {}
     _connection = _sender.connectionState;
-    if (_ownership == CastOwnership.recovering) {
-      _rejoinAttempt = 0;
-      _scheduleRejoin();
-    }
+    if (_ownership == CastOwnership.recovering) _startSessionLossTimer();
     _safeNotify();
   }
 
@@ -1247,8 +1302,7 @@ class CastController extends ChangeNotifier {
   /// keeps playing its queue (`stopCastingOnAppTerminated=false`).
   Future<void> handleAppBackground() async {
     _foreground = false;
-    _rejoinTimer?.cancel();
-    _rejoinTimer = null;
+    _cancelSessionLossTimer();
     try {
       await _sender.stopDiscovery();
     } catch (_) {}
@@ -1339,8 +1393,9 @@ class CastController extends ChangeNotifier {
   void _cancelTimers() {
     _resyncTimer?.cancel();
     _resyncTimer = null;
-    _rejoinTimer?.cancel();
-    _rejoinTimer = null;
+    _resyncOnPlay = false;
+    _correcting = false;
+    _cancelSessionLossTimer();
   }
 
   void _setOwnership(CastOwnership ownership) {
