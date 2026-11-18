@@ -301,6 +301,24 @@ class TrackMenuButton extends ConsumerWidget {
       );
 }
 
+class TrackMenuButtonWithDownloadStatus extends ConsumerWidget {
+  const TrackMenuButtonWithDownloadStatus({
+    required this.track,
+    required this.contextTracks,
+    super.key,
+  });
+
+  final Track track;
+  final List<Track> contextTracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => TrackMenuButton(
+    track: track,
+    contextTracks: contextTracks,
+    downloadStatus: ref.watch(downloadStatusesProvider).value?[track.id],
+  );
+}
+
 List<PopupMenuEntry<_TrackAction>> _trackMenuItems(
   Track track,
   String? downloadStatus,

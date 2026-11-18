@@ -71,6 +71,7 @@ Future<(FakeActivePlayback, ProviderContainer)> _pumpPanel(
     overrides: [
       activePlaybackProvider.overrideWithValue(active),
       remoteSessionProvider.overrideWithValue(remote),
+      downloadStatusesProvider.overrideWith((ref) => Stream.value(const {})),
     ],
   );
   addTearDown(container.dispose);
