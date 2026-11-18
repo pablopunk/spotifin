@@ -3,53 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/features.dart';
 import '../../app/providers.dart';
+import '../../services/downtify/downtify_collection_search.dart';
 import '../../services/downtify/downtify_models.dart';
-import '../../services/search/search_text.dart';
 import '../../storage/database.dart';
 import '../common/design_system.dart';
 import 'downtify_song_results.dart';
 
-class DowntifyCollectionSearch {
-  const DowntifyCollectionSearch.artist(this.artist) : album = null;
-
-  const DowntifyCollectionSearch.album({
-    required String this.album,
-    required this.artist,
-  });
-
-  final String artist;
-  final String? album;
-
-  String get query => [artist, ?album].join(' ');
-
-  List<DowntifySong> filter(List<DowntifySong> songs) {
-    final byArtist = songs.where(_creditsArtist).toList();
-    final album = this.album;
-    if (album == null) return byArtist;
-    final fromAlbum = byArtist
-        .where((song) => _sameName(song.albumName, album))
-        .toList();
-    return [
-      ...fromAlbum,
-      ...byArtist.where((song) => !fromAlbum.contains(song)),
-    ];
-  }
-
-  bool _creditsArtist(DowntifySong song) =>
-      song.artists.any((name) => _sameName(name, artist));
-
-  static bool _sameName(String a, String b) =>
-      normalizeSearchText(a).trim() == normalizeSearchText(b).trim();
-
-  @override
-  bool operator ==(Object other) =>
-      other is DowntifyCollectionSearch &&
-      other.artist == artist &&
-      other.album == album;
-
-  @override
-  int get hashCode => Object.hash(artist, album);
-}
+export '../../services/downtify/downtify_collection_search.dart';
 
 final downtifyCollectionSongsProvider = FutureProvider.autoDispose
     .family<List<DowntifySong>, DowntifyCollectionSearch>((ref, search) async {
@@ -59,10 +19,7 @@ final downtifyCollectionSongsProvider = FutureProvider.autoDispose
         ),
       );
       if (origin == null) return const [];
-      final songs = await ref
-          .read(downtifyClientProvider)
-          .search(origin, search.query);
-      return search.filter(songs);
+      return search.load(ref.read(downtifyClientProvider), origin);
     });
 
 bool watchDowntifyAvailable(WidgetRef ref) =>

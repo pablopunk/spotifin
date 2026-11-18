@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,112 +8,117 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotifin/app/providers.dart';
-import 'package:spotifin/features/downtify/downtify_collection_tab.dart';
 import 'package:spotifin/features/downtify/external_track_tile.dart';
 import 'package:spotifin/features/library/library_screen.dart';
 import 'package:spotifin/services/downtify/downtify_client.dart';
-import 'package:spotifin/services/downtify/downtify_models.dart';
 import 'package:spotifin/storage/database.dart';
 
-DowntifySong _song(String id, String artist, String album) =>
-    DowntifySong.fromJson({
-      'song_id': id,
-      'name': id,
-      'artists': [artist],
-      'album_name': album,
-    });
+Map<String, Object> _song(String id, String name, String artist) => {
+  'song_id': id,
+  'name': name,
+  'artists': [artist],
+};
+
+const _responses = <String, Object>{
+  '/api/artists/search': [
+    {'artist_id': 'daft', 'name': 'Daft Punk'},
+  ],
+  '/api/albums/search': [
+    {
+      'name': 'Discovery',
+      'artists': ['Daft Punk'],
+      'url': 'https://music.youtube.com/browse/discovery',
+    },
+  ],
+};
+
+Object _respond(Uri url) => switch (url.path) {
+  '/api/artists/top_songs' => [_song('top', 'Around the World', 'Daft Punk')],
+  '/api/songs/search' => [
+    _song('search', 'Aerodynamic', 'Daft Punk'),
+    _song('repeat', 'Around the World', 'Daft Punk'),
+    _song('other', 'Cover', 'Someone Else'),
+  ],
+  '/api/url' => [
+    _song('one', 'Digital Love', 'Daft Punk'),
+    _song('two', 'Voyager', 'Daft Punk'),
+  ],
+  final path => _responses[path] ?? [],
+};
+
+Future<List<String>> _showDowntifyTab(
+  WidgetTester tester,
+  CollectionKind kind,
+) async {
+  SharedPreferences.setMockInitialValues({
+    'downtifyServerUrl': 'https://downtify.example.com',
+  });
+  final database = AppDatabase.forTesting(NativeDatabase.memory());
+  final client = DowntifyClient(
+    httpClient: MockClient((request) async {
+      if (request.url.path == '/api/version') {
+        return http.Response(jsonEncode('2.12.0'), 200);
+      }
+      return http.Response(jsonEncode(_respond(request.url)), 200);
+    }),
+  );
+  addTearDown(client.close);
+  const track = Track(
+    id: 'local',
+    name: 'One More Time',
+    artist: 'Daft Punk',
+    album: 'Discovery',
+    artistItems: '[]',
+    labels: '[]',
+    durationTicks: 0,
+    favorite: false,
+    playCount: 0,
+    container: 'mp3',
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(database),
+        downtifyClientProvider.overrideWithValue(client),
+      ],
+      child: MaterialApp(
+        home: CollectionScreen(
+          title: kind == CollectionKind.artist ? 'Daft Punk' : 'Discovery',
+          tracks: const [track],
+          kind: kind,
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(Tab, 'Downtify'));
+  await tester.pumpAndSettle();
+
+  final titles = tester
+      .widgetList<ExternalTrackTile>(find.byType(ExternalTrackTile))
+      .map((tile) => tile.song.name)
+      .toList();
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+  await tester.runAsync(database.close);
+  return titles;
+}
 
 void main() {
-  test('album search keeps the artist and lists the album first', () {
-    const search = DowntifyCollectionSearch.album(
-      album: 'OK Computer',
-      artist: 'Radiohead',
-    );
-    final songs = search.filter([
-      _song('creep', 'Radiohead', 'Pablo Honey'),
-      _song('cover', 'Vitamin String Quartet', 'OK Computer'),
-      _song('airbag', 'radiohead', 'OK Computer'),
+  testWidgets('artist tab lists top songs before search results', (
+    tester,
+  ) async {
+    expect(await _showDowntifyTab(tester, CollectionKind.artist), [
+      'Around the World',
+      'Aerodynamic',
     ]);
-
-    expect(search.query, 'Radiohead OK Computer');
-    expect(songs.map((song) => song.id), ['airbag', 'creep']);
   });
 
-  for (final kind in [CollectionKind.artist, CollectionKind.album]) {
-    testWidgets('${kind.name} page shows a Downtify tab', (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'downtifyServerUrl': 'https://downtify.example.com',
-      });
-      final database = AppDatabase.forTesting(NativeDatabase.memory());
-      final queries = <String>[];
-      final client = DowntifyClient(
-        httpClient: MockClient((request) async {
-          if (request.url.path == '/api/version') {
-            return http.Response(jsonEncode('2.12.0'), 200);
-          }
-          if (request.url.path == '/api/queue') {
-            return http.Response('[]', 200);
-          }
-          queries.add(request.url.queryParameters['query']!);
-          return http.Response(
-            jsonEncode([
-              {
-                'song_id': 'external',
-                'name': 'Aerodynamic',
-                'artists': ['Daft Punk'],
-              },
-              {
-                'song_id': 'other',
-                'name': 'Cover',
-                'artists': ['Someone Else'],
-              },
-            ]),
-            200,
-          );
-        }),
-      );
-      addTearDown(client.close);
-      final track = Track(
-        id: 'local',
-        name: 'One More Time',
-        artist: 'Daft Punk',
-        album: 'Discovery',
-        artistItems: '[]',
-        labels: '[]',
-        durationTicks: 0,
-        favorite: false,
-        playCount: 0,
-        container: 'mp3',
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(database),
-            downtifyClientProvider.overrideWithValue(client),
-          ],
-          child: MaterialApp(
-            home: CollectionScreen(
-              title: kind == CollectionKind.artist ? 'Daft Punk' : 'Discovery',
-              tracks: [track],
-              kind: kind,
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(Tab, 'Downtify'));
-      await tester.pumpAndSettle();
-
-      expect(queries, [
-        kind == CollectionKind.artist ? 'Daft Punk' : 'Daft Punk Discovery',
-      ]);
-      expect(find.byType(ExternalTrackTile), findsOneWidget);
-      expect(find.text('Aerodynamic'), findsOneWidget);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(milliseconds: 1));
-      await tester.runAsync(database.close);
-    });
-  }
+  testWidgets('album tab lists the full album tracklist', (tester) async {
+    expect(await _showDowntifyTab(tester, CollectionKind.album), [
+      'Digital Love',
+      'Voyager',
+    ]);
+  });
 }

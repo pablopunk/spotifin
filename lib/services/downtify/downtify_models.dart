@@ -130,3 +130,47 @@ class DowntifyJob {
   final String message;
   final String? filename;
 }
+
+class DowntifyArtist {
+  const DowntifyArtist({required this.id, required this.name});
+
+  factory DowntifyArtist.fromJson(Map<String, dynamic> json) {
+    final id = json['artist_id'];
+    final name = json['name'];
+    if (id is! String || id.isEmpty || name is! String) {
+      throw const FormatException('Downtify returned an invalid artist.');
+    }
+    return DowntifyArtist(id: id, name: name);
+  }
+
+  final String id;
+  final String name;
+}
+
+class DowntifyAlbum {
+  const DowntifyAlbum({
+    required this.name,
+    required this.artists,
+    required this.url,
+  });
+
+  factory DowntifyAlbum.fromJson(Map<String, dynamic> json) {
+    final name = json['name'];
+    final url = json['url'];
+    if (name is! String || url is! String || url.isEmpty) {
+      throw const FormatException('Downtify returned an invalid album.');
+    }
+    return DowntifyAlbum(
+      name: name,
+      artists: switch (json['artists']) {
+        final List<dynamic> values => values.whereType<String>().toList(),
+        _ => const <String>[],
+      },
+      url: url,
+    );
+  }
+
+  final String name;
+  final List<String> artists;
+  final String url;
+}

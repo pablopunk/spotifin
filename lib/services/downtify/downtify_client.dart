@@ -56,11 +56,37 @@ class DowntifyClient {
     return decoded;
   }
 
-  Future<List<DowntifySong>> search(String serverUrl, String query) async {
-    final response = await _get(
-      _uri(serverUrl, '/api/songs/search', {'query': query.trim()}),
-    );
-    final decoded = _decode(response);
+  Future<List<DowntifySong>> search(String serverUrl, String query) =>
+      _songs(_uri(serverUrl, '/api/songs/search', {'query': query.trim()}));
+
+  Future<List<DowntifyArtist>> searchArtists(String serverUrl, String query) =>
+      _list(
+        _uri(serverUrl, '/api/artists/search', {'query': query.trim()}),
+        DowntifyArtist.fromJson,
+      );
+
+  Future<List<DowntifySong>> artistTopSongs(String serverUrl, String id) =>
+      _songs(_uri(serverUrl, '/api/artists/top_songs', {'channel_id': id}));
+
+  Future<List<DowntifyAlbum>> searchAlbums(String serverUrl, String query) =>
+      _list(
+        _uri(serverUrl, '/api/albums/search', {'query': query.trim()}),
+        DowntifyAlbum.fromJson,
+      );
+
+  Future<List<DowntifySong>> albumSongs(
+    String serverUrl,
+    DowntifyAlbum album,
+  ) => _songs(_uri(serverUrl, '/api/url', {'url': album.url}));
+
+  Future<List<DowntifySong>> _songs(Uri uri) =>
+      _list(uri, DowntifySong.fromJson);
+
+  Future<List<T>> _list<T>(
+    Uri uri,
+    T Function(Map<String, dynamic>) parse,
+  ) async {
+    final decoded = _decode(await _get(uri));
     if (decoded is! List<dynamic>) {
       throw const DowntifyException(
         'Downtify returned invalid search results.',
@@ -68,7 +94,7 @@ class DowntifyClient {
     }
     return decoded
         .whereType<Map<String, dynamic>>()
-        .map(DowntifySong.fromJson)
+        .map(parse)
         .toList(growable: false);
   }
 
