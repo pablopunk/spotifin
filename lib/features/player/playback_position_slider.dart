@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/playback/active_playback.dart';
+import 'scrub_slider.dart';
 
 class PlaybackPositionSlider extends StatelessWidget {
   const PlaybackPositionSlider({required this.active, super.key});
@@ -21,13 +22,13 @@ class PlaybackPositionSlider extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         label: 'Playback position',
-        child: Slider(
-          value: state.position.inMilliseconds.toDouble().clamp(0.0, maximum),
+        child: ScrubSlider(
+          value: state.position.inMilliseconds.toDouble(),
           max: maximum,
           semanticFormatterCallback: (value) =>
               '${_formatTime(Duration(milliseconds: value.round()))} of '
               '${_formatTime(duration)}',
-          onChanged: canSeek
+          onSeek: canSeek
               ? (value) => active.seek(Duration(milliseconds: value.round()))
               : null,
         ),
