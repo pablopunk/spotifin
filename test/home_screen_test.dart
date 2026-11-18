@@ -74,6 +74,41 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   });
 
+  testWidgets('recently added Go shuffle plays the whole library shuffled', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.upsertTracks([
+      TracksCompanion.insert(id: 'a', name: 'Song A'),
+      TracksCompanion.insert(id: 'b', name: 'Song B'),
+    ]);
+    final active = FakeActivePlayback();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(database),
+          activePlaybackProvider.overrideWithValue(active),
+        ],
+        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Go shuffle'));
+    await tester.pumpAndSettle();
+
+    final [tracks, _, shuffle] = active.actionArguments['replaceQueue']!;
+    expect((tracks! as List<Track>).map((track) => track.id), {'a', 'b'});
+    expect(shuffle, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
   testWidgets('renders generated mixes as valid slivers', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 5000));
     addTearDown(() => tester.binding.setSurfaceSize(null));

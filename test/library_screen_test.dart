@@ -93,15 +93,16 @@ void main() {
       find.byType(SpotifinPlayButton),
     );
     expect(play.onPressed, isNotNull);
-    final shuffle = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, Icons.shuffle_rounded),
+    final shuffle = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Go shuffle'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
     );
     expect(shuffle.onPressed, isNotNull);
 
     final playY = tester.getCenter(find.byType(SpotifinPlayButton)).dy;
-    final shuffleY = tester
-        .getCenter(find.widgetWithIcon(IconButton, Icons.shuffle_rounded))
-        .dy;
+    final shuffleY = tester.getCenter(find.text('Go shuffle')).dy;
     final sortY = tester.getCenter(find.byTooltip('Sort songs')).dy;
     final coverflowY = tester.getCenter(find.byTooltip('Coverflow')).dy;
     expect(shuffleY, playY);

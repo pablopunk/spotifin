@@ -11,6 +11,7 @@ import '../common/artwork.dart';
 import '../common/album_context_menu.dart';
 import '../common/collection_download_button.dart';
 import '../common/design_system.dart';
+import '../common/go_shuffle_button.dart';
 import '../common/playlist_artwork.dart';
 import '../common/playlist_context_menu.dart';
 import '../common/track_tile.dart';
@@ -994,6 +995,7 @@ class _CollectionHeader extends ConsumerWidget {
                     children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
+                        spacing: SpotifinSpacing.sm,
                         children: [
                           SpotifinPlayButton(
                             onPressed: tracks.isEmpty
@@ -1003,28 +1005,9 @@ class _CollectionHeader extends ConsumerWidget {
                                     shuffle: false,
                                   ),
                           ),
-                          const SizedBox(width: SpotifinSpacing.sm),
-                          IconButton(
-                            tooltip: 'Shuffle',
-                            color: active.state.shuffle
-                                ? SpotifinColors.accent
-                                : SpotifinColors.textMuted,
-                            onPressed: tracks.isEmpty
-                                ? null
-                                : () => active.replaceQueue(
-                                    tracks,
-                                    shuffle: true,
-                                  ),
-                            icon: const Icon(Icons.shuffle_rounded),
-                          ),
-                          if (coverflowToggle != null) ...[
-                            const SizedBox(width: SpotifinSpacing.sm),
-                            coverflowToggle!,
-                          ],
-                          if (sortAction != null) ...[
-                            const SizedBox(width: SpotifinSpacing.sm),
-                            sortAction!,
-                          ],
+                          Flexible(child: GoShuffleButton(tracks: tracks)),
+                          ?coverflowToggle,
+                          ?sortAction,
                         ],
                       ),
                       const SizedBox(height: SpotifinSpacing.sm),

@@ -156,9 +156,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Shuffle'), findsOneWidget);
-    final shuffle = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, Icons.shuffle_rounded),
+    expect(find.text('Go shuffle'), findsOneWidget);
+    final shuffle = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Go shuffle'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
     );
     expect(shuffle.onPressed, isNotNull);
     await _dispose(tester, tracks.database);
@@ -262,7 +265,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final playY = tester.getCenter(find.byType(SpotifinPlayButton)).dy;
-    expect(tester.getCenter(find.byTooltip('Shuffle')).dy, playY);
+    expect(tester.getCenter(find.text('Go shuffle')).dy, playY);
     expect(tester.getCenter(find.byTooltip('Sort collection songs')).dy, playY);
     final controls = find
         .ancestor(

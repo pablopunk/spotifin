@@ -18,6 +18,7 @@ import '../../services/downtify/downtify_models.dart';
 import '../common/artwork.dart';
 import '../common/album_context_menu.dart';
 import '../common/design_system.dart';
+import '../common/go_shuffle_button.dart';
 import '../common/track_tile.dart';
 import '../downtify/external_track_tile.dart';
 import '../library/library_screen.dart';
@@ -258,6 +259,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     tracks: catalog.added.take(12).toList(),
                     contextTracks: catalog.added,
                     onTitleTap: () => _openLibraryTab(0),
+                    action: GoShuffleButton(tracks: tracks),
                   ),
                 ),
                 SliverToBoxAdapter(
