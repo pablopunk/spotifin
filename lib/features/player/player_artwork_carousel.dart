@@ -34,6 +34,7 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   final _SwipeAnchor _swipeAnchor = _SwipeAnchor();
   late int _lastSyncedIndex;
   int? _dragStartIndex;
+  int? _requestedIndex;
   bool _syncingToPlayback = false;
 
   @override
@@ -49,10 +50,24 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
   @override
   void didUpdateWidget(covariant PlayerArtworkCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_requestedIndex != null) return;
+    _showPlayingTrack();
+  }
+
+  void _showPlayingTrack() {
     final currentIndex = _validIndex(widget.currentIndex);
-    if (currentIndex == _lastSyncedIndex) return;
+    if (currentIndex == _lastSyncedIndex &&
+        !_isShowingOtherPage(currentIndex)) {
+      return;
+    }
     _lastSyncedIndex = currentIndex;
     _animateToPlaybackIndex(currentIndex);
+  }
+
+  bool _isShowingOtherPage(int index) {
+    if (_dragStartIndex != null || _syncingToPlayback) return false;
+    if (!_pageController.hasClients) return false;
+    return _pageController.page != index.toDouble();
   }
 
   @override
@@ -150,7 +165,16 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
     if (settled != target) _snapBackTo(target);
     if (target == _lastSyncedIndex) return;
     setState(() => _lastSyncedIndex = target);
-    widget.onTrackChanged(target);
+    _requestTrack(target);
+  }
+
+  void _requestTrack(int index) {
+    _requestedIndex = index;
+    widget.onTrackChanged(index).whenComplete(() {
+      if (!mounted || _requestedIndex != index) return;
+      _requestedIndex = null;
+      _showPlayingTrack();
+    });
   }
 
   void _snapBackTo(int index) {
@@ -163,9 +187,8 @@ class _PlayerArtworkCarouselState extends State<PlayerArtworkCarousel> {
 
   void _animateToPlaybackIndex(int index) {
     if (!_pageController.hasClients) return;
-    final visibleIndex = _pageController.page?.round();
-    if (visibleIndex == index) return;
-
+    _dragStartIndex = null;
+    _swipeAnchor.startPage = null;
     _syncingToPlayback = true;
     _pageController
         .animateToPage(

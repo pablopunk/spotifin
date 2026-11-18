@@ -399,10 +399,10 @@ void main() {
               body: SizedBox(
                 width: 390,
                 height: 390,
-                child: PlayerArtworkCarousel(
+                child: _PlayingQueue(
                   tracks: tracks,
-                  currentIndex: 0,
-                  onTrackChanged: (index) async => changedIndexes.add(index),
+                  initialIndex: 0,
+                  onTrackChanged: changedIndexes.add,
                 ),
               ),
             ),
@@ -488,10 +488,10 @@ void main() {
               body: SizedBox(
                 width: 390,
                 height: 390,
-                child: PlayerArtworkCarousel(
+                child: _PlayingQueue(
                   tracks: tracks,
-                  currentIndex: 1,
-                  onTrackChanged: (index) async => changedIndexes.add(index),
+                  initialIndex: 1,
+                  onTrackChanged: changedIndexes.add,
                 ),
               ),
             ),
@@ -524,6 +524,99 @@ void main() {
       TargetPlatform.iOS,
     }),
   );
+
+  testWidgets(
+    'the playing track wins when playback briefly reports the old one',
+    (tester) async {
+      final tracks = [_track('zero'), _track('one'), _track('two')];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: _PlayingQueue(
+                  tracks: tracks,
+                  initialIndex: 0,
+                  reportsOldTrackFirst: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(PageView), const Offset(-220, 0));
+      for (var frame = 0; frame < 60; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!;
+      expect(controller.page, 1);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
+  testWidgets(
+    'a track change from playback stops the drag and shows its artwork',
+    (tester) async {
+      final tracks = [_track('zero'), _track('one'), _track('two')];
+      final playing = ValueNotifier<int>(0);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                height: 390,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: playing,
+                  builder: (context, index, _) => PlayerArtworkCarousel(
+                    tracks: tracks,
+                    currentIndex: index,
+                    onTrackChanged: (_) async {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(PageView)),
+      );
+      await gesture.moveBy(const Offset(-40, 0));
+      await tester.pump();
+      playing.value = 2;
+      await tester.pump();
+      await gesture.moveBy(const Offset(120, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!;
+      expect(controller.page, 2);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 }
 
 Track _track(String id) => Track(
@@ -539,3 +632,40 @@ Track _track(String id) => Track(
   favorite: false,
   playCount: 0,
 );
+
+class _PlayingQueue extends StatefulWidget {
+  const _PlayingQueue({
+    required this.tracks,
+    required this.initialIndex,
+    this.onTrackChanged,
+    this.reportsOldTrackFirst = false,
+  });
+
+  final List<Track> tracks;
+  final int initialIndex;
+  final void Function(int index)? onTrackChanged;
+  final bool reportsOldTrackFirst;
+
+  @override
+  State<_PlayingQueue> createState() => _PlayingQueueState();
+}
+
+class _PlayingQueueState extends State<_PlayingQueue> {
+  late int _playing = widget.initialIndex;
+
+  Future<void> _play(int index) async {
+    widget.onTrackChanged?.call(index);
+    if (widget.reportsOldTrackFirst) {
+      setState(() => _playing = _playing);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+    if (mounted) setState(() => _playing = index);
+  }
+
+  @override
+  Widget build(BuildContext context) => PlayerArtworkCarousel(
+    tracks: widget.tracks,
+    currentIndex: _playing,
+    onTrackChanged: _play,
+  );
+}
