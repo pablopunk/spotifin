@@ -64,8 +64,12 @@ class _SpotifinAppState extends ConsumerState<SpotifinApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cast = ref.read(castControllerProvider);
     if (state == AppLifecycleState.resumed) {
       ref.read(appControllerProvider.notifier).refresh(silent: true);
+      unawaited(cast.handleAppForeground());
+    } else if (state == AppLifecycleState.paused) {
+      unawaited(cast.handleAppBackground());
     }
   }
 

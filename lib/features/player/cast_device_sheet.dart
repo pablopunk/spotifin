@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../services/cast/cast_controller.dart';
 import '../../services/cast/cast_sender.dart';
 import '../common/design_system.dart';
+import 'scrub_slider.dart';
 
 Future<void> showCastDevices(
   BuildContext context,
@@ -115,6 +116,10 @@ class _CastDevicesSheet extends StatelessWidget {
 
   String _statusText() {
     if (controller.initializing) return 'Looking for devices…';
+    if (controller.ownership == CastOwnership.recovering &&
+        controller.error == null) {
+      return 'Reconnecting to ${controller.connectedDeviceName ?? 'Chromecast'}…';
+    }
     if (controller.isCasting && controller.connectedDeviceName != null) {
       return 'Casting to ${controller.connectedDeviceName}';
     }
@@ -235,10 +240,10 @@ class _NowCasting extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            Slider(
-              value: position.inMilliseconds.toDouble().clamp(0.0, max),
+            ScrubSlider(
+              value: position.inMilliseconds.toDouble(),
               max: max,
-              onChanged: controller.busy
+              onSeek: controller.busy
                   ? null
                   : (value) => _run(
                       context,

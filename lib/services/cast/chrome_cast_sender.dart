@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_chrome_cast/cast_context.dart';
-import 'package:flutter_chrome_cast/common.dart';
 import 'package:flutter_chrome_cast/discovery.dart';
 import 'package:flutter_chrome_cast/entities.dart';
 import 'package:flutter_chrome_cast/enums.dart';
@@ -13,12 +13,8 @@ import 'package:flutter_chrome_cast/session.dart';
 
 import '../redaction.dart';
 import 'cast_device.dart';
-import 'cast_media.dart';
 import 'cast_sender.dart';
-
-const _spotifinCastLoadIdKey = 'spotifinCastLoadId';
-
-typedef _CastLoadIdentity = ({String loadId, String? occurrenceId});
+import 'jellyfin_receiver_protocol.dart';
 
 /// Real [CastSender] backed by the Google Cast SDK via `flutter_chrome_cast`.
 ///
@@ -39,16 +35,12 @@ class ChromeCastSender implements CastSender {
   final _connectionController =
       StreamController<CastConnectionState>.broadcast();
   final _remoteController = StreamController<CastRemoteState>.broadcast();
+  final _receiverMessagesController = StreamController<String>.broadcast();
 
   List<CastDevice> _devices = const [];
   CastConnectionState _connection = CastConnectionState.disconnected;
   CastDevice? _connectedDevice;
   CastRemoteState _remote = const CastRemoteState();
-  // A status can omit mediaInformation while retaining mediaSessionID. Only
-  // resolve that status when this sender previously observed the session ID
-  // alongside Spotifin's own load ID. A reused session ID becomes ambiguous;
-  // never infer its latest load from timing or receiver state.
-  final Map<int, _CastLoadIdentity?> _loadIdentityByMediaSession = {};
   String _receiverAppId = 'F007D354';
   bool _initialized = false;
 
@@ -57,6 +49,7 @@ class ChromeCastSender implements CastSender {
   StreamSubscription<GoggleCastMediaStatus?>? _mediaSub;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<dynamic>? _volumeSub;
+  StreamSubscription<GoogleCastMessage>? _messagesSub;
 
   @override
   List<CastDevice> get devices => _devices;
@@ -79,6 +72,9 @@ class ChromeCastSender implements CastSender {
 
   @override
   Stream<CastRemoteState> get remoteStateStream => _remoteController.stream;
+
+  @override
+  Stream<String> get receiverMessages => _receiverMessagesController.stream;
 
   @override
   Future<void> initialize({required String receiverAppId}) async {
@@ -110,6 +106,9 @@ class ChromeCastSender implements CastSender {
       }
       _initialized = true;
       _listen();
+      await GoogleCastSessionManager.instance.addMessageChannel(
+        JellyfinReceiverProtocol.namespace,
+      );
     } on MissingPluginException {
       throw const CastException(
         'Chromecast is not available on this device build.',
@@ -154,68 +153,27 @@ class ChromeCastSender implements CastSender {
     _mediaSub ??= GoogleCastRemoteMediaClient.instance.mediaStatusStream.listen(
       (status) {
         if (status == null) return;
-        final customData = status.mediaInformation?.customData;
-        final rawLoadId = customData?[_spotifinCastLoadIdKey];
-        final rawOccurrenceId = customData?['playlistItemId'];
-        final mediaSessionId = status.mediaSessionID;
-        final knownIdentity = mediaSessionId == 0
-            ? null
-            : _loadIdentityByMediaSession[mediaSessionId];
-        final hasKnownIdentity =
-            mediaSessionId != 0 &&
-            _loadIdentityByMediaSession.containsKey(mediaSessionId);
-        final directLoadId = rawLoadId is String ? rawLoadId : null;
-        final directOccurrenceId = rawOccurrenceId is String
-            ? rawOccurrenceId
-            : null;
-
-        if (directLoadId != null && mediaSessionId != 0) {
-          final sameKnownLoad =
-              knownIdentity != null &&
-              knownIdentity.loadId == directLoadId &&
-              (directOccurrenceId == null ||
-                  knownIdentity.occurrenceId == directOccurrenceId);
-          if (!hasKnownIdentity || sameKnownLoad) {
-            _loadIdentityByMediaSession[mediaSessionId] = (
-              loadId: directLoadId,
-              occurrenceId:
-                  directOccurrenceId ??
-                  (sameKnownLoad ? knownIdentity.occurrenceId : null),
-            );
-          } else {
-            // A native session ID observed for multiple loads cannot identify
-            // a later mediaInformation-null status safely.
-            _loadIdentityByMediaSession[mediaSessionId] = null;
-          }
-        }
-
-        final sessionIdentity = mediaSessionId == 0
-            ? null
-            : _loadIdentityByMediaSession[mediaSessionId];
-        final loadId =
-            directLoadId ??
-            (directOccurrenceId == null ||
-                    sessionIdentity?.occurrenceId == directOccurrenceId
-                ? sessionIdentity?.loadId
-                : null);
-        final occurrenceId =
-            directOccurrenceId ??
-            (directLoadId == null || sessionIdentity?.loadId == directLoadId
-                ? sessionIdentity?.occurrenceId
-                : null);
+        final itemId = status.mediaInformation?.customData?['itemId'];
         _remote = CastRemoteState(
           playerState: _mapPlayer(status.playerState),
           position: _remote.position,
           duration: status.mediaInformation?.duration,
           volume: _remote.volume,
           finishReason: _mapFinishReason(status),
-          occurrenceId: occurrenceId,
-          loadId: loadId,
-          mediaSessionId: mediaSessionId,
+          itemId: itemId is String ? itemId : null,
         );
         if (!_remoteController.isClosed) _remoteController.add(_remote);
       },
     );
+    _messagesSub ??= GoogleCastSessionManager.instance.messageStream
+        .where(
+          (message) => message.namespace == JellyfinReceiverProtocol.namespace,
+        )
+        .listen((message) {
+          if (!_receiverMessagesController.isClosed) {
+            _receiverMessagesController.add(message.message);
+          }
+        });
     _positionSub ??= GoogleCastRemoteMediaClient.instance.playerPositionStream
         .listen((position) {
           _remote = _remote.copyWith(position: position);
@@ -254,8 +212,7 @@ class ChromeCastSender implements CastSender {
           );
     if (_connection == CastConnectionState.disconnected) {
       _connectedDevice = null;
-      _remote = const CastRemoteState();
-      _loadIdentityByMediaSession.clear();
+      _remote = CastRemoteState(volume: _remote.volume);
       if (!_remoteController.isClosed) _remoteController.add(_remote);
     }
     if (!_connectionController.isClosed) {
@@ -368,67 +325,20 @@ class ChromeCastSender implements CastSender {
   }
 
   @override
-  Future<void> loadSingle(
-    CastTrackPayload payload, {
-    required Duration position,
-    required String loadId,
-    bool autoplay = true,
-  }) async {
+  Future<void> sendReceiverCommand(Map<String, Object?> command) async {
     _guardSupported();
     _guardConnected();
+    final bool sent;
     try {
-      final customData = <String, dynamic>{
-        ...payload.customData,
-        _spotifinCastLoadIdKey: loadId,
-      };
-      final info = GoogleCastMediaInformation(
-        contentId: payload.contentId,
-        streamType: CastMediaStreamType.buffered,
-        contentUrl: payload.contentUrl,
-        contentType: payload.contentType,
-        duration: payload.duration,
-        customData: customData,
-        metadata: GoogleCastMusicMediaMetadata(
-          title: payload.title,
-          artist: payload.artist,
-          albumName: payload.album.isEmpty ? null : payload.album,
-          images: payload.artworkUrl == null
-              ? null
-              : [
-                  GoogleCastImage(
-                    url: payload.artworkUrl!,
-                    height: 500,
-                    width: 500,
-                  ),
-                ],
-        ),
+      sent = await GoogleCastSessionManager.instance.sendMessage(
+        JellyfinReceiverProtocol.namespace,
+        jsonEncode(command),
       );
-      await GoogleCastRemoteMediaClient.instance.loadMedia(
-        info,
-        autoPlay: autoplay,
-        playPosition: position,
-        customData: customData,
-      );
-      final mediaSessionId = _remote.loadId == loadId
-          ? _remote.mediaSessionId
-          : null;
-      _remote = CastRemoteState(
-        position: position,
-        duration: payload.duration,
-        playerState: autoplay
-            ? CastPlayerState.playing
-            : CastPlayerState.paused,
-        volume: _remote.volume,
-        occurrenceId: payload.customData['playlistItemId'] is String
-            ? payload.customData['playlistItemId'] as String
-            : null,
-        loadId: loadId,
-        mediaSessionId: mediaSessionId,
-      );
-      if (!_remoteController.isClosed) _remoteController.add(_remote);
     } catch (error) {
-      if (error is CastException) rethrow;
       throw CastException(_friendly(error));
+    }
+    if (!sent) {
+      throw const CastException('Chromecast did not accept the command.');
     }
   }
 
@@ -451,14 +361,6 @@ class ChromeCastSender implements CastSender {
   );
 
   @override
-  Future<void> seek(Duration position) => _guarded(
-    () => GoogleCastRemoteMediaClient.instance.seek(
-      GoogleCastMediaSeekOption(position: position),
-    ),
-    'Could not seek on Chromecast.',
-  );
-
-  @override
   Future<void> setVolume(double volume) async {
     _guardSupported();
     _guardConnected();
@@ -471,18 +373,6 @@ class ChromeCastSender implements CastSender {
       throw CastException(_friendly(error));
     }
   }
-
-  @override
-  Future<void> next() => _guarded(
-    () => GoogleCastRemoteMediaClient.instance.queueNextItem(),
-    'Could not skip to the next track on Chromecast.',
-  );
-
-  @override
-  Future<void> previous() => _guarded(
-    () => GoogleCastRemoteMediaClient.instance.queuePrevItem(),
-    'Could not go back on Chromecast.',
-  );
 
   Future<void> _guarded(Future<void> Function() action, String fallback) async {
     _guardSupported();
@@ -526,9 +416,10 @@ class ChromeCastSender implements CastSender {
     _mediaSub?.cancel();
     _positionSub?.cancel();
     _volumeSub?.cancel();
-    _loadIdentityByMediaSession.clear();
+    _messagesSub?.cancel();
     _devicesController.close();
     _connectionController.close();
     _remoteController.close();
+    _receiverMessagesController.close();
   }
 }

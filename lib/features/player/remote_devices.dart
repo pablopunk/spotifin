@@ -7,6 +7,7 @@ import '../../services/jellyfin/remote_session.dart';
 import '../../services/playback/remote_session_service.dart';
 import '../common/artwork.dart';
 import '../common/design_system.dart';
+import 'scrub_slider.dart';
 
 class RemoteDeviceButton extends ConsumerWidget {
   const RemoteDeviceButton({super.key});
@@ -217,13 +218,10 @@ class _RemoteDeviceCard extends StatelessWidget {
             ),
             if (session.nowPlayingItemId != null) ...[
               if (session.canSeek && maximum > 0)
-                Slider(
-                  value: session.position.inMilliseconds.toDouble().clamp(
-                    0,
-                    maximum,
-                  ),
+                ScrubSlider(
+                  value: session.position.inMilliseconds.toDouble(),
                   max: maximum,
-                  onChanged: pending
+                  onSeek: pending
                       ? null
                       : (value) => _run(
                           context,

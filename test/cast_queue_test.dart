@@ -1,19 +1,17 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_device.dart';
-import 'package:spotifin/services/cast/cast_media.dart';
 import 'package:spotifin/services/cast/cast_playback_source.dart';
 import 'package:spotifin/services/cast/cast_sender.dart';
-import 'package:spotifin/services/cast/jellyfin_cast_adapter.dart';
-import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
 import 'package:spotifin/services/playback/playback_snapshot.dart';
 import 'package:spotifin/services/playback/queue_state.dart';
 import 'package:spotifin/storage/database.dart';
+
+import 'support/fake_receiver_sender.dart';
 
 const _session = JellyfinSession(
   serverUrl: 'https://music.example.com/jellyfin',
@@ -42,131 +40,8 @@ Track _track(String id) => Track(
 
 Future<void> _pump() => Future<void>.delayed(Duration.zero);
 
-class _QueueSender implements CastSender {
-  final connectionController =
-      StreamController<CastConnectionState>.broadcast();
-  final remoteController = StreamController<CastRemoteState>.broadcast();
-
-  CastConnectionState _connection = CastConnectionState.disconnected;
-  CastDevice? _connectedDevice;
-  CastRemoteState _remote = const CastRemoteState();
-
-  int failLoadCount = 0;
-  final loads = <CastTrackPayload>[];
-  final loadAutoplays = <bool>[];
-  int stopCalls = 0;
-  int localPlayCount = 0;
-
-  void emitConnection(CastConnectionState state) {
-    _connection = state;
-    if (state == CastConnectionState.disconnected) _connectedDevice = null;
-    connectionController.add(state);
-  }
-
-  void emitRemote(CastRemoteState state) {
-    _remote = state;
-    remoteController.add(state);
-  }
-
-  @override
-  List<CastDevice> get devices => const [_device];
-
-  @override
-  Stream<List<CastDevice>> get devicesStream => Stream.value(devices);
-
-  @override
-  CastConnectionState get connectionState => _connection;
-
-  @override
-  Stream<CastConnectionState> get connectionStateStream =>
-      connectionController.stream;
-
-  @override
-  CastDevice? get connectedDevice => _connectedDevice;
-
-  @override
-  CastRemoteState get remoteState => _remote;
-
-  @override
-  Stream<CastRemoteState> get remoteStateStream => remoteController.stream;
-
-  @override
-  Future<void> initialize({required String receiverAppId}) async {}
-
-  @override
-  Future<void> startDiscovery() async {}
-
-  @override
-  Future<void> stopDiscovery() async {}
-
-  @override
-  Future<void> connect(CastDevice device) async {
-    _connectedDevice = device;
-    _connection = CastConnectionState.connected;
-    connectionController.add(_connection);
-  }
-
-  @override
-  Future<void> disconnect({bool stopReceiver = false}) async {
-    _connectedDevice = null;
-    _connection = CastConnectionState.disconnected;
-    _remote = const CastRemoteState();
-    connectionController.add(_connection);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> loadSingle(
-    CastTrackPayload payload, {
-    required Duration position,
-    required String loadId,
-    bool autoplay = true,
-  }) async {
-    loads.add(payload);
-    loadAutoplays.add(autoplay);
-    if (failLoadCount > 0) {
-      failLoadCount--;
-      throw const CastException('Receiver rejected this track.');
-    }
-    _remote = _remote.copyWith(
-      position: position,
-      duration: payload.duration,
-      playerState: autoplay ? CastPlayerState.playing : CastPlayerState.paused,
-    );
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> play() async {}
-
-  @override
-  Future<void> pause() async {}
-
-  @override
-  Future<void> stop() async {
-    stopCalls++;
-    _remote = _remote.copyWith(playerState: CastPlayerState.idle);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> seek(Duration position) async {}
-
-  @override
-  Future<void> setVolume(double volume) async {}
-
-  @override
-  Future<void> next() async {}
-
-  @override
-  Future<void> previous() async {}
-
-  @override
-  void dispose() {
-    connectionController.close();
-    remoteController.close();
-  }
-}
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 30));
 
 class _QueuePlayback implements CastPlaybackSource {
   _QueuePlayback(this.snapshotQueue);
@@ -246,19 +121,24 @@ QueueState _prepared(List<String> ids, {int start = 0}) => QueueState.prepare(
   newId: _newId,
 );
 
-Future<CastController> _connected(
-  _QueuePlayback playback,
-  _QueueSender sender,
-) async {
+CastController _controller(_QueuePlayback playback, FakeReceiverSender sender) {
   final cast = CastController(
     playback: playback,
-    adapter: JellyfinCastAdapter(JellyfinClient()),
     sender: sender,
     isSupported: () => true,
     random: Random(7),
+    resyncDelay: const Duration(milliseconds: 5),
   );
   addTearDown(sender.dispose);
   addTearDown(cast.dispose);
+  return cast;
+}
+
+Future<CastController> _connected(
+  _QueuePlayback playback,
+  FakeReceiverSender sender,
+) async {
+  final cast = _controller(playback, sender);
   await cast.configure(_session);
   await cast.connect(_device);
   await _pump();
@@ -266,13 +146,23 @@ Future<CastController> _connected(
   return cast;
 }
 
+FakeReceiverSender _sender() => FakeReceiverSender(devices: const [_device]);
+
+int _playNows(FakeReceiverSender sender) =>
+    sender.commandNames.where((name) => name == 'PlayNow').length;
+
+/// What the receiver will play from now on.
+List<String> _receiverUpcoming(FakeReceiverSender sender) =>
+    sender.playlist.sublist(sender.index);
+
+List<String> _upcoming(CastController cast) =>
+    cast.castQueue.skip(cast.remoteIndex).map((track) => track.id).toList();
+
 void main() {
-  test('new collection loads the chosen entry and commits', () async {
+  test('new collection plays the chosen entry on the receiver', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    final handoffLoads = sender.loads.length;
-    expect(handoffLoads, 1);
 
     await cast.replaceQueue([
       _track('x'),
@@ -281,67 +171,116 @@ void main() {
     ], startIndex: 2);
     await _pump();
 
-    expect(sender.loads.length, handoffLoads + 1);
-    expect(sender.loads.last.itemId, 'z');
+    final options = sender.lastOptions('PlayNow');
+    expect(sender.itemIdsOf(options), ['x', 'y', 'z']);
+    expect(options['startIndex'], 2);
     expect(cast.castQueue.map((track) => track.id), ['x', 'y', 'z']);
     expect(cast.remoteTrack?.id, 'z');
-    expect(cast.remoteIndex, 2);
-    // Local audio never started: only the handoff stop ran.
     expect(playback.stopForCastCalls, 1);
     expect(playback.localPlayCalls, 0);
   });
 
-  test('pure edits commit without a receiver load', () async {
-    final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
-    final sender = _QueueSender();
+  test('appending reaches the receiver without interrupting it', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b'], start: 0));
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    final loads = sender.loads.length;
 
-    await cast.addToQueue(_track('e'));
+    await cast.addToQueue(_track('c'));
+    await _settle();
+
+    expect(_playNows(sender), 1);
+    expect(sender.commandNames.last, 'PlayLast');
+    expect(sender.playlist, ['a', 'b', 'c']);
+    expect(_receiverUpcoming(sender), _upcoming(cast));
+  });
+
+  test('reordering edits reach the receiver as one reload in place', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
+    final sender = _sender();
+    final cast = await _connected(playback, sender);
+    sender.reportPlaying(position: const Duration(seconds: 40));
+    await _pump();
+
     await cast.addNextToQueue([_track('f')]);
     await cast.reorder(3, 1);
     await cast.removeAt(0);
-    await _pump();
+    await _settle();
 
-    expect(sender.loads.length, loads);
     expect(cast.remoteTrack?.id, 'b');
-    expect(cast.castQueue.map((track) => track.id), ['c', 'b', 'f', 'd', 'e']);
+    expect(cast.castQueue.map((track) => track.id), ['c', 'b', 'f', 'd']);
+    expect(_playNows(sender), 2);
+    expect(sender.lastOptions('PlayNow')['startPositionTicks'], 400000000);
+    expect(_receiverUpcoming(sender), _upcoming(cast));
     expect(playback.localPlayCalls, 0);
   });
 
-  test('replacing upcoming keeps the current cast track playing', () async {
-    final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
-    final sender = _QueueSender();
+  test('a reorder while paused waits for play to reach the receiver', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    final loads = sender.loads.length;
-
-    await cast.replaceUpcoming([_track('r1'), _track('r2')]);
+    sender.reportPlaying(
+      position: const Duration(seconds: 8),
+      state: CastPlayerState.paused,
+    );
     await _pump();
 
-    expect(sender.loads.length, loads);
-    expect(cast.remoteTrack?.id, 'b');
-    expect(cast.castQueue.map((track) => track.id), ['a', 'b', 'r1', 'r2']);
+    await cast.reorder(2, 1);
+    await _settle();
+    expect(_playNows(sender), 1);
+
+    await cast.play();
+    await _pump();
+    expect(_playNows(sender), 2);
+    expect(sender.lastOptions('PlayNow')['startPositionTicks'], 80000000);
+    expect(_receiverUpcoming(sender), ['a', 'c', 'b']);
+    expect(cast.remotePlaying, isTrue);
   });
 
-  test('removing the current entry loads its successor paused-aware', () async {
-    final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 1));
-    final sender = _QueueSender();
+  test('replacing upcoming keeps the current track and position', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    sender.emitRemote(
-      const CastRemoteState(
-        playerState: CastPlayerState.paused,
-        position: Duration(seconds: 9),
-        duration: Duration(minutes: 3),
-      ),
+
+    await cast.replaceUpcoming([_track('r1'), _track('r2')]);
+    await _settle();
+
+    expect(cast.remoteTrack?.id, 'b');
+    expect(cast.castQueue.map((track) => track.id), ['a', 'b', 'r1', 'r2']);
+    expect(_receiverUpcoming(sender), ['b', 'r1', 'r2']);
+  });
+
+  test(
+    'the receiver follows the phone when an edit is still pending',
+    () async {
+      final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
+      final sender = _sender();
+      final cast = await _connected(playback, sender);
+
+      await cast.removeAt(1);
+      sender.finishCurrent();
+      await _settle();
+
+      expect(cast.remoteTrack?.id, 'c');
+      expect(sender.playingItemId, 'c');
+      expect(_receiverUpcoming(sender), ['c']);
+    },
+  );
+
+  test('removing the current entry plays its successor paused-aware', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 1));
+    final sender = _sender();
+    final cast = await _connected(playback, sender);
+    sender.reportPlaying(
+      position: const Duration(seconds: 9),
+      state: CastPlayerState.paused,
     );
     await _pump();
 
     await cast.removeAt(1);
     await _pump();
 
-    expect(sender.loads.length, 2);
-    expect(sender.loads.last.itemId, 'c');
-    expect(sender.loadAutoplays.last, isFalse);
+    expect(sender.playingItemId, 'c');
+    expect(sender.calls.last, 'pause');
     expect(cast.castQueue.map((track) => track.id), ['a', 'c']);
     expect(cast.remoteTrack?.id, 'c');
     expect(playback.localPlayCalls, 0);
@@ -351,7 +290,7 @@ void main() {
     'removing the final entry stops the receiver and keeps casting',
     () async {
       final playback = _QueuePlayback(_prepared(['a'], start: 0));
-      final sender = _QueueSender();
+      final sender = _sender();
       final cast = await _connected(playback, sender);
 
       await cast.removeAt(0);
@@ -362,42 +301,42 @@ void main() {
       expect(cast.ownership, CastOwnership.remote);
       expect(sender.connectionState, CastConnectionState.connected);
 
-      // A new selection on the empty queue loads and commits.
       await cast.replaceQueue([_track('n')], startIndex: 0);
       await _pump();
       expect(cast.castQueue.map((track) => track.id), ['n']);
       expect(cast.remoteTrack?.id, 'n');
+      expect(sender.playingItemId, 'n');
     },
   );
 
   test('history selection inserts next and updates history', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
 
     await cast.playHistoryTrack(_track('h'));
     await _pump();
 
-    expect(sender.loads.length, 2);
-    expect(sender.loads.last.itemId, 'h');
+    expect(sender.playingItemId, 'h');
     expect(cast.castQueue.map((track) => track.id), ['a', 'h', 'b', 'c']);
     expect(cast.remoteTrack?.id, 'h');
+    expect(cast.castHistory.map((track) => track.id), ['a']);
     expect(playback.localPlayCalls, 0);
   });
 
-  test('shuffle preserves current without restarting audio', () async {
+  test('shuffle keeps the current track and reorders the receiver', () async {
     final playback = _QueuePlayback(
       _prepared(['a', 'b', 'c', 'd', 'e'], start: 1),
     );
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    final loads = sender.loads.length;
 
     await cast.toggleShuffle();
-    await _pump();
+    await _settle();
 
-    expect(sender.loads.length, loads);
     expect(cast.remoteTrack?.id, 'b');
+    expect(cast.castShuffle, isTrue);
+    expect(cast.castQueue.first.id, 'a');
     expect(cast.castQueue.map((track) => track.id).toSet(), {
       'a',
       'b',
@@ -405,32 +344,24 @@ void main() {
       'd',
       'e',
     });
-    // Loaded prefix through current is untouched.
-    expect(cast.castQueue.first.id, 'a');
+    expect(_receiverUpcoming(sender), _upcoming(cast));
   });
 
   test('commands are rejected while not remote', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b'], start: 0));
-    final sender = _QueueSender();
-    final cast = CastController(
-      playback: playback,
-      adapter: JellyfinCastAdapter(JellyfinClient()),
-      sender: sender,
-      isSupported: () => true,
-    );
-    addTearDown(sender.dispose);
-    addTearDown(cast.dispose);
+    final sender = _sender();
+    final cast = _controller(playback, sender);
     await cast.configure(_session);
 
-    // Local ownership: ordinary commands fail and change nothing.
     await expectLater(
       cast.addToQueue(_track('x')),
       throwsA(isA<CastException>()),
     );
-    expect(sender.loads, isEmpty);
+    expect(sender.commands, isEmpty);
 
     await cast.connect(_device);
     await _pump();
+    await cast.handleAppBackground();
     sender.emitConnection(CastConnectionState.disconnected);
     await _pump();
     expect(cast.ownership, CastOwnership.recovering);
@@ -440,58 +371,37 @@ void main() {
     expect(playback.localPlayCalls, 0);
   });
 
-  test('failed selection retains prior state and restores the item', () async {
+  test('a failed selection keeps the prior state', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 0));
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
-    // Fail both the initial and AAC-fallback selection loads; the prior
-    // item restore below succeeds.
-    sender.failLoadCount = 2;
+    sender.failCommandCount = 1;
 
     await expectLater(cast.playIndex(2), throwsA(isA<CastException>()));
     await _pump();
 
-    // Prior snapshot retained; the prior item was reloaded in place.
     expect(cast.remoteTrack?.id, 'a');
     expect(cast.ownership, CastOwnership.remote);
     expect(cast.error, isNotNull);
     expect(playback.localPlayCalls, 0);
 
-    // Retry of the same selection succeeds.
+    sender.reportPlaying(position: const Duration(seconds: 5));
+    await _pump();
+    expect(cast.remotePosition, const Duration(seconds: 5));
+
     await cast.playIndex(2);
     await _pump();
     expect(cast.remoteTrack?.id, 'c');
   });
 
-  test('failed selection with failed restore keeps recovery', () async {
-    final playback = _QueuePlayback(_prepared(['a', 'b'], start: 0));
-    final sender = _QueueSender();
-    final cast = await _connected(playback, sender);
-    // Fail selection and the prior-item restore (initial + fallback each).
-    sender.failLoadCount = 10;
-
-    await expectLater(cast.playIndex(1), throwsA(isA<CastException>()));
-    await _pump();
-
-    expect(cast.ownership, CastOwnership.recovering);
-    expect(cast.remoteTrack?.id, 'a');
-    expect(playback.localPlayCalls, 0);
-  });
-
-  test('duplicate tracks keep distinct occurrence and payload ids', () async {
+  test('duplicate tracks keep distinct occurrences', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'a'], start: 0));
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
 
     await cast.playIndex(2);
     await _pump();
-
-    final handoffId = sender.loads.first.playlistItemId;
-    final selectionId = sender.loads.last.playlistItemId;
-    expect(handoffId, isNotNull);
-    expect(selectionId, isNotNull);
-    expect(selectionId, isNot(handoffId));
-    expect(sender.loads.last.itemId, 'a');
+    expect(sender.lastOptions('PlayNow')['startIndex'], 2);
     expect(cast.remoteIndex, 2);
 
     await cast.removeTrack('a');
@@ -501,17 +411,14 @@ void main() {
 
   test('edits survive disconnect into the resumed snapshot', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b'], start: 0));
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
 
     await cast.addToQueue(_track('c'));
     await _pump();
-    sender.emitConnection(CastConnectionState.disconnected);
-    await _pump();
     await cast.disconnect();
     await _pump();
 
-    expect(playback.restoredSnapshots, hasLength(1));
     final restored = playback.restoredSnapshots.single;
     expect(restored.queue.loadedEntries.map((entry) => entry.track.id), [
       'a',
@@ -524,7 +431,7 @@ void main() {
     );
   });
 
-  test('handoff beyond the window extends near the tail', () async {
+  test('a long queue is topped up as the receiver nears its end', () async {
     _ids = 1000;
     final local = QueueState.prepare(
       [for (var i = 0; i < 250; i++) _track('t-$i')],
@@ -533,18 +440,23 @@ void main() {
       newId: _newId,
     );
     final playback = _QueuePlayback(local);
-    final sender = _QueueSender();
+    final sender = _sender();
     final cast = await _connected(playback, sender);
 
     expect(cast.castQueue, hasLength(100));
     expect(cast.remoteTrack?.id, 't-120');
+    expect(sender.playlist.last, 't-199');
 
-    await cast.playIndex(85);
-    await cast.next();
-    await _pump();
+    for (var i = 0; i < 70; i++) {
+      sender.finishCurrent();
+      await _pump();
+    }
+    await _settle();
 
-    expect(cast.castQueue.length, greaterThan(100));
-    expect(cast.remoteTrack?.id, 't-186');
+    expect(cast.remoteTrack?.id, 't-190');
+    expect(sender.commandNames, contains('PlayLast'));
+    expect(sender.playlist.last, 't-249');
+    expect(_playNows(sender), 1);
     expect(playback.localPlayCalls, 0);
   });
 }
