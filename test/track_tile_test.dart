@@ -393,6 +393,42 @@ void main() {
     ]);
   });
 
+  testWidgets('radio for the current song keeps it playing', (tester) async {
+    final active = FakeActivePlayback();
+    final track = makeTrack();
+    final radioTrack = makeTrack(id: 'radio');
+    active.emit(_ownerState(track: track, playing: true));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activePlaybackProvider.overrideWithValue(active),
+          radioServiceProvider.overrideWithValue(
+            _FakeRadioService([track, radioTrack]),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TrackMenuButton(
+              track: track,
+              contextTracks: [track],
+              downloadStatus: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start radio'));
+    await tester.pumpAndSettle();
+
+    expect(active.actions, ['addNextToQueue']);
+    expect(active.actionArguments['addNextToQueue'], [
+      [radioTrack],
+    ]);
+  });
+
   testWidgets('song menu stays above the shell player and navigation', (
     tester,
   ) async {
