@@ -7,6 +7,7 @@ import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/app/state/app_controller.dart';
 import 'package:spotifin/features/common/artwork.dart';
 import 'package:spotifin/features/player/player_bar.dart';
+import 'package:spotifin/features/player/playback_position_slider.dart';
 import 'package:spotifin/features/player/player_card.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_sender.dart';
@@ -364,6 +365,10 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byTooltip('Queue'), findsOneWidget);
+    final sliderWidth = tester
+        .getSize(find.byType(PlaybackPositionSlider))
+        .width;
+    expect(sliderWidth, greaterThan(951 * 0.6));
   });
 
   testWidgets('receiver loss retains the recovery display', (tester) async {

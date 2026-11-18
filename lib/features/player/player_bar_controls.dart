@@ -46,33 +46,10 @@ class DesktopPlayerBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: SpotifinSpacing.md),
           child: LayoutBuilder(
-            builder: (context, constraints) => Row(
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _TrackSummary(track: track, onTap: onOpenPlayer),
-                  ),
-                ),
-                Expanded(
-                  flex: constraints.maxWidth >= SpotifinBreakpoints.extendedRail
-                      ? 2
-                      : 1,
-                  child: DesktopTransport(active: active),
-                ),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: _DesktopUtilities(
-                      active: active,
-                      usesSidePanel: usesSidePanel,
-                      onOpenQueue: onOpenQueue,
-                      onOpenLyrics: onOpenLyrics,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            builder: (context, constraints) =>
+                constraints.maxWidth >= SpotifinBreakpoints.extendedRail
+                ? _wideLayout()
+                : _compactLayout(),
           ),
         ),
       ),
@@ -83,6 +60,48 @@ class DesktopPlayerBar extends StatelessWidget {
       child: content,
     );
   }
+
+  Widget _wideLayout() => Row(
+    children: [
+      Expanded(child: _summary()),
+      Expanded(flex: 2, child: DesktopTransport(active: active)),
+      Expanded(child: _utilities()),
+    ],
+  );
+
+  Widget _compactLayout() => Column(
+    children: [
+      Expanded(
+        child: Row(
+          children: [
+            Expanded(child: _summary(artworkSize: 48)),
+            DesktopTransport(active: active, showProgress: false),
+            Expanded(child: _utilities()),
+          ],
+        ),
+      ),
+      _ProgressSlider(active: active),
+    ],
+  );
+
+  Widget _summary({double artworkSize = 56}) => Align(
+    alignment: Alignment.centerLeft,
+    child: _TrackSummary(
+      track: track,
+      onTap: onOpenPlayer,
+      artworkSize: artworkSize,
+    ),
+  );
+
+  Widget _utilities() => Align(
+    alignment: Alignment.centerRight,
+    child: _DesktopUtilities(
+      active: active,
+      usesSidePanel: usesSidePanel,
+      onOpenQueue: onOpenQueue,
+      onOpenLyrics: onOpenLyrics,
+    ),
+  );
 }
 
 class PlayerBarSurface extends StatelessWidget {
@@ -249,10 +268,15 @@ class MobilePlayerBar extends StatelessWidget {
 }
 
 class _TrackSummary extends StatelessWidget {
-  const _TrackSummary({required this.track, required this.onTap});
+  const _TrackSummary({
+    required this.track,
+    required this.onTap,
+    this.artworkSize = 56,
+  });
 
   final Track track;
   final VoidCallback onTap;
+  final double artworkSize;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -265,7 +289,7 @@ class _TrackSummary extends StatelessWidget {
         children: [
           Artwork(
             itemId: track.albumId ?? track.id,
-            size: 56,
+            size: artworkSize,
             borderRadius: SpotifinRadii.small,
           ),
           const SizedBox(width: SpotifinSpacing.sm),
