@@ -32,15 +32,10 @@ abstract final class JellyfinReceiverProtocol {
   static Map<String, Object?> playLast(
     JellyfinSession session, {
     required List<String> itemIds,
-  }) => _command(session, 'PlayLast', {
-    'items': _itemStubs(session, itemIds),
-  });
+  }) => _command(session, 'PlayLast', {'items': _itemStubs(session, itemIds)});
 
   static Map<String, Object?> nextTrack(JellyfinSession session) =>
       _command(session, 'NextTrack', const {});
-
-  static Map<String, Object?> previousTrack(JellyfinSession session) =>
-      _command(session, 'PreviousTrack', const {});
 
   static Map<String, Object?> seek(
     JellyfinSession session,
@@ -90,8 +85,7 @@ abstract final class JellyfinReceiverProtocol {
 
   static int _ticks(Duration position) => position.inMicroseconds * 10;
 
-  static String _serverAddress(String serverUrl) =>
-      serverUrl.endsWith('/')
+  static String _serverAddress(String serverUrl) => serverUrl.endsWith('/')
       ? serverUrl.substring(0, serverUrl.length - 1)
       : serverUrl;
 

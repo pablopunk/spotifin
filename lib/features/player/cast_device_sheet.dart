@@ -115,6 +115,10 @@ class _CastDevicesSheet extends StatelessWidget {
 
   String _statusText() {
     if (controller.initializing) return 'Looking for devices…';
+    if (controller.ownership == CastOwnership.recovering &&
+        controller.error == null) {
+      return 'Reconnecting to ${controller.connectedDeviceName ?? 'Chromecast'}…';
+    }
     if (controller.isCasting && controller.connectedDeviceName != null) {
       return 'Casting to ${controller.connectedDeviceName}';
     }

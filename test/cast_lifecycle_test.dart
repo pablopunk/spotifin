@@ -7,18 +7,16 @@ import 'package:mocktail/mocktail.dart';
 import 'package:spotifin/app/providers.dart';
 import 'package:spotifin/services/cast/cast_controller.dart';
 import 'package:spotifin/services/cast/cast_device.dart';
-import 'package:spotifin/services/cast/cast_media.dart';
 import 'package:spotifin/services/cast/cast_playback_source.dart';
 import 'package:spotifin/services/cast/cast_sender.dart';
-import 'package:spotifin/services/cast/jellyfin_cast_adapter.dart';
 import 'package:spotifin/services/cast/playback_service_cast_source.dart';
-import 'package:spotifin/services/jellyfin/jellyfin_client.dart';
 import 'package:spotifin/services/jellyfin/session.dart';
 import 'package:spotifin/services/playback/playback_service.dart';
 import 'package:spotifin/services/playback/playback_snapshot.dart';
 import 'package:spotifin/services/playback/queue_state.dart';
 import 'package:spotifin/storage/database.dart';
 
+import 'support/fake_receiver_sender.dart';
 import 'support/playback_harness.dart';
 
 const _session = JellyfinSession(
@@ -47,169 +45,6 @@ Track _track(String id) => Track(
 );
 
 Future<void> _pump() => Future<void>.delayed(Duration.zero);
-
-/// Controllable [CastSender] with gates for delayed connect/load testing.
-class LifecycleSender implements CastSender {
-  final devicesController = StreamController<List<CastDevice>>.broadcast();
-  final connectionController =
-      StreamController<CastConnectionState>.broadcast();
-  final remoteController = StreamController<CastRemoteState>.broadcast();
-
-  CastConnectionState _connection = CastConnectionState.disconnected;
-  CastDevice? _connectedDevice;
-  CastRemoteState _remote = const CastRemoteState();
-
-  int failLoadCount = 0;
-  bool failDisconnect = false;
-  Completer<void>? connectGate;
-  Completer<void>? loadGate;
-
-  final loads = <CastTrackPayload>[];
-  final loadPositions = <Duration>[];
-  final loadAutoplays = <bool>[];
-  final calls = <String>[];
-  bool? stoppedReceiver;
-  int stopCalls = 0;
-  int disconnectCalls = 0;
-  int disposeCalls = 0;
-  int initializeCalls = 0;
-  int startDiscoveryCalls = 0;
-
-  void emitConnection(CastConnectionState state, [CastDevice? device]) {
-    _connection = state;
-    if (device != null) _connectedDevice = device;
-    if (state == CastConnectionState.disconnected) _connectedDevice = null;
-    connectionController.add(state);
-  }
-
-  void emitRemote(CastRemoteState state) {
-    _remote = state;
-    remoteController.add(state);
-  }
-
-  @override
-  List<CastDevice> get devices => const [_device];
-
-  @override
-  Stream<List<CastDevice>> get devicesStream => devicesController.stream;
-
-  @override
-  CastConnectionState get connectionState => _connection;
-
-  @override
-  Stream<CastConnectionState> get connectionStateStream =>
-      connectionController.stream;
-
-  @override
-  CastDevice? get connectedDevice => _connectedDevice;
-
-  @override
-  CastRemoteState get remoteState => _remote;
-
-  @override
-  Stream<CastRemoteState> get remoteStateStream => remoteController.stream;
-
-  @override
-  Future<void> initialize({required String receiverAppId}) async {
-    initializeCalls++;
-  }
-
-  @override
-  Future<void> startDiscovery() async {
-    startDiscoveryCalls++;
-  }
-
-  @override
-  Future<void> stopDiscovery() async {}
-
-  @override
-  Future<void> connect(CastDevice device) async {
-    calls.add('connect:${device.id}');
-    final gate = connectGate;
-    if (gate != null) await gate.future;
-    _connectedDevice = device;
-    _connection = CastConnectionState.connected;
-    connectionController.add(_connection);
-  }
-
-  @override
-  Future<void> disconnect({bool stopReceiver = false}) async {
-    disconnectCalls++;
-    stoppedReceiver = stopReceiver;
-    if (failDisconnect) throw const CastException('Could not stop receiver.');
-    _connectedDevice = null;
-    _connection = CastConnectionState.disconnected;
-    _remote = const CastRemoteState();
-    connectionController.add(_connection);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> loadSingle(
-    CastTrackPayload payload, {
-    required Duration position,
-    required String loadId,
-    bool autoplay = true,
-  }) async {
-    loads.add(payload);
-    loadPositions.add(position);
-    loadAutoplays.add(autoplay);
-    if (failLoadCount > 0) {
-      failLoadCount--;
-      throw const CastException('Receiver rejected this track.');
-    }
-    final gate = loadGate;
-    if (gate != null) await gate.future;
-    _remote = _remote.copyWith(
-      position: position,
-      duration: payload.duration,
-      playerState: autoplay ? CastPlayerState.playing : CastPlayerState.paused,
-    );
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> play() async {
-    _remote = _remote.copyWith(playerState: CastPlayerState.playing);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> pause() async {
-    _remote = _remote.copyWith(playerState: CastPlayerState.paused);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> stop() async {
-    stopCalls++;
-    _remote = _remote.copyWith(playerState: CastPlayerState.idle);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> seek(Duration position) async {
-    _remote = _remote.copyWith(position: position);
-    remoteController.add(_remote);
-  }
-
-  @override
-  Future<void> setVolume(double volume) async {}
-
-  @override
-  Future<void> next() async {}
-
-  @override
-  Future<void> previous() async {}
-
-  @override
-  void dispose() {
-    disposeCalls++;
-    devicesController.close();
-    connectionController.close();
-    remoteController.close();
-  }
-}
 
 class _FakePlayback implements CastPlaybackSource {
   _FakePlayback({required List<Track> queue}) : _queue = List.of(queue);
@@ -286,16 +121,24 @@ class _FakePlayback implements CastPlaybackSource {
 
 CastController _controller({
   required CastPlaybackSource playback,
-  required LifecycleSender sender,
-}) {
-  final instance = CastController(
-    playback: playback,
-    adapter: JellyfinCastAdapter(JellyfinClient()),
-    sender: sender,
-    isSupported: () => true,
-  );
-  return instance;
+  required FakeReceiverSender sender,
+}) => CastController(
+  playback: playback,
+  sender: sender,
+  isSupported: () => true,
+  rejoinDelays: const [Duration(seconds: 30)],
+  adoptTimeout: const Duration(milliseconds: 10),
+);
+
+FakeReceiverSender _sender() => FakeReceiverSender(devices: const [_device]);
+
+Duration? _lastStart(FakeReceiverSender sender) {
+  final ticks = sender.lastOptions('PlayNow')['startPositionTicks'] as int?;
+  return ticks == null ? null : Duration(microseconds: ticks ~/ 10);
 }
+
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 30));
 
 void main() {
   group('failed handoff with real playback', () {
@@ -307,7 +150,7 @@ void main() {
       await harness.service.pause();
       await harness.settle();
 
-      final sender = LifecycleSender()..failLoadCount = 10;
+      final sender = _sender()..failCommandCount = 10;
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -341,7 +184,7 @@ void main() {
       await harness.settle();
       expect(harness.service.playing, isTrue);
 
-      final sender = LifecycleSender()..failLoadCount = 10;
+      final sender = _sender()..failCommandCount = 10;
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -362,7 +205,7 @@ void main() {
   group('recovery across transport resets', () {
     test('empty remote before disconnect keeps the position', () async {
       final playback = _FakePlayback(queue: [_track('a'), _track('b')]);
-      final sender = LifecycleSender();
+      final sender = _sender();
       final cast = _controller(playback: playback, sender: sender);
       addTearDown(sender.dispose);
       addTearDown(cast.dispose);
@@ -376,17 +219,17 @@ void main() {
       await _pump();
 
       expect(cast.ownership, CastOwnership.recovering);
-      expect(cast.error, contains('connection lost'));
+      expect(cast.error, isNull);
 
       await cast.retry();
       await _pump();
       expect(sender.calls, contains('connect:room'));
-      expect(sender.loadPositions.last, const Duration(seconds: 12));
+      expect(_lastStart(sender), const Duration(seconds: 12));
     });
 
     test('disconnect before empty remote keeps the position', () async {
       final playback = _FakePlayback(queue: [_track('a'), _track('b')]);
-      final sender = LifecycleSender();
+      final sender = _sender();
       final cast = _controller(playback: playback, sender: sender);
       addTearDown(sender.dispose);
       addTearDown(cast.dispose);
@@ -402,24 +245,21 @@ void main() {
 
       await cast.retry();
       await _pump();
-      expect(sender.loadPositions.last, const Duration(seconds: 12));
+      expect(_lastStart(sender), const Duration(seconds: 12));
     });
 
     test('paused recovery survives reset and retry stays paused', () async {
       final playback = _FakePlayback(queue: [_track('a'), _track('b')]);
-      final sender = LifecycleSender();
+      final sender = _sender();
       final cast = _controller(playback: playback, sender: sender);
       addTearDown(sender.dispose);
       addTearDown(cast.dispose);
       await cast.configure(_session);
       await cast.connect(_device);
 
-      sender.emitRemote(
-        const CastRemoteState(
-          playerState: CastPlayerState.paused,
-          position: Duration(seconds: 30),
-          duration: Duration(minutes: 3),
-        ),
+      sender.reportPlaying(
+        position: const Duration(seconds: 30),
+        state: CastPlayerState.paused,
       );
       await _pump();
       sender.emitRemote(const CastRemoteState());
@@ -428,9 +268,9 @@ void main() {
       await _pump();
 
       await cast.retry();
-      await _pump();
-      expect(sender.loadPositions.last, const Duration(seconds: 30));
-      expect(sender.loadAutoplays.last, isFalse);
+      await _settle();
+      expect(_lastStart(sender), const Duration(seconds: 30));
+      expect(sender.calls.last, 'pause');
 
       await cast.disconnect();
       await _pump();
@@ -444,28 +284,25 @@ void main() {
 
     test('buffering never flips a playing decision', () async {
       final playback = _FakePlayback(queue: [_track('a')]);
-      final sender = LifecycleSender();
+      final sender = _sender();
       final cast = _controller(playback: playback, sender: sender);
       addTearDown(sender.dispose);
       addTearDown(cast.dispose);
       await cast.configure(_session);
       await cast.connect(_device);
 
-      sender.emitRemote(
-        const CastRemoteState(
-          playerState: CastPlayerState.buffering,
-          position: Duration(seconds: 40),
-          duration: Duration(minutes: 3),
-        ),
+      sender.reportPlaying(
+        position: const Duration(seconds: 40),
+        state: CastPlayerState.buffering,
       );
       await _pump();
       sender.emitConnection(CastConnectionState.disconnected);
       await _pump();
 
       await cast.retry();
-      await _pump();
-      expect(sender.loadPositions.last, const Duration(seconds: 40));
-      expect(sender.loadAutoplays.last, isTrue);
+      await _settle();
+      expect(_lastStart(sender), const Duration(seconds: 40));
+      expect(sender.calls, isNot(contains('pause')));
     });
   });
 
@@ -477,7 +314,7 @@ void main() {
       await harness.service.replaceQueue(playbackCatalog(3), startIndex: 0);
       await harness.settle();
 
-      final sender = LifecycleSender()..connectGate = Completer<void>();
+      final sender = _sender()..connectGate = Completer<void>();
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -496,7 +333,7 @@ void main() {
       await cleaning;
       await _pump();
 
-      expect(sender.loads, isEmpty);
+      expect(sender.commands, isEmpty);
       expect(cast.ownership, CastOwnership.local);
       expect(cast.isCasting, isFalse);
       expect(harness.player.playCalls, 1);
@@ -509,7 +346,7 @@ void main() {
       await harness.service.replaceQueue(playbackCatalog(3), startIndex: 0);
       await harness.settle();
 
-      final sender = LifecycleSender()..loadGate = Completer<void>();
+      final sender = _sender()..commandGate = Completer<void>();
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -522,12 +359,12 @@ void main() {
       await _pump();
       final cleaning = cast.configure(null);
       await _pump();
-      sender.loadGate?.complete();
+      sender.commandGate?.complete();
       await connecting;
       await cleaning;
       await _pump();
 
-      expect(sender.loads, hasLength(1));
+      expect(sender.commandNames, isNot(contains('PlayNow')));
       expect(cast.ownership, CastOwnership.local);
       expect(cast.isCasting, isFalse);
       expect(harness.service.isCastingActive, isFalse);
@@ -547,7 +384,7 @@ void main() {
       await harness.service.replaceQueue(playbackCatalog(3), startIndex: 0);
       await harness.settle();
 
-      final sender = LifecycleSender();
+      final sender = _sender();
       final cast = _controller(
         playback: PlaybackServiceCastSource(harness.service),
         sender: sender,
@@ -581,7 +418,7 @@ void main() {
         await harness.service.replaceQueue(playbackCatalog(5), startIndex: 0);
         await harness.settle();
 
-        final sender = LifecycleSender();
+        final sender = _sender();
         final cast = _controller(
           playback: PlaybackServiceCastSource(harness.service),
           sender: sender,
@@ -613,7 +450,7 @@ void main() {
 
   test('disposal during a delayed operation notifies nothing after', () async {
     final playback = _FakePlayback(queue: [_track('a')]);
-    final sender = LifecycleSender()..connectGate = Completer<void>();
+    final sender = _sender()..connectGate = Completer<void>();
     final cast = _controller(playback: playback, sender: sender);
 
     var notified = 0;
@@ -634,7 +471,7 @@ void main() {
   });
 
   test('sender has one disposal owner and no discovery on build', () async {
-    final sender = LifecycleSender();
+    final sender = _sender();
     final mockPlayback = _MockPlaybackService();
     final container = ProviderContainer(
       overrides: [

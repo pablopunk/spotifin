@@ -166,7 +166,9 @@ class ChromeCastSender implements CastSender {
       },
     );
     _messagesSub ??= GoogleCastSessionManager.instance.messageStream
-        .where((message) => message.namespace == JellyfinReceiverProtocol.namespace)
+        .where(
+          (message) => message.namespace == JellyfinReceiverProtocol.namespace,
+        )
         .listen((message) {
           if (!_receiverMessagesController.isClosed) {
             _receiverMessagesController.add(message.message);

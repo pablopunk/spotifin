@@ -41,7 +41,8 @@ class ReceiverQueue {
   QueueEntry? get next =>
       index + 1 < entries.length ? entries[index + 1] : null;
 
-  List<QueueEntry> get upcoming => entries.sublist(index.clamp(0, entries.length));
+  List<QueueEntry> get upcoming =>
+      entries.sublist(index.clamp(0, entries.length));
 
   ReceiverQueue at(int index) => ReceiverQueue._(entries, index);
 

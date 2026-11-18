@@ -271,7 +271,10 @@ void main() {
         ..failCommandCount = 10;
       final cast = controller(playback: playback, sender: sender);
 
-      await expectLater(cast.connect(livingRoom), throwsA(isA<CastException>()));
+      await expectLater(
+        cast.connect(livingRoom),
+        throwsA(isA<CastException>()),
+      );
       expect(cast.isCasting, isFalse);
       expect(cast.ownership, CastOwnership.local);
       expect(cast.error, isNotNull);
@@ -292,22 +295,25 @@ void main() {
   });
 
   group('receiver-owned queue', () {
-    test('keeps playing the queue without the phone sending anything', () async {
-      final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(['a', 'b', 'c'], sender: sender);
-      final sent = sender.commands.length;
+    test(
+      'keeps playing the queue without the phone sending anything',
+      () async {
+        final sender = FakeReceiverSender(devices: const [livingRoom]);
+        final cast = await casting(['a', 'b', 'c'], sender: sender);
+        final sent = sender.commands.length;
 
-      sender.finishCurrent();
-      await pump();
-      expect(cast.remoteTrack?.id, 'b');
-      expect(cast.remoteIndex, 1);
+        sender.finishCurrent();
+        await pump();
+        expect(cast.remoteTrack?.id, 'b');
+        expect(cast.remoteIndex, 1);
 
-      sender.finishCurrent();
-      await pump();
-      expect(cast.remoteTrack?.id, 'c');
-      expect(cast.remotePlaying, isTrue);
-      expect(sender.commands, hasLength(sent));
-    });
+        sender.finishCurrent();
+        await pump();
+        expect(cast.remoteTrack?.id, 'c');
+        expect(cast.remotePlaying, isTrue);
+        expect(sender.commands, hasLength(sent));
+      },
+    );
 
     test('duplicate tracks resolve to the occurrence reached', () async {
       final sender = FakeReceiverSender(devices: const [livingRoom]);
@@ -337,22 +343,25 @@ void main() {
       expect(cast.remoteTrack?.id, 'a');
     });
 
-    test('queue end leaves the last track paused; play starts it again', () async {
-      final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(['a', 'b'], index: 1, sender: sender);
+    test(
+      'queue end leaves the last track paused; play starts it again',
+      () async {
+        final sender = FakeReceiverSender(devices: const [livingRoom]);
+        final cast = await casting(['a', 'b'], index: 1, sender: sender);
 
-      sender.finishCurrent();
-      await pump();
-      expect(cast.remoteTrack?.id, 'b');
-      expect(cast.remotePlaying, isFalse);
-      expect(cast.error, isNull);
+        sender.finishCurrent();
+        await pump();
+        expect(cast.remoteTrack?.id, 'b');
+        expect(cast.remotePlaying, isFalse);
+        expect(cast.error, isNull);
 
-      await cast.play();
-      await pump();
-      expect(sender.lastOptions('PlayNow')['startPositionTicks'], isNull);
-      expect(sender.playingItemId, 'b');
-      expect(cast.remotePlaying, isTrue);
-    });
+        await cast.play();
+        await pump();
+        expect(sender.lastOptions('PlayNow')['startPositionTicks'], isNull);
+        expect(sender.playingItemId, 'b');
+        expect(cast.remotePlaying, isTrue);
+      },
+    );
 
     test('next uses the receiver queue when it is in sync', () async {
       final sender = FakeReceiverSender(devices: const [livingRoom]);
@@ -461,6 +470,8 @@ void main() {
       expect(cast.isCasting, isTrue);
       expect(cast.error, isNull);
       expect(cast.connectedDeviceName, 'Living Room');
+      expect(cast.remoteTrack?.id, 'a');
+      expect(cast.remotePosition, const Duration(seconds: 12));
 
       // The phone slept while the receiver kept going.
       sender.index = 1;
@@ -553,11 +564,7 @@ void main() {
         queue: [track('a'), track('b'), track('c')],
       );
       final sender = FakeReceiverSender(devices: const [livingRoom]);
-      final cast = await casting(
-        const [],
-        playback: playback,
-        sender: sender,
-      );
+      final cast = await casting(const [], playback: playback, sender: sender);
       sender.finishCurrent();
       sender.reportPlaying(position: const Duration(seconds: 25));
       await pump();

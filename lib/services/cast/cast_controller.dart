@@ -331,7 +331,7 @@ class CastController extends ChangeNotifier {
   }
 
   void _onRemote(CastRemoteState state) {
-    if (_isStale(state)) {
+    if (_isStale(state) || _isTransportReset(state)) {
       // Volume belongs to the device, not the media item.
       if (state.volume != _remote.volume) {
         _remote = _remote.copyWith(volume: state.volume);
@@ -350,6 +350,13 @@ class CastController extends ChangeNotifier {
     if (_ownership == CastOwnership.remote) _followReceiver(state);
     _safeNotify();
   }
+
+  /// A dropped session resets the sender's transport state; keep showing the
+  /// last known track and position while rejoining.
+  bool _isTransportReset(CastRemoteState state) =>
+      isCasting &&
+      state.playerState == CastPlayerState.unknown &&
+      state.itemId == null;
 
   /// Status for an item other than the one just requested belongs to the
   /// previous load. A receiver that never reports the request is followed
@@ -511,6 +518,7 @@ class CastController extends ChangeNotifier {
           localSnapshot.repeatMode,
         ),
       );
+      if (generation != _generation) return;
       _castSnapshot = localSnapshot;
       await _playOnReceiver(
         localSnapshot.queue,
@@ -753,8 +761,7 @@ class CastController extends ChangeNotifier {
     final snapshot = _castSnapshot;
     final current = snapshot?.queue.currentEntry;
     final idle =
-        _remote.playerState == CastPlayerState.idle ||
-        _remote.itemId == null;
+        _remote.playerState == CastPlayerState.idle || _remote.itemId == null;
     if (idle && snapshot != null && current != null) {
       final ended = _remote.finishReason == CastFinishReason.finished;
       await _playOnReceiver(
@@ -926,18 +933,16 @@ class CastController extends ChangeNotifier {
         await _replaceQueueNow(context, startIndex: index < 0 ? 0 : index);
       });
 
-  Future<void> addToQueue(Track track) => _editQueue(
-    (queue) => queue.append(track, newId: _newCastId),
-  );
+  Future<void> addToQueue(Track track) =>
+      _editQueue((queue) => queue.append(track, newId: _newCastId));
 
   Future<void> addNextToQueue(List<Track> tracks) => _editQueue(
     (queue) =>
         tracks.isEmpty ? queue : queue.insertNext(tracks, newId: _newCastId),
   );
 
-  Future<void> replaceUpcoming(List<Track> tracks) => _editQueue(
-    (queue) => queue.replaceUpcoming(tracks, newId: _newCastId),
-  );
+  Future<void> replaceUpcoming(List<Track> tracks) =>
+      _editQueue((queue) => queue.replaceUpcoming(tracks, newId: _newCastId));
 
   Future<void> reorder(int oldIndex, int newIndex) =>
       _editQueue((queue) => queue.reorder(oldIndex, newIndex));
@@ -1064,9 +1069,7 @@ class CastController extends ChangeNotifier {
     if (!_foreground || _ownership != CastOwnership.recovering) return;
     if (_rejoinAttempt >= rejoinDelays.length) {
       final name = _lastDevice?.friendlyName ?? 'Chromecast';
-      _fail(
-        'Lost connection to $name. Reconnect, or resume on this phone.',
-      );
+      _fail('Lost connection to $name. Reconnect, or resume on this phone.');
       return;
     }
     _rejoinTimer = Timer(rejoinDelays[_rejoinAttempt], () {
