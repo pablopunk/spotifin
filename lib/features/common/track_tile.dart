@@ -204,6 +204,7 @@ enum _TrackAction {
   playlist,
   playNext,
   queue,
+  startRadio,
   download,
   removeDownload,
   delete,
@@ -336,6 +337,11 @@ List<PopupMenuEntry<_TrackAction>> _trackMenuItems(
       label: 'Add to queue',
     ),
   ),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.startRadio,
+    child: SpotifinMenuLabel(icon: Icons.radio_rounded, label: 'Start radio'),
+  ),
   PopupMenuItem(
     height: 40,
     value: downloadStatus == 'complete'
@@ -402,6 +408,13 @@ Future<void> _handleTrackAction(
       ref,
       (owner) => owner.addNextToQueue([track]),
     );
+  } else if (action == _TrackAction.startRadio) {
+    await _guardedQueueAction(context, ref, (owner) async {
+      final radio = await ref
+          .read(radioServiceProvider)
+          .queueFor(track, ref.read(appControllerProvider).session);
+      await owner.playTrack(track, radio);
+    });
   } else if (action == _TrackAction.download) {
     final app = ref.read(appControllerProvider);
     if (app.session != null) {

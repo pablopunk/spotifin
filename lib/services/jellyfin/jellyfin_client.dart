@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../platform/safe_path_segment.dart';
 import '../../storage/database.dart';
 import '../../storage/track_artists.dart';
 import '../lyrics/lyric_line.dart';
@@ -169,6 +170,25 @@ class JellyfinClient {
     final items = (body['Items'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
     return items.map(_trackFromJson).toList(growable: false);
+  }
+
+  Future<List<String>> fetchInstantMixTrackIds(
+    JellyfinSession session,
+    String trackId, {
+    int limit = 100,
+  }) async {
+    final body = await _getJson(
+      session,
+      _uri(session, '/Items/${safePathSegment(trackId)}/InstantMix', {
+        'UserId': session.userId,
+        'Limit': '$limit',
+      }),
+    );
+    return (body['Items'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map((item) => item['Id'] as String?)
+        .whereType<String>()
+        .toList(growable: false);
   }
 
   Future<List<PlaylistsCompanion>> fetchPlaylists(

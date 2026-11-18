@@ -12,6 +12,7 @@ import '../services/jellyfin/library_cache_owner_store.dart';
 import '../services/jellyfin/secure_storage_config.dart';
 import '../services/jellyfin/session_store.dart';
 import '../services/lyrics/lyrics_service.dart';
+import '../services/mixes/radio_service.dart';
 import '../services/downloads/download_service.dart';
 import '../services/playback/playback_service.dart';
 import '../services/playback/active_playback.dart';
@@ -92,6 +93,13 @@ final downtifyControllerProvider =
 
 final lyricsProvider = Provider<LyricsService>(
   (ref) => LyricsService(ref.watch(jellyfinClientProvider)),
+);
+
+final radioServiceProvider = Provider<RadioService>(
+  (ref) => RadioService(
+    ref.watch(jellyfinClientProvider),
+    ref.watch(databaseProvider),
+  ),
 );
 
 final sessionSecureStorageProvider = Provider<FlutterSecureStorage>(
