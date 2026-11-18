@@ -21,7 +21,6 @@ import '../services/playback/remote_session_service.dart';
 import '../services/cast/cast_controller.dart';
 import '../services/cast/cast_sender.dart';
 import '../services/cast/chrome_cast_sender.dart';
-import '../services/cast/jellyfin_cast_adapter.dart';
 import '../services/cast/playback_service_cast_source.dart';
 import '../services/updates/update_controller.dart';
 import '../services/updates/update_service.dart';
@@ -191,7 +190,6 @@ final castSenderProvider = Provider<CastSender>((ref) {
 final castControllerProvider = Provider<CastController>((ref) {
   final controller = CastController(
     playback: PlaybackServiceCastSource(ref.watch(playbackProvider)),
-    adapter: JellyfinCastAdapter(ref.watch(jellyfinClientProvider)),
     sender: ref.watch(castSenderProvider),
   );
   ref.onDispose(controller.dispose);
