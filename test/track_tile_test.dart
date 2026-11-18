@@ -9,12 +9,24 @@ import 'package:spotifin/app/theme.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:spotifin/features/common/track_tile.dart';
 import 'package:spotifin/features/common/mobile_track_queue_actions.dart';
+import 'package:spotifin/services/jellyfin/session.dart';
+import 'package:spotifin/services/mixes/radio_service.dart';
 import 'package:spotifin/services/playback/active_playback_state.dart';
 import 'package:spotifin/storage/database.dart';
 
 import 'support/fake_active_playback.dart';
 
 class _FakeTrack extends Fake implements Track {}
+
+class _FakeRadioService extends Fake implements RadioService {
+  _FakeRadioService(this.queue);
+
+  final List<Track> queue;
+
+  @override
+  Future<List<Track>> queueFor(Track seed, JellyfinSession? session) async =>
+      queue;
+}
 
 ActivePlaybackState _ownerState({Track? track, bool playing = false}) =>
     ActivePlaybackState(
@@ -71,8 +83,8 @@ void main() {
     registerFallbackValue(_FakeTrack());
     registerFallbackValue(<Track>[]);
   });
-  Track makeTrack() => const Track(
-    id: 'track',
+  Track makeTrack({String id = 'track'}) => Track(
+    id: id,
     name: 'Song',
     album: 'Album',
     albumId: 'album',
@@ -339,6 +351,81 @@ void main() {
     expect(active.actions, ['addNextToQueue']);
     expect(active.actionArguments['addNextToQueue'], [
       [track],
+    ]);
+  });
+
+  testWidgets('track menu starts a radio from the selected track', (
+    tester,
+  ) async {
+    final active = FakeActivePlayback();
+    final track = makeTrack();
+    final radioTrack = makeTrack(id: 'radio');
+    active.emit(_ownerState());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activePlaybackProvider.overrideWithValue(active),
+          radioServiceProvider.overrideWithValue(
+            _FakeRadioService([track, radioTrack]),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TrackMenuButton(
+              track: track,
+              contextTracks: [track],
+              downloadStatus: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start radio'));
+    await tester.pumpAndSettle();
+
+    expect(active.actions, ['playTrack']);
+    expect(active.actionArguments['playTrack'], [
+      track,
+      [track, radioTrack],
+    ]);
+  });
+
+  testWidgets('radio for the current song keeps it playing', (tester) async {
+    final active = FakeActivePlayback();
+    final track = makeTrack();
+    final radioTrack = makeTrack(id: 'radio');
+    active.emit(_ownerState(track: track, playing: true));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activePlaybackProvider.overrideWithValue(active),
+          radioServiceProvider.overrideWithValue(
+            _FakeRadioService([track, radioTrack]),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TrackMenuButton(
+              track: track,
+              contextTracks: [track],
+              downloadStatus: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start radio'));
+    await tester.pumpAndSettle();
+
+    expect(active.actions, ['replaceUpcoming']);
+    expect(active.actionArguments['replaceUpcoming'], [
+      [radioTrack],
     ]);
   });
 

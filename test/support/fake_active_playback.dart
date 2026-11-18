@@ -100,6 +100,11 @@ class FakeActivePlayback extends ChangeNotifier implements ActivePlayback {
   }
 
   @override
+  Future<void> replaceUpcoming(List<Track> tracks) async {
+    _record('replaceUpcoming', [tracks]);
+  }
+
+  @override
   Future<void> removeAt(int index) async {
     _record('removeAt', [index]);
   }

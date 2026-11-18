@@ -201,6 +201,29 @@ class QueueState {
     );
   }
 
+  /// Keeps the entries up to the current one and replaces everything after
+  /// it with [tracks] as distinct occurrences, stopping automatic expansion.
+  QueueState replaceUpcoming(
+    List<Track> tracks, {
+    required String Function() newId,
+  }) {
+    final base = _collapsed();
+    final keep = base.absoluteCurrentIndex == null
+        ? 0
+        : base.absoluteCurrentIndex! + 1;
+    final entries = [
+      ...base._entries.sublist(0, keep),
+      for (final track in tracks) QueueEntry(id: newId(), track: track),
+    ];
+    return QueueState._(
+      entries,
+      windowStart: 0,
+      windowEnd: entries.length,
+      currentIndex: entries.isEmpty ? null : base.currentIndex,
+      shuffle: shuffle,
+    );
+  }
+
   /// Removes the loaded entry at window-relative [index]. An invalid index
   /// returns the same state. Removing the current entry selects its
   /// successor, or the new last entry; an empty result has a null index.

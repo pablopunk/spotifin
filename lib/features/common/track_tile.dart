@@ -204,6 +204,7 @@ enum _TrackAction {
   playlist,
   playNext,
   queue,
+  startRadio,
   download,
   removeDownload,
   delete,
@@ -336,6 +337,11 @@ List<PopupMenuEntry<_TrackAction>> _trackMenuItems(
       label: 'Add to queue',
     ),
   ),
+  const PopupMenuItem(
+    height: 40,
+    value: _TrackAction.startRadio,
+    child: SpotifinMenuLabel(icon: Icons.radio_rounded, label: 'Start radio'),
+  ),
   PopupMenuItem(
     height: 40,
     value: downloadStatus == 'complete'
@@ -402,6 +408,12 @@ Future<void> _handleTrackAction(
       ref,
       (owner) => owner.addNextToQueue([track]),
     );
+  } else if (action == _TrackAction.startRadio) {
+    await _guardedQueueAction(
+      context,
+      ref,
+      (owner) => _startRadio(ref, owner, track),
+    );
   } else if (action == _TrackAction.download) {
     final app = ref.read(appControllerProvider);
     if (app.session != null) {
@@ -415,6 +427,23 @@ Future<void> _handleTrackAction(
     await _addToPlaylist(context, ref, track);
   } else if (action == _TrackAction.delete) {
     await _deleteTrack(context, ref, track);
+  }
+}
+
+Future<void> _startRadio(
+  WidgetRef ref,
+  ActivePlayback owner,
+  Track track,
+) async {
+  final radio = await ref
+      .read(radioServiceProvider)
+      .queueFor(track, ref.read(appControllerProvider).session);
+  if (owner.state.track?.id == track.id) {
+    await owner.replaceUpcoming(
+      radio.where((item) => item.id != track.id).toList(),
+    );
+  } else {
+    await owner.playTrack(track, radio);
   }
 }
 

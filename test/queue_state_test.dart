@@ -215,6 +215,29 @@ void main() {
       expect(prepended.loadedTracks.map((track) => track.id), ['first']);
     });
 
+    test('replaceUpcoming keeps the current entry and drops the rest', () {
+      final state = QueueState.prepare(
+        _tracks(250),
+        startIndex: 2,
+        shuffle: false,
+        newId: _ids(),
+      );
+      final replaced = state.replaceUpcoming([
+        _track('radio-1'),
+        _track('radio-2'),
+      ], newId: _ids());
+
+      expect(replaced.loadedTracks.map((track) => track.id), [
+        '0',
+        '1',
+        '2',
+        'radio-1',
+        'radio-2',
+      ]);
+      expect(replaced.currentEntry?.id, state.currentEntry?.id);
+      expect(replaced.hasUnloadedTail, isFalse);
+    });
+
     test('removeAt preserves current and handles the current removal', () {
       final state = QueueState.prepare(
         _tracks(5),

@@ -300,6 +300,13 @@ class ActivePlayback extends ChangeNotifier {
     () => _cast.addNextToQueue(tracks),
   );
 
+  Future<void> replaceUpcoming(List<Track> tracks) => _act(
+    PlaybackCapability.queueEditing,
+    'replaceUpcoming',
+    () => _local.replaceUpcoming(tracks),
+    () => _cast.replaceUpcoming(tracks),
+  );
+
   Future<void> removeAt(int index) => _act(
     PlaybackCapability.queueEditing,
     'removeAt',

@@ -309,6 +309,20 @@ void main() {
     expect(playback.localPlayCalls, 0);
   });
 
+  test('replacing upcoming keeps the current cast track playing', () async {
+    final playback = _QueuePlayback(_prepared(['a', 'b', 'c', 'd'], start: 1));
+    final sender = _QueueSender();
+    final cast = await _connected(playback, sender);
+    final loads = sender.loads.length;
+
+    await cast.replaceUpcoming([_track('r1'), _track('r2')]);
+    await _pump();
+
+    expect(sender.loads.length, loads);
+    expect(cast.remoteTrack?.id, 'b');
+    expect(cast.castQueue.map((track) => track.id), ['a', 'b', 'r1', 'r2']);
+  });
+
   test('removing the current entry loads its successor paused-aware', () async {
     final playback = _QueuePlayback(_prepared(['a', 'b', 'c'], start: 1));
     final sender = _QueueSender();
