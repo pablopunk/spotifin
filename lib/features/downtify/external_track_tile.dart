@@ -49,21 +49,20 @@ class ExternalTrackTile extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           trailing: _ImportAction(song: song, item: item),
-          onTap: () async {
-            if (!await launchUrl(
-              song.sourceUri,
-              mode: LaunchMode.externalApplication,
-            )) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not open YouTube.')),
-              );
-            }
-          },
+          onTap: song.sourceUri == null
+              ? null
+              : () => _openSource(context, song.sourceUri!),
         ),
       ),
     );
   }
+}
+
+Future<void> _openSource(BuildContext context, Uri source) async {
+  if (await launchUrl(source, mode: LaunchMode.externalApplication)) return;
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context)
+      .showSnackBar(const SnackBar(content: Text('Could not open this song.')));
 }
 
 class _ExternalArtwork extends StatelessWidget {

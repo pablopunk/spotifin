@@ -37,7 +37,7 @@ class DowntifySong {
       albumName: json['album_name'] as String? ?? '',
       coverUri: _httpsUri(json['cover_url']),
       duration: _duration(json['duration']),
-      sourceUri: _youtubeUri(json['url'], id),
+      sourceUri: _httpsUri(json['url']),
       explicit: json['explicit'] as bool? ?? false,
       year: json['year']?.toString() ?? '',
       raw: Map.unmodifiable(json),
@@ -50,7 +50,7 @@ class DowntifySong {
   final String albumName;
   final Uri? coverUri;
   final Duration? duration;
-  final Uri sourceUri;
+  final Uri? sourceUri;
   final bool explicit;
   final String year;
   final Map<String, dynamic> raw;
@@ -71,22 +71,6 @@ class DowntifySong {
     if (value is! String) return null;
     final uri = Uri.tryParse(value);
     return uri?.scheme == 'https' ? uri : null;
-  }
-
-  static Uri _youtubeUri(Object? value, String id) {
-    if (value is String) {
-      final uri = Uri.tryParse(value);
-      if (uri != null &&
-          uri.scheme == 'https' &&
-          const {
-            'youtube.com',
-            'www.youtube.com',
-            'music.youtube.com',
-          }.contains(uri.host)) {
-        return uri;
-      }
-    }
-    return Uri.https('music.youtube.com', '/watch', {'v': id});
   }
 }
 
