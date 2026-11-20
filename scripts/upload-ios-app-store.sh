@@ -42,7 +42,7 @@ flutter build ios \
   --config-only \
   --build-name "$version" \
   --build-number "$build_number" \
-  --dart-define=SPOTIFIN_DOWNTIFY=false
+  --dart-define=SPOTIFIN_DOWNTIFY=true
 xcodebuild archive \
   -workspace ios/Runner.xcworkspace \
   -scheme Runner \

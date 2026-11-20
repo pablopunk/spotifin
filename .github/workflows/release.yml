@@ -120,7 +120,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
-      - name: Sign and upload the Apple-safe build to App Store Connect
+      - name: Sign and upload the full build (with Downtify) to App Store Connect
         run: ./scripts/upload-ios-app-store.sh
       - name: Submit the build for Notarization (AltStore PAL)
         run: |
