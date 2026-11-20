@@ -51,3 +51,16 @@ One-time setup:
 2. `dart run auto_updater:generate_keys` and replace the `SUPublicEDKey` placeholder in `macos/Runner/Info.plist` with the printed public key.
 3. `security find-generic-password -a ed25519 -s "https://sparkle-project.org" -w` prints the private key. Store it as the `SPARKLE_PRIVATE_KEY` repository secret and keep an offline backup: losing it breaks auto-update for every install that ships with the current public key.
 4. `scripts/generate-appcast.sh` exits with an error while `SUPublicEDKey` is still the placeholder, so a tag release fails instead of publishing an unsigned feed.
+
+## iOS (AltStore PAL)
+
+Nothing is manual per release. On every tag, the `ios-notarization` job builds the full app (with Downtify), uploads it to App Store Connect as build `github.run_number`, and submits it for Notarization. Apple's notarization review takes hours to a day or two. Every 3 hours, the `sync` workflow in `pablopunk/altstore` finds the approved version, uploads its files to a release in that repo and adds it to `apps.json`. AltStore PAL then offers the update to users.
+
+- The job does not block the GitHub release; a red `ios-notarization` only means iOS is not out yet.
+- If the job fails after the upload step, never re-run it: the same build number is rejected. Fix the cause, then submit the uploaded build from a local checkout with `VERSION=vX.Y.Z BUILD_NUMBER=<run number> ASC_KEY_ID=… ASC_ISSUER_ID=… ASC_PRIVATE_KEY="$(cat AuthKey_….p8)" python3 scripts/submit-ios-notarization.py` (needs `pyjwt[crypto]`).
+- After Apple approves, `gh workflow run sync.yml -R pablopunk/altstore` publishes it without waiting for the next sync.
+- Check the state in App Store Connect (Spotifin → iOS App) or with `gh run list -R pablopunk/altstore --workflow sync.yml --limit 3`.
+
+The reviewer signs in to the demo Jellyfin at `https://spotifin-demo.notflix.us` (user `reviewer`) and can add songs through the demo Downtify at `https://downtify-demo.notflix.us`. Both run in the homelab stack `spotifin-demo` with CC BY-SA music only, and must be up while a version is in review.
+
+One-time setup, already done: the `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY` secrets in both repos, the app's metadata, screenshots, App Privacy and review notes in App Store Connect, the AltStore marketplace token, and the EU trader (DSA) declaration in App Store Connect → Business.
