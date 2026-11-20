@@ -42,6 +42,8 @@
 		<string>_googlecast._tcp</string>
 		<string>_F007D354._googlecast._tcp</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Spotifin uses the local network to discover Chromecast devices on your Wi-Fi network.</string>
 	<key>UIApplicationSceneManifest</key>
