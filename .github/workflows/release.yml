@@ -100,6 +100,34 @@ jobs:
           path: dist/Spotifin-*-ios-*.ipa
           if-no-files-found: error
 
+  ios-notarization:
+    needs: checks
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-26
+    timeout-minutes: 150
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.3
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Sign and upload the full build (with Downtify) to App Store Connect
+        run: ./scripts/upload-ios-app-store.sh
+      - name: Submit the build for Notarization (AltStore PAL)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/asc"
+          "$RUNNER_TEMP/asc/bin/pip" install --quiet 'pyjwt[crypto]==2.10.1'
+          "$RUNNER_TEMP/asc/bin/python" scripts/submit-ios-notarization.py
+
   android:
     needs: checks
     runs-on: ubuntu-latest
