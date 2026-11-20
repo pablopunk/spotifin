@@ -27,7 +27,7 @@ const _responses = <String, Object>{
     {
       'name': 'Discovery',
       'artists': ['Daft Punk'],
-      'url': 'https://music.youtube.com/browse/discovery',
+      'url': 'https://music.example.com/browse/discovery',
     },
   ],
 };

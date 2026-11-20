@@ -33,10 +33,9 @@ void main() {
               'album_name': 'Discovery',
               'cover_url': 'https://images.example.com/cover.jpg',
               'duration': 321,
-              'url': 'https://music.youtube.com/watch?v=video-id',
+              'url': 'https://music.example.com/watch?v=video-id',
               'explicit': false,
               'year': '',
-              'source': 'youtube',
             },
           ]),
           200,
@@ -53,7 +52,7 @@ void main() {
     expect(songs.single.id, 'video-id');
     expect(songs.single.artist, 'Daft Punk');
     expect(songs.single.duration, const Duration(seconds: 321));
-    expect(songs.single.sourceUri.host, 'music.youtube.com');
+    expect(songs.single.sourceUri?.host, 'music.example.com');
   });
 
   test('submits one song through the background batch endpoint', () async {

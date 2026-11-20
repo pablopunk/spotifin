@@ -135,7 +135,7 @@ class _DowntifySettingsScreenState
                   padding: const EdgeInsets.all(SpotifinSpacing.md),
                   child: SearchBar(
                     controller: _searchController,
-                    hintText: 'Search YouTube Music',
+                    hintText: 'Search songs, artists or albums',
                     leading: const Icon(Icons.search_rounded),
                     onChanged: (value) => ref
                         .read(downtifyControllerProvider.notifier)
