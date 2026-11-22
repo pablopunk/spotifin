@@ -128,3 +128,27 @@ class _ArtworkState extends ConsumerState<Artwork> {
     );
   }
 }
+
+class CollectionArtwork extends StatelessWidget {
+  const CollectionArtwork({
+    required this.itemId,
+    this.circular = false,
+    super.key,
+  });
+
+  final String itemId;
+  final bool circular;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final side = constraints.biggest.shortestSide;
+      final artwork = Artwork(
+        itemId: itemId,
+        size: side,
+        borderRadius: circular ? side / 2 : SpotifinRadii.small,
+      );
+      return circular ? Center(child: artwork) : artwork;
+    },
+  );
+}

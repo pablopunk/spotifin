@@ -262,14 +262,9 @@ class _CollectionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final first = tracks.first;
     final card = SpotifinCollectionCard(
-      artwork: LayoutBuilder(
-        builder: (context, constraints) => Artwork(
-          itemId: first.albumId ?? first.id,
-          size: constraints.biggest.shortestSide,
-          borderRadius: artist
-              ? constraints.biggest.shortestSide / 2
-              : SpotifinRadii.small,
-        ),
+      artwork: CollectionArtwork(
+        itemId: first.albumId ?? first.id,
+        circular: artist,
       ),
       title: title,
       subtitle: songCountLabel(tracks.length),
