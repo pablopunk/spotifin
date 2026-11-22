@@ -560,14 +560,9 @@ class _CollectionResults extends ConsumerWidget {
         final entry = entries[index];
         final first = entry.value.first;
         final card = SpotifinCollectionCard(
-          artwork: LayoutBuilder(
-            builder: (context, constraints) => Artwork(
-              itemId: first.albumId ?? first.id,
-              size: constraints.biggest.shortestSide,
-              borderRadius: artist
-                  ? constraints.biggest.shortestSide / 2
-                  : SpotifinRadii.small,
-            ),
+          artwork: CollectionArtwork(
+            itemId: first.albumId ?? first.id,
+            circular: artist,
           ),
           title: entry.key,
           subtitle: songCountLabel(entry.value.length),
@@ -764,12 +759,8 @@ class _HorizontalSection extends ConsumerWidget {
                       child: SizedBox(
                         width: 164,
                         child: SpotifinCollectionCard(
-                          artwork: LayoutBuilder(
-                            builder: (context, constraints) => Artwork(
-                              itemId: track.albumId ?? track.id,
-                              size: constraints.biggest.shortestSide,
-                              borderRadius: SpotifinRadii.small,
-                            ),
+                          artwork: CollectionArtwork(
+                            itemId: track.albumId ?? track.id,
                           ),
                           title: track.name,
                           subtitle: track.artist,
