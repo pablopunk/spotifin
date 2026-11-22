@@ -24,7 +24,7 @@ Spotifin is a free, open-source, Spotify-style music player that connects to you
 | --- | --- |
 | ⭐ **Web — start here** | **[spotifin.app](https://spotifin.app)** — your library, all features, even downloads, on every device, no install |
 | 📱 iPhone / iPad | [Add to AltStore PAL](https://altstore.io/source/pablopunk.github.io/altstore/apps.json?app=com.pablopunk.spotifin), or [`.ipa` from Releases](https://github.com/pablopunk/spotifin/releases) → sideload with [Sideloadly](https://sideloadly.io). |
-| 🤖 Android | [APK / AAB from Releases](https://github.com/pablopunk/spotifin/releases) — offline downloads. Play Store might come soon too |
+| 🤖 Android | [APK / AAB from Releases](https://github.com/pablopunk/spotifin/releases). |
 | 🍎 macOS | [signed universal zip from Releases](https://github.com/pablopunk/spotifin/releases) |
 | 🪟 Windows | [x64 zip from Releases](https://github.com/pablopunk/spotifin/releases) |
 | 🐧 Linux | [AppImage (x64 + arm64) from Releases](https://github.com/pablopunk/spotifin/releases) |
