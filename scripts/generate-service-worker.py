@@ -28,6 +28,7 @@ def shell_files() -> list[str]:
 
 def version_for(files: list[str]) -> str:
     digest = hashlib.sha256()
+    digest.update(worker_source(files, "").encode())
     for name in files:
         digest.update(name.encode())
         digest.update((BUILD_DIRECTORY / name).read_bytes())
@@ -43,8 +44,25 @@ const CACHE = `spotifin-shell-${{VERSION}}`;
 const CACHE_PREFIX = 'spotifin-shell-';
 const RESOURCES = {resources};
 
+async function fetchCleanResponse(path) {{
+  const url = path === 'index.html' ? './' : path;
+  const res = await fetch(url, {{ cache: 'reload' }});
+  if (!res.ok) throw new Error(`Failed to cache ${{path}}: ${{res.status}}`);
+  if (!res.redirected) return res;
+  return new Response(await res.blob(), {{
+    status: 200,
+    statusText: 'OK',
+    headers: res.headers,
+  }});
+}}
+
 self.addEventListener('install', (event) => {{
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(RESOURCES)));
+  event.waitUntil((async () => {{
+    const cache = await caches.open(CACHE);
+    await Promise.all(RESOURCES.map(async (path) =>
+      cache.put(path, await fetchCleanResponse(path))));
+    await self.skipWaiting();
+  }})());
 }});
 
 self.addEventListener('activate', (event) => {{
@@ -63,7 +81,8 @@ self.addEventListener('fetch', (event) => {{
   if (url.origin !== self.location.origin) return;
   if (event.request.mode === 'navigate') {{
     event.respondWith(caches.open(CACHE).then((cache) =>
-      cache.match('index.html').then((cached) => cached || fetch(event.request))));
+      cache.match('index.html').then((cached) =>
+        cached && !cached.redirected ? cached : fetch(event.request))));
     return;
   }}
   const path = decodeURIComponent(url.pathname)
